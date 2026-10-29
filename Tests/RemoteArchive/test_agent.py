@@ -82,6 +82,13 @@ def main():
         assert len(server.records) == before
         assert all(r['if_match'] is None for r in server.records[strict_end:])
         run('default-still-strict', f'{base}/missing-etag/sample.zip', 1)
+        run('selected-zip', f'{base}/ok/sample.zip', extra=['--format=zip'])
+        run('selected-7z', f'{base}/ok/nonsolid.7z', extra=['--format=7z'])
+        run('selected-encrypted-7z', f'{base}/ok/secret.7z', extra=['--format=7z'])
+        run('selected-zip-no-etag', f'{base}/missing-etag/sample.zip',
+            extra=['--format=zip', '--skip-http-etag'])
+        run('selected-wrong-format', f'{base}/ok/sample.zip', 1, ['--format=7z'])
+        run('rar-family-rejects-zip', f'{base}/ok/sample.zip', 1, ['--format=rar'])
     finally:
         server.shutdown()
         server.server_close()

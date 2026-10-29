@@ -2,11 +2,23 @@
 
 ## Optional ETag verification bypass
 
-ETag verification is enabled by default. For a direct URL whose server has no
-strong ETag, the HTTP-enabled File Manager's **File → Open URL...** dialog now
-has an unchecked **Skip ETag verification** checkbox. It applies to that session
+The transport and console verify ETags by default. At the user's request, the
+File Manager's **File → Open URL...** dialog now starts with **Skip ETag verification**
+checked. Uncheck it to require a strong ETag. It applies to that session
 and is retained on Refresh; the panel path shows `[HTTP; ETag off]`. Each new
-Open URL dialog starts with verification enabled.
+Open URL dialog starts with ETag bypass enabled.
+
+The dialog also has an **Archive type** dropdown: **Auto** (default), **ZIP**,
+**7z**, and **RAR**. RAR restricts detection to the RAR and RAR5 handlers and lets
+the engine identify the generation. Auto uses normal format detection; other explicit
+selections are passed to the existing handler selection. Refresh retains both the
+type and ETag policy. Direct address-bar opens and the console retain their
+existing strict ETag defaults. The latest GUI build is in `.build/msvc/rar-family/`.
+
+The unified RAR choice is covered by `test_rar_family.py --rar4 PATH --rar5 PATH`,
+using caller-supplied fixtures. It compares complete extracted file hashes with
+local extraction and checks both generations, unknown URL extensions, Auto, and
+ETag bypass. No RAR fixtures are downloaded or redistributed by the test.
 
 The regular console exposes the same opt-in for `l/x/e/t`:
 

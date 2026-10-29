@@ -4,7 +4,7 @@ Study date: October 29, 2026.
 Local version: **7-Zip 26.05**, with source release date `2026-10-21`.
 Git reference at the time of the study: `8204ba7d01f8cd73abee5e2f82ac98e7ce3edef9`.
 
-**Latest implementation update:** ETag verification can now be disabled explicitly per remote session through the File Manager's Open URL checkbox or the console's `-shttp-no-etag` switch. The default remains strict. MediaFire HTTPS listing and selected extraction succeeded with the option, and extracted bytes matched the user-provided local archive. The prototype, CLI, and Agent suites passed 72, 85, and 29 scenarios respectively. The new checkbox still needs desktop interaction verification. See [ETag option results](09-etag-option.md). The following sections summarize the original study and broader design.
+**Latest implementation update:** the Open URL dialog offers **Auto**, **ZIP**, **7z**, and one **RAR** choice covering both RAR generations. Selecting RAR restricts detection to the RAR/RAR5 handlers. ETag bypass remains checked by default in the dialog, and Refresh retains both choices. The Agent suite passed 35 scenarios and the new RAR-family suite passed 8 scenarios with matching extracted hashes for real RAR and RAR5 fixtures. Desktop interaction verification remains pending. See [Unified RAR selection](11-rar-family.md). The following sections summarize the original study and broader design.
 
 ## Conclusion
 
@@ -40,6 +40,8 @@ These are engineering choices for the study, not settings currently available in
 7. [26.05 build and CLI integration](07-cli-integration-results.md): current development binaries, CLI verification, and remaining work.
 8. [MSVC build and File Manager integration](08-msvc-and-file-manager.md): latest build commands, Agent verification, and desktop-testing limits.
 9. [Optional ETag verification bypass](09-etag-option.md): opt-in compatibility mode, MediaFire verification, and retained checks.
+10. [Open URL defaults and archive type selection](10-open-url-options.md): latest dialog defaults and retained format selection.
+11. [Unified RAR selection](11-rar-family.md): one RAR choice with internal generation detection and real-fixture tests.
 
 ## Illustrative Benefit
 

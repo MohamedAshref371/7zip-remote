@@ -1,0 +1,37 @@
+{
+  "gui_defaults": {
+    "skip_etag_verification": true,
+    "archive_type": "Auto"
+  },
+  "archive_types": [
+    "Auto",
+    "ZIP",
+    "7z",
+    "RAR",
+    "RAR5"
+  ],
+  "refresh_retains": [
+    "ETag policy",
+    "Archive type"
+  ],
+  "agent_scenarios_passed": 34,
+  "report": ".build\\msvc\\runs\\agent-m44a0_hy\\report.json",
+  "rar_and_rar5_handlers_registered": true,
+  "rar_extraction_fixture_tested": false,
+  "dialog_resource_verified": true,
+  "desktop_ui_automated_verification": false,
+  "binaries": {
+    "7zFM.exe": {
+      "path": ".build\\msvc\\open-options\\7zFM.exe",
+      "sha256": "9ba53d428b18f89ec005b601b20cfec617b4e260db6b822fe970ca97e54e7506"
+    },
+    "7z.dll": {
+      "path": ".build\\msvc\\open-options\\7z.dll",
+      "sha256": "86f8d2a65853bb64abebf8be5fcf210b013ecb756dcbbd4bc18a28a6239aa727"
+    },
+    "agentcheck.exe": {
+      "path": ".build\\msvc\\open-options\\agentcheck.exe",
+      "sha256": "cb6afc693fddc7cdbf5fe8a2e18100c51c8597054c805ceb52dedff8e3c47aeb"
+    }
+  }
+}

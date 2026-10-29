@@ -185,6 +185,7 @@ struct CFolderLink: public CTempFileInfo
   UString VirtualPath; // without tail slash
   #ifdef Z7_HTTP
   UString RemoteUrl; // session-only; never included in display/history paths
+  UString RemoteArcFormat;
   bool SkipHttpETag = false;
   #endif
   CByteBuffer ZoneBuf; // ZoneBuf for virtaul stream (IsVirtual)

@@ -1,5 +1,10 @@
 # Optional ETag Verification Bypass
 
+**Later UI update:** at the user's request, the Open URL dialog now defaults to
+ETag bypass enabled and includes an archive type dropdown. Transport/CLI defaults
+remain strict. See [Open URL options](10-open-url-options.md). The text below
+records the initial bypass implementation and its earlier checkbox default.
+
 The user requested an option to read servers without a strong ETag, accepting
 that an archive is unlikely to change during a session. This change makes that
 tradeoff explicit and leaves the default consistency policy intact.

@@ -1705,7 +1705,14 @@ Z7_COM7F_IMF(CAgent::Open(
   RINOK(LoadGlobalCodecs())
 
   CObjectVector<COpenType> types;
+  #ifdef Z7_HTTP
+  const bool rarFamily = IsRemote() && arcFormat && UString(arcFormat).IsEqualTo_Ascii_NoCase("rar");
+  // A user selecting RAR should not need to know its generation. Let the
+  // normal signature detection choose between the two RAR handlers only.
+  if (!ParseOpenTypes(*g_CodecsObj, rarFamily ? L"" : arcFormat, types))
+  #else
   if (!ParseOpenTypes(*g_CodecsObj, arcFormat, types))
+  #endif
     return S_FALSE;
 
   /*
@@ -1724,6 +1731,17 @@ Z7_COM7F_IMF(CAgent::Open(
   options.codecs = g_CodecsObj;
   options.types = &types;
   CIntVector exl;
+  #ifdef Z7_HTTP
+  if (rarFamily)
+  {
+    FOR_VECTOR (i, g_CodecsObj->Formats)
+    {
+      const UString &name = g_CodecsObj->Formats[i].Name;
+      if (!name.IsEqualTo_Ascii_NoCase("rar") && !name.IsEqualTo_Ascii_NoCase("rar5"))
+        exl.Add((int)i); // Format indices are added in sorted order.
+    }
+  }
+  #endif
   options.excludedFormats = &exl;
   options.stdInMode = false;
   options.stream = inStream;

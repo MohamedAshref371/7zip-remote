@@ -478,6 +478,7 @@ HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, 
   CFolderLink link;
   link.IsVirtual = true;
   link.RemoteUrl = url;
+  link.RemoteArcFormat = arcFormat;
   link.SkipHttpETag = skipHttpETag;
   link.RelPath = skipHttpETag ? "[HTTP; ETag off] " : "[HTTP] ";
   link.RelPath += CRemoteArchiveSource::DisplayNameFromUrl(url);
@@ -502,10 +503,17 @@ HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, 
 class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
 {
   NWindows::NControl::CComboBox _url;
+  NWindows::NControl::CComboBox _format;
   virtual bool OnInit() Z7_override
   {
     _url.Attach(GetItem(IDC_COMBO));
-    CheckButton(IDC_REMOTE_SKIP_ETAG, false);
+    _format.Attach(GetItem(IDC_REMOTE_FORMAT));
+    _format.AddString(L"Auto");
+    _format.AddString(L"ZIP");
+    _format.AddString(L"7z");
+    _format.AddString(L"RAR");
+    _format.SetCurSel(0);
+    CheckButton(IDC_REMOTE_SKIP_ETAG, true);
     NormalizeSize();
     return CModalDialog::OnInit();
   }
@@ -513,11 +521,19 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
   {
     _url.GetText(Value);
     SkipHttpETag = IsButtonCheckedBool(IDC_REMOTE_SKIP_ETAG);
+    switch (_format.GetCurSel())
+    {
+      case 1: ArcFormat = "zip"; break;
+      case 2: ArcFormat = "7z"; break;
+      case 3: ArcFormat = "rar"; break;
+      default: ArcFormat.Empty(); break; // Empty uses the engine's format detection.
+    }
     CModalDialog::OnOK();
   }
 public:
   UString Value;
-  bool SkipHttpETag = false;
+  UString ArcFormat;
+  bool SkipHttpETag = true;
   INT_PTR Create(HWND parent) { return CModalDialog::Create(IDD_REMOTE_OPEN, parent); }
 };
 
@@ -531,7 +547,7 @@ void CPanel::OpenRemoteArchiveDialog()
     return;
   }
   COpenResult openRes;
-  if (OpenRemoteArchive(dialog.Value, UString(), openRes, dialog.SkipHttpETag) == S_OK)
+  if (OpenRemoteArchive(dialog.Value, dialog.ArcFormat, openRes, dialog.SkipHttpETag) == S_OK)
     RefreshListCtrl();
   SetFocusToList();
 }

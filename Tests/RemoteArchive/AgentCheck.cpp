@@ -47,14 +47,20 @@ int __cdecl wmain(int argc, wchar_t **argv)
   const bool remote = IsHttpArchiveUrl(UString(argv[1]));
   CArchiveFolderManager *manager = new CArchiveFolderManager;
   CMyComPtr<IFolderManager> managerRef = manager;
+  const wchar_t *arcFormat = L"";
+  bool rarFamilyCheck = false;
   for (int i = 3; i < argc; ++i)
+  {
     if (wcscmp(argv[i], L"--skip-http-etag") == 0) manager->SetSkipHttpETag(true);
+    if (wcsncmp(argv[i], L"--format=", 9) == 0) arcFormat = argv[i] + 9;
+    if (wcscmp(argv[i], L"--rar-family-check") == 0) rarFamilyCheck = true;
+  }
   CMyComPtr<IFolderFolder> folder;
   {
     CTestCallback *callback = new CTestCallback;
     CMyComPtr<IProgress> progress = callback;
     if (argc > 3 && wcscmp(argv[3], L"cancel") == 0) callback->Cancel = true;
-    const HRESULT result = managerRef->OpenFolderFile(NULL, argv[1], L"", &folder, progress);
+    const HRESULT result = managerRef->OpenFolderFile(NULL, argv[1], arcFormat, &folder, progress);
     if (result != S_OK)
     {
       fprintf(stderr, "Open HRESULT %08lx\n", (unsigned long)result);
@@ -67,6 +73,37 @@ int __cdecl wmain(int argc, wchar_t **argv)
   NWindows::NCOM::CPropVariant readOnly;
   CHECK_HR(folder->GetFolderProperty(kpidReadOnly, &readOnly));
   CHECK(readOnly.vt == VT_BOOL && (readOnly.boolVal != VARIANT_FALSE) == remote);
+
+  if (rarFamilyCheck)
+  {
+    CMyComPtr<IGetFolderArcProps> getProps;
+    CHECK_HR(folder.QueryInterface(IID_IGetFolderArcProps, &getProps));
+    CMyComPtr<IFolderArcProps> props;
+    CHECK_HR(getProps->GetFolderArcProps(&props));
+    NWindows::NCOM::CPropVariant type;
+    CHECK_HR(props->GetArcProp(0, kpidType, &type));
+    CHECK(type.vt == VT_BSTR);
+    const UString typeName(type.bstrVal);
+    CHECK(typeName.IsEqualTo_Ascii_NoCase("rar") || typeName.IsEqualTo_Ascii_NoCase("rar5"));
+    printf("Handler=%s\n", UnicodeStringToMultiByte(typeName, CP_UTF8).Ptr());
+    UInt32 count = 0;
+    CHECK_HR(folder->GetNumberOfItems(&count));
+    CHECK(count != 0);
+    CUIntVector indices;
+    for (UInt32 i = 0; i < count; ++i) indices.Add(i);
+    CMyComPtr<IArchiveFolder> archive;
+    CHECK_HR(folder.QueryInterface(IID_IArchiveFolder, &archive));
+    CTestCallback *extract = new CTestCallback;
+    CMyComPtr<IFolderArchiveExtractCallback> callback = extract;
+    CHECK_HR(archive->Extract(indices.ConstData(), indices.Size(), 0, 0, NExtract::NPathMode::kFullPaths,
+        NExtract::NOverwriteMode::kOverwrite, argv[2], 0, callback));
+    CHECK(!extract->Failed);
+    CHECK_HR(archive->Extract(indices.ConstData(), indices.Size(), 0, 0, NExtract::NPathMode::kFullPaths,
+        NExtract::NOverwriteMode::kOverwrite, argv[2], 1, callback));
+    CHECK(!extract->Failed);
+    printf("RAR-family browse/extract/test checks passed.\n");
+    return 0;
+  }
 
   CMyComPtr<IFolderFolder> docs;
   CHECK_HR(folder->BindToFolder(L"docs", &docs));
