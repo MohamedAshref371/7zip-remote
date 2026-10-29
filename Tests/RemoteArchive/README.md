@@ -2,6 +2,21 @@
 
 ## MSVC engine, console, and File Manager
 
+For a manual desktop test after building, start a loopback-only fixture server:
+
+```powershell
+python Tests/RemoteArchive/serve_fixture.py
+```
+
+Keep it running and open `.build/msvc/bin/7zFM.exe`. Use **File → Open URL...**
+with the printed `zip_url`. Browse `docs`, extract `target.txt` to a fresh local
+directory, refresh, and return to local browsing. Try `encrypted_url` with the
+printed test-only password, `slow_url` for cancellation, and `rejected_url` for
+the unsupported-Range error. Current URLs are also saved to
+`.build/msvc/manual-session.json`; request logs and reference files stay in the
+session's directory. Ctrl+C stops the server. These are disposable test fixtures,
+not Internet interoperability or completed desktop acceptance evidence.
+
 With the Visual Studio Desktop development with C++ workload and Windows SDK:
 
 ```powershell
