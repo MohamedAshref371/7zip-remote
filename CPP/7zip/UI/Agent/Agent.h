@@ -234,6 +234,7 @@ public:
   UString _archiveFilePath; // it can be path of non-existing file if file is virtual
   #ifdef Z7_HTTP
   CRemoteArchiveSource RemoteSource;
+  bool SkipHttpETag = false;
   bool IsRemote() const { return RemoteSource.Spec != NULL; }
   #endif
   
@@ -358,6 +359,7 @@ Z7_CLASS_IMP_COM_1(
   bool WasLoaded;
   #ifdef Z7_HTTP
   UString RemoteError;
+  bool SkipHttpETag = false;
   #endif
 
   void LoadFormats();
@@ -368,6 +370,7 @@ public:
       {}
   #ifdef Z7_HTTP
   const UString &GetRemoteError() const { return RemoteError; }
+  void SetSkipHttpETag(bool skip) { SkipHttpETag = skip; }
   #endif
 };
 

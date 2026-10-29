@@ -116,6 +116,28 @@ def main():
         assert any(r["path"].endswith("?sig=private-token%2Ftest&x=1&x=2") for r in server.records)
         assert all(r["if_match"] == '"fixture-v1"' for r in server.records
                    if (r["start"], r["end"]) != (0, 0))
+
+        # Explicitly disabling ETag must omit If-Match without weakening range,
+        # length, representation, status or source-size validation.
+        unchecked_start = len(server.records)
+        opt = "-shttp-no-etag"
+        for mode in ("missing-etag", "weak", "duplicate-etag", "changed"):
+            for command in ("l", "t"):
+                run("no-etag-" + mode + "-" + command,
+                    [command, f"{base}/{mode}/sample.zip?sig=private-token", opt])
+        for command in ("x", "e"):
+            output_dir = work / ("no-etag-" + command)
+            run("no-etag-" + command,
+                [command, f"{base}/missing-etag/sample.zip", "docs/target.txt", opt,
+                 "-o" + str(output_dir), "-y"])
+            target = output_dir / ("docs/target.txt" if command == "x" else "target.txt")
+            assert target.read_bytes() == contents["docs/target.txt"]
+        for mode in ("changed-size", "wrong-range", "missing-range", "duplicate-range", "truncated",
+                     "extra-body", "encoded", "multipart", "wrong-length", "ignore", "precondition", "redirect"):
+            run("no-etag-reject-" + mode, ["t", f"{base}/{mode}/sample.zip", opt], False)
+        assert all(r["if_match"] is None for r in server.records[unchecked_start:])
+        run("no-etag-local-rejected", ["l", archive, opt], False)
+        run("etag-default-still-strict", ["l", f"{base}/missing-etag/sample.zip"], False)
     finally:
         server.shutdown()
         server.server_close()

@@ -2,6 +2,9 @@
 
 Date: October 29, 2026.
 
+**Later update:** an explicit per-session ETag bypass is now implemented and has
+passed real MediaFire HTTPS listing/extraction checks. See [ETag option results](09-etag-option.md).
+
 Visual Studio C++ tools are now installed. The engine, console, and File Manager
 build successfully through the upstream Windows nmake files. An initial remote
 File Manager implementation is included; its Agent is integration-tested, but

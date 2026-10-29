@@ -100,6 +100,9 @@ Z7_COM7F_IMF(CArchiveFolderManager::OpenFolderFile(IInStream *inStream,
     progressWrapper.QueryInterface(IID_IArchiveOpenCallback, &openArchiveCallback);
   }
   CAgent *agent = new CAgent();
+  #ifdef Z7_HTTP
+  agent->SkipHttpETag = SkipHttpETag;
+  #endif
   CMyComPtr<IInFolderArchive> archive = agent;
   
   const HRESULT res = archive->Open(inStream, filePath, arcFormat, NULL, openArchiveCallback);

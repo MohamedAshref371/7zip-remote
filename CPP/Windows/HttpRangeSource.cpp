@@ -173,7 +173,7 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
     return Fail("Cannot configure HTTP request policy.", LastErrorResult());
   const std::wstring headers = L"Accept-Encoding: identity\r\nRange: bytes=" +
       std::to_wstring(start) + L"-" + std::to_wstring(start + length - 1) + L"\r\n" +
-      (probe ? L"" : L"If-Match: " + _etag + L"\r\n");
+      (probe || _options.SkipETagVerification ? L"" : L"If-Match: " + _etag + L"\r\n");
   ++Requests;
   if (!WinHttpSendRequest(request.Value, headers.c_str(), static_cast<DWORD>(headers.size()),
       WINHTTP_NO_REQUEST_DATA, 0, 0, 0) || !WinHttpReceiveResponse(request.Value, NULL))
@@ -198,9 +198,10 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
   if (Header(request.Value, WINHTTP_QUERY_CONTENT_RANGE, range) != S_OK ||
       !ParseRange(range, first, last, total) || first != start || last - first + 1 != length)
     return Fail("Invalid or mismatched Content-Range.");
-  if (Header(request.Value, WINHTTP_QUERY_ETAG, tag) != S_OK || !StrongETag(tag))
+  if (!_options.SkipETagVerification &&
+      (Header(request.Value, WINHTTP_QUERY_ETAG, tag) != S_OK || !StrongETag(tag)))
     return Fail("A strong ETag is required for partial downloads.");
-  if (!probe && (total != Size || tag != _etag))
+  if (!probe && (total != Size || (!_options.SkipETagVerification && tag != _etag)))
     return Fail("Archive identity or size changed during the session.");
   HRESULT h = Header(request.Value, WINHTTP_QUERY_CONTENT_ENCODING, encoding);
   if (FAILED(h) || (h == S_OK && _wcsicmp(encoding.c_str(), L"identity") != 0))

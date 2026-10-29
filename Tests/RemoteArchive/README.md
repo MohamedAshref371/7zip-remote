@@ -1,5 +1,38 @@
 # Remote archive prototype (Windows x64)
 
+## Optional ETag verification bypass
+
+ETag verification is enabled by default. For a direct URL whose server has no
+strong ETag, the HTTP-enabled File Manager's **File → Open URL...** dialog now
+has an unchecked **Skip ETag verification** checkbox. It applies to that session
+and is retained on Refresh; the panel path shows `[HTTP; ETag off]`. Each new
+Open URL dialog starts with verification enabled.
+
+The regular console exposes the same opt-in for `l/x/e/t`:
+
+```powershell
+& .\.build\msvc\etag-option\7z.exe l 'https://example.com/archive.zip' -shttp-no-etag
+& .\.build\msvc\etag-option\7z.exe x 'https://example.com/archive.zip' 'docs/readme.txt' -oOut -shttp-no-etag
+```
+
+In this mode the client neither checks ETags nor sends `If-Match`. It still
+checks the total size on subsequent responses, exact Content-Range, body length,
+HTTP status, representation, and TLS certificates. Normal archive integrity
+checks remain active. Changes that preserve the file size may go undetected;
+use the option only when you trust the archive to remain unchanged.
+
+Build the current development binaries into a separate folder with:
+
+```powershell
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/etag-option
+python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/etag-option/7z.exe"
+python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/etag-option/agentcheck.exe"
+```
+
+The fixture server prints `no_etag_url` for manual checkbox tests. Opening it
+without the option must fail; with the option, browse/extract and Refresh should
+work. See [ETag option results](../../Notes/09-etag-option.md).
+
 ## MSVC engine, console, and File Manager
 
 For a manual desktop test after building, start a loopback-only fixture server:
@@ -135,8 +168,10 @@ $dll = 'C:\Program Files\7-Zip\7z.dll'
 ```
 
 The URLs are placeholders. Servers must return correct single-range 206
-responses with a known total size and a strong ETag, including on subsequent
-requests. URLs must be ASCII/percent-encoded, without userinfo or fragments.
+responses with a known total size. A strong ETag, including on subsequent
+requests, is required by default; the regular console and File Manager can
+explicitly opt out as described above. The standalone prototype remains strict.
+URLs must be ASCII/percent-encoded, without userinfo or fragments.
 Signed query strings are preserved. Format selection is explicit: `zip` or `7z`.
 
 `--password-env NAME` reads an archive password from an environment variable.

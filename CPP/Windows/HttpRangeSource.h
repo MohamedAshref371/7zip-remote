@@ -15,6 +15,7 @@ struct CHttpRangeOptions
   void *CancelContext = NULL; // caller-owned, must outlive the source
   int TimeoutMs = 3000;
   unsigned RequestDeadlineMs = 30000;
+  bool SkipETagVerification = false; // explicit per-session opt-in; range/size checks remain mandatory
 };
 
 class CHttpRangeSource

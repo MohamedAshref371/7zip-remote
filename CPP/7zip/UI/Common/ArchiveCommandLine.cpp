@@ -210,6 +210,10 @@ enum Enum
   kDeleteAfterCompressing,
   kSetArcMTime
 
+  #ifdef Z7_HTTP
+  , kHttpNoETag
+  #endif
+
   #ifndef Z7_NO_CRYPTO
   , kPassword
   #endif
@@ -361,6 +365,10 @@ static const CSwitchForm kSwitchForms[] =
   
   { "sdel", SWFRM_SIMPLE },
   { "stl", SWFRM_SIMPLE }
+
+  #ifdef Z7_HTTP
+  , { "shttp-no-etag", SWFRM_SIMPLE }
+  #endif
 
   #ifndef Z7_NO_CRYPTO
   , { "p", SWFRM_STRING }
@@ -1564,6 +1572,15 @@ void CArcCmdLineParser::Parse2(CArcCmdLineOptions &options)
     // options.ArchiveName.Replace(L'/', WCHAR_PATH_SEPARATOR);
     #endif
   }
+
+  #ifdef Z7_HTTP
+  if (parser[NKey::kHttpNoETag].ThereIs)
+  {
+    if (!isExtractOrList || !IsHttpArchiveUrl(options.ArchiveName))
+      throw CArcCmdLineException("-shttp-no-etag requires l/x/e/t with a direct HTTP(S) URL");
+    options.ExtractOptions.SkipHttpETag = true;
+  }
+  #endif
 
   nop.Include = true;
   AddToCensorFromNonSwitchesStrings(isRename ? &options.UpdateOptions.RenamePairs : NULL,

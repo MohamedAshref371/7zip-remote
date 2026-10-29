@@ -185,6 +185,7 @@ struct CFolderLink: public CTempFileInfo
   UString VirtualPath; // without tail slash
   #ifdef Z7_HTTP
   UString RemoteUrl; // session-only; never included in display/history paths
+  bool SkipHttpETag = false;
   #endif
   CByteBuffer ZoneBuf; // ZoneBuf for virtaul stream (IsVirtual)
 
@@ -568,7 +569,8 @@ public:
   HRESULT BindToPath(const UString &fullPath, const UString &arcFormat, COpenResult &openRes); // can be prefix
   HRESULT BindToPathAndRefresh(const UString &path);
   #ifdef Z7_HTTP
-  HRESULT OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes);
+  HRESULT OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes,
+      bool skipHttpETag = false);
   void OpenRemoteArchiveDialog();
   #endif
   void OpenDrivesFolder();

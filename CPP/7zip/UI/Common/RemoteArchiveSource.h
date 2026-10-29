@@ -77,11 +77,12 @@ public:
     return Spec->Open(url, options);
   }
 
-  HRESULT Open(const UString &url, IOpenCallbackUI *callback)
+  HRESULT Open(const UString &url, IOpenCallbackUI *callback, bool skipETagVerification = false)
   {
     NWindows::CHttpRangeOptions options;
     options.CancelCheck = CheckBreak;
     options.CancelContext = callback;
+    options.SkipETagVerification = skipETagVerification;
     return Open(url, options);
   }
 };

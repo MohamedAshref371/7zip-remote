@@ -1,0 +1,63 @@
+{
+  "feature": "Explicit per-session ETag verification bypass",
+  "default": "Strict ETag verification enabled",
+  "cli_switch": "-shttp-no-etag",
+  "gui_checkbox": "Skip ETag verification",
+  "retained_checks": [
+    "Source total size",
+    "Exact Content-Range",
+    "Body length",
+    "HTTP status",
+    "Representation",
+    "TLS",
+    "Archive integrity checks"
+  ],
+  "passed_scenarios": {
+    "cli": 85,
+    "file_manager_agent": 29,
+    "prototype_stream": 72
+  },
+  "reports": {
+    "cli": ".build\\native\\runs\\cli-e8snujyw\\report.json",
+    "agent": ".build\\msvc\\runs\\agent-xbr8przm\\report.json",
+    "prototype": ".build\\remote\\runs\\run-m2ssyaxv\\report.json",
+    "mediafire": ".build\\msvc\\runs\\mediafire-etag-etfpxp4v\\report.json"
+  },
+  "binaries": {
+    "7z.exe": {
+      "path": ".build\\msvc\\etag-option\\7z.exe",
+      "sha256": "eea6d8d488807212b1e334f56c20d2b847d065c416638274f744c88a10d9ed40"
+    },
+    "7z.dll": {
+      "path": ".build\\msvc\\etag-option\\7z.dll",
+      "sha256": "86f8d2a65853bb64abebf8be5fcf210b013ecb756dcbbd4bc18a28a6239aa727"
+    },
+    "7zFM.exe": {
+      "path": ".build\\msvc\\etag-option\\7zFM.exe",
+      "sha256": "d09c22a4c903d5cffea304b8b09edcc2c2e3d6846cf65ebedc445a8e164c777e"
+    },
+    "agentcheck.exe": {
+      "path": ".build\\msvc\\etag-option\\agentcheck.exe",
+      "sha256": "474e549523205a40a437ee4caf1ba38f2a0a7c472a65134cae36a8ec9b4b17b4"
+    }
+  },
+  "mediafire_https": {
+    "url_saved": false,
+    "scope": "User-provided MediaFire URL; selected member compared to Tests/tafasir.zip",
+    "strict_rejected_missing_etag": true,
+    "unchecked_listing_exit_code": 0,
+    "unchecked_extraction_exit_code": 0,
+    "selected_uncompressed_bytes": 589824,
+    "matches_local_reference": true
+  },
+  "local_reference_sha256": "bbd81002444b1e9b90b23205d54670f2d9a53d509769b24150f1c690f3a2399d",
+  "build_without_http": {
+    "console": true,
+    "filemanager": true,
+    "local_integrity_test": true
+  },
+  "compiled_checkbox_resource_verified": true,
+  "desktop_ui_automated_verification": false,
+  "desktop_ui_blocker": "Computer-use native pipe unavailable",
+  "limitation": "Changes preserving source size can go undetected with the option enabled"
+}

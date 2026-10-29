@@ -11,6 +11,9 @@ struct CFfpOpen
 public:
   // out:
   bool Encrypted;
+  #ifdef Z7_HTTP
+  bool SkipHttpETag = false;
+  #endif
   UString Password;
 
   NWindows::NDLL::CLibrary Library;

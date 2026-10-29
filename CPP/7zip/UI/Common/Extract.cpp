@@ -313,7 +313,7 @@ HRESULT Extract(
   const bool isRemote = !options.StdInMode && numArcs == 1 && IsHttpArchiveUrl(arcPaths[0]);
   if (isRemote)
   {
-    const HRESULT res = remote.Open(arcPaths[0], openCallback);
+    const HRESULT res = remote.Open(arcPaths[0], openCallback, options.SkipHttpETag);
     if (res != S_OK)
     {
       errorMessage = remote.ErrorMessage().Ptr();

@@ -4,7 +4,7 @@ Study date: October 29, 2026.
 Local version: **7-Zip 26.05**, with source release date `2026-10-21`.
 Git reference at the time of the study: `8204ba7d01f8cd73abee5e2f82ac98e7ce3edef9`.
 
-**Latest implementation update:** the engine, console, and File Manager now build with MSVC/nmake. The optional HTTP-enabled File Manager includes an initial “Open URL” implementation, backed by an Agent tested for browsing, extraction, and read-only enforcement. The prototype, CLI, and Agent suites passed 72, 61, and 21 scenarios respectively. Desktop UI verification remains pending because the computer-use connection is unavailable. See [MSVC and File Manager results](08-msvc-and-file-manager.md). The following sections summarize the original study and broader design.
+**Latest implementation update:** ETag verification can now be disabled explicitly per remote session through the File Manager's Open URL checkbox or the console's `-shttp-no-etag` switch. The default remains strict. MediaFire HTTPS listing and selected extraction succeeded with the option, and extracted bytes matched the user-provided local archive. The prototype, CLI, and Agent suites passed 72, 85, and 29 scenarios respectively. The new checkbox still needs desktop interaction verification. See [ETag option results](09-etag-option.md). The following sections summarize the original study and broader design.
 
 ## Conclusion
 
@@ -39,6 +39,7 @@ These are engineering choices for the study, not settings currently available in
 6. [Initial implementation results](06-prototype-results.md): new code, measurements, commands, and testing limits.
 7. [26.05 build and CLI integration](07-cli-integration-results.md): current development binaries, CLI verification, and remaining work.
 8. [MSVC build and File Manager integration](08-msvc-and-file-manager.md): latest build commands, Agent verification, and desktop-testing limits.
+9. [Optional ETag verification bypass](09-etag-option.md): opt-in compatibility mode, MediaFire verification, and retained checks.
 
 ## Illustrative Benefit
 
@@ -46,4 +47,4 @@ For a 20 GiB ZIP, downloading its directory and a 5 MiB compressed file's data, 
 
 ## Work Status
 
-The study, standalone prototype, 26.05 engine build, and CLI integration are complete. Initial File Manager code now supports opening direct URLs and refreshing with a fresh session, with Agent-level coverage for local/remote browsing, extraction, passwords, zones, and rejected mutations. The desktop interaction itself has not been verified. Successful public HTTPS/proxy interoperability, redirects, retries, full-download fallback, and remote volume resolution remain future work. This is a development milestone, not a release-ready product.
+The study, standalone prototype, 26.05 engine build, and CLI integration are complete. File Manager supports opening direct URLs and refreshing with a fresh session, with Agent-level coverage for local/remote browsing, extraction, passwords, zones, rejected mutations, and optional ETag bypass. The user confirmed the previous Open URL flow works; the new checkbox and complete desktop acceptance flow still need verification. A real MediaFire HTTPS listing and selected extraction have now succeeded. Broader server/proxy interoperability, redirects, retries, full-download fallback, and remote volume resolution remain future work. This is a development milestone, not a release-ready product.

@@ -1454,9 +1454,10 @@ void CPanel::OnReload(bool onTimer)
   if (!onTimer && !_parentFolders.IsEmpty() && !_parentFolders[0].RemoteUrl.IsEmpty())
   {
     const UString url = _parentFolders[0].RemoteUrl;
+    const bool skipHttpETag = _parentFolders[0].SkipHttpETag;
     const UString folderPath = _parentFolders.Size() == 1 ? GetFolderPath(_folder) : UString();
     COpenResult openRes;
-    if (OpenRemoteArchive(url, UString(), openRes) == S_OK && !folderPath.IsEmpty())
+    if (OpenRemoteArchive(url, UString(), openRes, skipHttpETag) == S_OK && !folderPath.IsEmpty())
     {
       CMyComPtr<IFolderFolder> folder;
       if (_folder->BindToFolder(folderPath, &folder) == S_OK && folder)

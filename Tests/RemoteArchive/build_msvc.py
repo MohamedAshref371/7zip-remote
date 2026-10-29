@@ -16,6 +16,7 @@ def main():
     parser.add_argument('--http', action='store_true')
     parser.add_argument('--rebuild', action='store_true', help='Recompile all objects, including header dependents')
     parser.add_argument('--agent-check', action='store_true', help='Link a headless Agent integration check after File Manager')
+    parser.add_argument('--bin-dir', type=Path, help='Publish binaries to a separate directory, e.g. while an earlier build is open')
     args = parser.parse_args()
     vswhere = Path(os.environ.get('ProgramFiles(x86)', 'C:/Program Files (x86)')) / 'Microsoft Visual Studio/Installer/vswhere.exe'
     instances = json.loads(subprocess.check_output([
@@ -26,8 +27,8 @@ def main():
     vcvars = Path(instances[0]['installationPath']) / 'VC/Auxiliary/Build/vcvars64.bat'
     out = ROOT / '.build/msvc'
     out.mkdir(parents=True, exist_ok=True)
-    binaries = out / ('bin' if args.http else 'bin-local')
-    binaries.mkdir(exist_ok=True)
+    binaries = args.bin_dir.resolve() if args.bin_dir else out / ('bin' if args.http else 'bin-local')
+    binaries.mkdir(parents=True, exist_ok=True)
     # Batch is only used to obtain the compiler environment, never for file operations.
     setup = out / 'environment.cmd'
     setup.write_text(f'@echo off\ncall "{vcvars}" >nul\nif errorlevel 1 exit /b 1\nset\n')

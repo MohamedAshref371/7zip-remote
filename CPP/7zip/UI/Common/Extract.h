@@ -29,6 +29,9 @@ struct CExtractOptionsBase
 
   bool ExcludeDirItems;
   bool ExcludeFileItems;
+  #ifdef Z7_HTTP
+  bool SkipHttpETag;
+  #endif
 
   bool PathMode_Force;
   bool OverwriteMode_Force;
@@ -45,6 +48,9 @@ struct CExtractOptionsBase
   CExtractOptionsBase():
       ExcludeDirItems(false),
       ExcludeFileItems(false),
+      #ifdef Z7_HTTP
+      SkipHttpETag(false),
+      #endif
       PathMode_Force(false),
       OverwriteMode_Force(false),
       PathMode(NExtract::NPathMode::kFullPaths),

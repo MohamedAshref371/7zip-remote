@@ -135,7 +135,8 @@ static const char * const kHelpString =
     " <command> [<switches>...] <archive_name> [<file_names>...] [@listfile]\n"
     #ifdef Z7_HTTP
     "  HTTP support: l/x/e/t accept a direct HTTP(S) URL (single-volume, read-only).\n"
-    "  Requires byte ranges and a strong ETag; no redirects or full-download fallback.\n"
+    "  Requires byte ranges and, by default, a strong ETag; no redirects or full-download fallback.\n"
+    "  -shttp-no-etag : Skip ETag verification for this URL; file changes may go undetected.\n"
     #endif
     "\n"
     "<Commands>\n"
@@ -1309,6 +1310,8 @@ int Main2(
     #ifdef Z7_HTTP
     else if (IsHttpArchiveUrl(options.ArchiveName))
     {
+      if (options.ExtractOptions.SkipHttpETag && g_ErrStream)
+        *g_ErrStream << "WARNING: ETag verification is disabled for this remote archive." << endl;
       ArchivePathsSorted.Add(options.ArchiveName);
       ArchivePathsFullSorted.Add(options.ArchiveName);
     }
@@ -1534,6 +1537,9 @@ int Main2(
       lo.ExcludeDirItems = options.Censor.ExcludeDirItems;
       lo.ExcludeFileItems = options.Censor.ExcludeFileItems;
       lo.DisablePercents = options.DisablePercents;
+      #ifdef Z7_HTTP
+      lo.SkipHttpETag = options.ExtractOptions.SkipHttpETag;
+      #endif
 
       hresultMain = ListArchives(
           lo,

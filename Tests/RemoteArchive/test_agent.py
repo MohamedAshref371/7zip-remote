@@ -70,6 +70,18 @@ def main():
             if mode in ('forbidden', 'missing', 'range416'):
                 assert str({'forbidden': 403, 'missing': 404, 'range416': 416}[mode]) in text
         assert any(r['path'].endswith('?sig=fixture-secret') for r in server.records)
+        strict_end = len(server.records)
+        assert all(r['if_match'] == '"fixture-v1"' for r in server.records
+                   if (r['start'], r['end']) != (0, 0))
+        for mode in ('missing-etag', 'weak', 'duplicate-etag', 'changed'):
+            run('no-etag-' + mode, f'{base}/{mode}/sample.zip', extra=['--skip-http-etag'])
+        run('no-etag-encrypted', f'{base}/missing-etag/secret.7z', extra=['--skip-http-etag'])
+        run('no-etag-size-rejected', f'{base}/changed-size/sample.zip', 1, ['--skip-http-etag'])
+        before = len(server.records)
+        run('no-etag-cancel-before', f'{base}/missing-etag/sample.zip', 3, ['cancel', '--skip-http-etag'])
+        assert len(server.records) == before
+        assert all(r['if_match'] is None for r in server.records[strict_end:])
+        run('default-still-strict', f'{base}/missing-etag/sample.zip', 1)
     finally:
         server.shutdown()
         server.server_close()

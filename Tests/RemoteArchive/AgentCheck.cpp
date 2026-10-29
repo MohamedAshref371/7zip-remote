@@ -47,6 +47,8 @@ int __cdecl wmain(int argc, wchar_t **argv)
   const bool remote = IsHttpArchiveUrl(UString(argv[1]));
   CArchiveFolderManager *manager = new CArchiveFolderManager;
   CMyComPtr<IFolderManager> managerRef = manager;
+  for (int i = 3; i < argc; ++i)
+    if (wcscmp(argv[i], L"--skip-http-etag") == 0) manager->SetSkipHttpETag(true);
   CMyComPtr<IFolderFolder> folder;
   {
     CTestCallback *callback = new CTestCallback;

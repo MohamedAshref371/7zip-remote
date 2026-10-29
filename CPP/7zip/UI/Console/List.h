@@ -12,11 +12,17 @@ struct CListOptions
   bool ExcludeDirItems;
   bool ExcludeFileItems;
   bool DisablePercents;
+  #ifdef Z7_HTTP
+  bool SkipHttpETag;
+  #endif
 
   CListOptions():
     ExcludeDirItems(false),
     ExcludeFileItems(false),
     DisablePercents(false)
+    #ifdef Z7_HTTP
+    , SkipHttpETag(false)
+    #endif
     {}
 };
 

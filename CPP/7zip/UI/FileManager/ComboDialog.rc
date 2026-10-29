@@ -14,3 +14,21 @@ CAPTION "Combo"
 
 #undef xc
 #undef yc
+
+#ifdef Z7_HTTP
+#define xc 300
+#define yc 112
+
+IDD_REMOTE_OPEN DIALOG 0, 0, xs, ys MY_MODAL_DIALOG_STYLE MY_FONT
+CAPTION "Open URL"
+{
+  LTEXT "Direct HTTP or HTTPS archive URL:", IDT_COMBO, m, m, xc, 8
+  COMBOBOX IDC_COMBO, m, 20, xc, 65, MY_COMBO_WITH_EDIT
+  CONTROL "Skip ETag verification", IDC_REMOTE_SKIP_ETAG, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 40, xc, 12
+  LTEXT "Enable only if you trust that the archive will not change. Changes during download may cause incorrect data or extraction errors.", -1, m, 57, xc, 25
+  OK_CANCEL
+}
+
+#undef xc
+#undef yc
+#endif

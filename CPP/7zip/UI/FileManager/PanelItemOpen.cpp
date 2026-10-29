@@ -455,13 +455,15 @@ public:
 void GetFolderError(CMyComPtr<IFolderFolder> &folder, UString &s);
 
 #ifdef Z7_HTTP
-HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes)
+HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes,
+    bool skipHttpETag)
 {
   CDisableTimerProcessing disableTimerProcessing(*this);
   CDisableNotify disableNotify(*this);
   openRes.ArchiveIsOpened = false;
   openRes.Encrypted = false;
   CFfpOpen ffp;
+  ffp.SkipHttpETag = skipHttpETag;
   const HRESULT res = ffp.OpenFileFolderPlugin(NULL, us2fs(url), arcFormat, GetParent());
   openRes.Encrypted = ffp.Encrypted;
   openRes.ErrorMessage = ffp.ErrorMessage;
@@ -476,7 +478,8 @@ HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, 
   CFolderLink link;
   link.IsVirtual = true;
   link.RemoteUrl = url;
-  link.RelPath = "[HTTP] ";
+  link.SkipHttpETag = skipHttpETag;
+  link.RelPath = skipHttpETag ? "[HTTP; ETag off] " : "[HTTP] ";
   link.RelPath += CRemoteArchiveSource::DisplayNameFromUrl(url);
   link.VirtualPath = link.RelPath;
   link.ParentFolderPath = _parentFolders.IsEmpty() ? _currentFolderPrefix : _parentFolders[0].ParentFolderPath;
@@ -496,18 +499,40 @@ HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, 
   return S_OK;
 }
 
+class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
+{
+  NWindows::NControl::CComboBox _url;
+  virtual bool OnInit() Z7_override
+  {
+    _url.Attach(GetItem(IDC_COMBO));
+    CheckButton(IDC_REMOTE_SKIP_ETAG, false);
+    NormalizeSize();
+    return CModalDialog::OnInit();
+  }
+  virtual void OnOK() Z7_override
+  {
+    _url.GetText(Value);
+    SkipHttpETag = IsButtonCheckedBool(IDC_REMOTE_SKIP_ETAG);
+    CModalDialog::OnOK();
+  }
+public:
+  UString Value;
+  bool SkipHttpETag = false;
+  INT_PTR Create(HWND parent) { return CModalDialog::Create(IDD_REMOTE_OPEN, parent); }
+};
+
 void CPanel::OpenRemoteArchiveDialog()
 {
-  CComboDialog dialog;
-  dialog.Title = "Open URL";
-  dialog.Static = "Direct HTTP or HTTPS archive URL:";
+  CRemoteOpenDialog dialog;
   if (dialog.Create(GetParent()) != IDOK) return;
   if (!IsHttpArchiveUrl(dialog.Value))
   {
     MessageBox_Error(L"Enter a direct HTTP or HTTPS archive URL.");
     return;
   }
-  BindToPathAndRefresh(dialog.Value);
+  COpenResult openRes;
+  if (OpenRemoteArchive(dialog.Value, UString(), openRes, dialog.SkipHttpETag) == S_OK)
+    RefreshListCtrl();
   SetFocusToList();
 }
 #endif

@@ -1124,7 +1124,7 @@ HRESULT ListArchives(
     CRemoteArchiveSource remote;
     if (isRemote)
     {
-      const HRESULT res = remote.Open(arcPath, &openCallback);
+      const HRESULT res = remote.Open(arcPath, &openCallback, listOptions.SkipHttpETag);
       arcPath = remote.DisplayName;
       if (res != S_OK)
       {
