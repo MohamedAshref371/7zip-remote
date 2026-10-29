@@ -1,0 +1,292 @@
+{
+  "date": "2026-10-29",
+  "scope": "Windows x64 development build; local HTTP fixtures; complete Format7zF source selection without MASM",
+  "repository_version": "26.05",
+  "runtime_engine_version": "26.05",
+  "compiler": "Zig 0.13.0 / Clang; C++17",
+  "engine_sha256": "ccedb0c81630e55721c749b212ac7052bc45869b214f9a87f83cb75f915fd3cf",
+  "console_sha256": "8d418748d3ceea7187e1b3b0f1a69ee18e8e4b3514cd48ea3446d169e976270d",
+  "prototype_scenarios_passed": 72,
+  "prototype_engine_sha256": "ccedb0c81630e55721c749b212ac7052bc45869b214f9a87f83cb75f915fd3cf",
+  "cli_scenarios_passed": 61,
+  "cli_cases": [
+    {
+      "label": "engine-version",
+      "exit_code": 0
+    },
+    {
+      "label": "create-nonsolid.7z",
+      "exit_code": 0
+    },
+    {
+      "label": "create-solid.7z",
+      "exit_code": 0
+    },
+    {
+      "label": "create-secret.7z",
+      "exit_code": 0
+    },
+    {
+      "label": "nonsolid.7z-local-list",
+      "exit_code": 0
+    },
+    {
+      "label": "nonsolid.7z-remote-list",
+      "exit_code": 0
+    },
+    {
+      "label": "nonsolid.7z-x",
+      "exit_code": 0,
+      "requests": 3,
+      "requested_bytes": 262736,
+      "archive_bytes": 4194895
+    },
+    {
+      "label": "nonsolid.7z-e",
+      "exit_code": 0,
+      "requests": 3,
+      "requested_bytes": 262736,
+      "archive_bytes": 4194895
+    },
+    {
+      "label": "nonsolid.7z-test",
+      "exit_code": 0
+    },
+    {
+      "label": "nonsolid.7z-local-test",
+      "exit_code": 0
+    },
+    {
+      "label": "sample.zip-local-list",
+      "exit_code": 0
+    },
+    {
+      "label": "sample.zip-remote-list",
+      "exit_code": 0
+    },
+    {
+      "label": "sample.zip-x",
+      "exit_code": 0,
+      "requests": 5,
+      "requested_bytes": 853760,
+      "archive_bytes": 4261631
+    },
+    {
+      "label": "sample.zip-e",
+      "exit_code": 0,
+      "requests": 5,
+      "requested_bytes": 853760,
+      "archive_bytes": 4261631
+    },
+    {
+      "label": "sample.zip-test",
+      "exit_code": 0
+    },
+    {
+      "label": "sample.zip-local-test",
+      "exit_code": 0
+    },
+    {
+      "label": "secret.7z-local-list",
+      "exit_code": 0
+    },
+    {
+      "label": "secret.7z-remote-list",
+      "exit_code": 0
+    },
+    {
+      "label": "secret.7z-x",
+      "exit_code": 0,
+      "requests": 3,
+      "requested_bytes": 262914,
+      "archive_bytes": 4195073
+    },
+    {
+      "label": "secret.7z-e",
+      "exit_code": 0,
+      "requests": 3,
+      "requested_bytes": 262914,
+      "archive_bytes": 4195073
+    },
+    {
+      "label": "secret.7z-test",
+      "exit_code": 0
+    },
+    {
+      "label": "secret.7z-local-test",
+      "exit_code": 0
+    },
+    {
+      "label": "solid.7z-local-list",
+      "exit_code": 0
+    },
+    {
+      "label": "solid.7z-remote-list",
+      "exit_code": 0
+    },
+    {
+      "label": "solid.7z-x",
+      "exit_code": 0,
+      "requests": 18,
+      "requested_bytes": 4195225,
+      "archive_bytes": 4195224
+    },
+    {
+      "label": "solid.7z-e",
+      "exit_code": 0,
+      "requests": 18,
+      "requested_bytes": 4195225,
+      "archive_bytes": 4195224
+    },
+    {
+      "label": "solid.7z-test",
+      "exit_code": 0
+    },
+    {
+      "label": "solid.7z-local-test",
+      "exit_code": 0
+    },
+    {
+      "label": "unicode-select",
+      "exit_code": 0
+    },
+    {
+      "label": "wildcard-select",
+      "exit_code": 0
+    },
+    {
+      "label": "local-extract",
+      "exit_code": 0
+    },
+    {
+      "label": "reject-a",
+      "exit_code": 7
+    },
+    {
+      "label": "reject-u",
+      "exit_code": 7
+    },
+    {
+      "label": "reject-d",
+      "exit_code": 7
+    },
+    {
+      "label": "reject-rn",
+      "exit_code": 7
+    },
+    {
+      "label": "ignore-l",
+      "exit_code": 2
+    },
+    {
+      "label": "ignore-t",
+      "exit_code": 2
+    },
+    {
+      "label": "weak-l",
+      "exit_code": 2
+    },
+    {
+      "label": "weak-t",
+      "exit_code": 2
+    },
+    {
+      "label": "missing-etag-l",
+      "exit_code": 2
+    },
+    {
+      "label": "missing-etag-t",
+      "exit_code": 2
+    },
+    {
+      "label": "changed-l",
+      "exit_code": 2
+    },
+    {
+      "label": "changed-t",
+      "exit_code": 2
+    },
+    {
+      "label": "changed-size-l",
+      "exit_code": 2
+    },
+    {
+      "label": "changed-size-t",
+      "exit_code": 2
+    },
+    {
+      "label": "precondition-l",
+      "exit_code": 2
+    },
+    {
+      "label": "precondition-t",
+      "exit_code": 2
+    },
+    {
+      "label": "truncated-l",
+      "exit_code": 2
+    },
+    {
+      "label": "truncated-t",
+      "exit_code": 2
+    },
+    {
+      "label": "redirect-l",
+      "exit_code": 2
+    },
+    {
+      "label": "redirect-t",
+      "exit_code": 2
+    },
+    {
+      "label": "forbidden-l",
+      "exit_code": 2
+    },
+    {
+      "label": "forbidden-t",
+      "exit_code": 2
+    },
+    {
+      "label": "missing-l",
+      "exit_code": 2
+    },
+    {
+      "label": "missing-t",
+      "exit_code": 2
+    },
+    {
+      "label": "range416-l",
+      "exit_code": 2
+    },
+    {
+      "label": "range416-t",
+      "exit_code": 2
+    },
+    {
+      "label": "wrong-range-l",
+      "exit_code": 2
+    },
+    {
+      "label": "wrong-range-t",
+      "exit_code": 2
+    },
+    {
+      "label": "wrong-password",
+      "exit_code": 2
+    },
+    {
+      "label": "chunked",
+      "exit_code": 0
+    }
+  ],
+  "http_disabled_build": "Built separately; local ZIP and encrypted 7z integrity tests passed",
+  "full_cli_report": ".build\\native\\runs\\cli-lenru75e\\report.json",
+  "full_prototype_report": ".build\\remote\\runs\\run-78dmefws\\report.json",
+  "remaining": [
+    "File Manager and ReOpen integration",
+    "Real HTTPS/proxy interoperability",
+    "Separate transfer progress and responsive cancellation",
+    "Redirects, retries, full-download fallback",
+    "Broader formats and volumes"
+  ]
+}

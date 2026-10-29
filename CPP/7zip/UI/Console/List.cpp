@@ -14,6 +14,7 @@
 #include "../../../Windows/PropVariantConv.h"
 
 #include "../Common/OpenArchive.h"
+#include "../Common/RemoteArchiveSource.h"
 #include "../Common/PropIDUtils.h"
 
 #include "ConsoleClose.h"
@@ -1114,10 +1115,36 @@ HRESULT ListArchives(
   {
     if (skipArcs[arcIndex])
       continue;
-    const UString &arcPath = arcPaths[arcIndex];
+    UString arcPath = arcPaths[arcIndex];
     UInt64 arcPackSize = 0;
+    COpenCallbackConsole openCallback;
+    openCallback.Init(&g_StdOut, g_ErrStream, NULL, listOptions.DisablePercents);
+    #ifdef Z7_HTTP
+    const bool isRemote = IsHttpArchiveUrl(arcPath);
+    CRemoteArchiveSource remote;
+    if (isRemote)
+    {
+      const HRESULT res = remote.Open(arcPath, &openCallback);
+      arcPath = remote.DisplayName;
+      if (res != S_OK)
+      {
+        if (res == E_ABORT) return res;
+        if (g_ErrStream)
+          *g_ErrStream << "ERROR: " << remote.ErrorMessage().Ptr() << endl;
+        lastError = res;
+        ++numErrors;
+        continue;
+      }
+      arcPackSize = remote.Spec->Source.Size;
+      totalArcSizes += arcPackSize;
+    }
+    #endif
     
-    if (!stdInMode)
+    if (!stdInMode
+        #ifdef Z7_HTTP
+        && !isRemote
+        #endif
+        )
     {
       NFile::NFind::CFileInfo fi;
       if (!fi.Find_FollowLink(us2fs(arcPath)))
@@ -1154,9 +1181,6 @@ HRESULT ListArchives(
 
     CArchiveLink arcLink;
 
-    COpenCallbackConsole openCallback;
-    openCallback.Init(&g_StdOut, g_ErrStream, NULL, listOptions.DisablePercents);
-
     #ifndef Z7_NO_CRYPTO
 
     openCallback.PasswordIsDefined = passwordEnabled;
@@ -1179,6 +1203,9 @@ HRESULT ListArchives(
     options.excludedFormats = &excludedFormats;
     options.stdInMode = stdInMode;
     options.stream = NULL;
+    #ifdef Z7_HTTP
+    if (isRemote) options.stream = remote.Stream;
+    #endif
     options.filePath = arcPath;
 
     if (enableHeaders)
@@ -1189,6 +1216,14 @@ HRESULT ListArchives(
     }
     
     HRESULT result = arcLink.Open_Strict(options, &openCallback);
+    #ifdef Z7_HTTP
+    if (isRemote && !remote.Spec->Source.Error.empty())
+    {
+      if (g_ErrStream)
+        *g_ErrStream << "ERROR: " << remote.ErrorMessage().Ptr() << endl;
+      if (result == S_OK) result = E_FAIL;
+    }
+    #endif
 
     if (result != S_OK)
     {

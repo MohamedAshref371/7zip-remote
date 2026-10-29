@@ -14,6 +14,7 @@
 #include "../Common/HashCalc.h"
 
 #include "Extract.h"
+#include "RemoteArchiveSource.h"
 #include "SetProperties.h"
 
 using namespace NWindows;
@@ -307,6 +308,19 @@ HRESULT Extract(
   CRecordVector<UInt64> arcSizes;
 
   unsigned numArcs = options.StdInMode ? 1 : arcPaths.Size();
+  #ifdef Z7_HTTP
+  CRemoteArchiveSource remote;
+  const bool isRemote = !options.StdInMode && numArcs == 1 && IsHttpArchiveUrl(arcPaths[0]);
+  if (isRemote)
+  {
+    const HRESULT res = remote.Open(arcPaths[0], openCallback);
+    if (res != S_OK)
+    {
+      errorMessage = remote.ErrorMessage().Ptr();
+      return res;
+    }
+  }
+  #endif
 
   unsigned i;
   
@@ -314,7 +328,14 @@ HRESULT Extract(
   {
     NFind::CFileInfo fi;
     fi.Size = 0;
-    if (!options.StdInMode)
+    #ifdef Z7_HTTP
+    if (isRemote) fi.Size = remote.Spec->Source.Size;
+    #endif
+    if (!options.StdInMode
+        #ifdef Z7_HTTP
+        && !isRemote
+        #endif
+        )
     {
       const FString arcPath = us2fs(arcPaths[i]);
       if (!fi.Find_FollowLink(arcPath))
@@ -368,8 +389,19 @@ HRESULT Extract(
 
     ecs->InitBeforeNewArchive();
 
-    const UString &arcPath = arcPaths[i];
+    UString arcPath = arcPaths[i];
+    #ifdef Z7_HTTP
+    if (isRemote) arcPath = remote.DisplayName;
+    #endif
     NFind::CFileInfo fi;
+    #ifdef Z7_HTTP
+    if (isRemote)
+    {
+      fi.ClearBase();
+      fi.Size = remote.Spec->Source.Size;
+    }
+    else
+    #endif
     if (options.StdInMode)
     {
       // do we need ctime and mtime?
@@ -435,9 +467,19 @@ HRESULT Extract(
     op.excludedFormats = &excludedFormats;
     op.stdInMode = options.StdInMode;
     op.stream = NULL;
+    #ifdef Z7_HTTP
+    if (isRemote) op.stream = remote.Stream;
+    #endif
     op.filePath = arcPath;
 
     HRESULT result = arcLink.Open_Strict(op, openCallback);
+    #ifdef Z7_HTTP
+    if (isRemote && !remote.Spec->Source.Error.empty())
+    {
+      errorMessage = remote.ErrorMessage().Ptr();
+      if (result == S_OK) result = E_FAIL;
+    }
+    #endif
 
     if (result == E_ABORT)
       return result;
@@ -457,7 +499,15 @@ HRESULT Extract(
     if (options.ZoneMode != NExtract::NZoneIdMode::kNone
         && !options.StdInMode)
     {
-      ReadZoneFile_Of_BaseFile(us2fs(arcPath), ecs->ZoneBuf);
+      #ifdef Z7_HTTP
+      if (isRemote)
+      {
+        static const char zone[] = "[ZoneTransfer]\r\nZoneId=3\r\n";
+        ecs->ZoneBuf.CopyFrom((const Byte *)zone, sizeof(zone) - 1);
+      }
+      else
+      #endif
+        ReadZoneFile_Of_BaseFile(us2fs(arcPath), ecs->ZoneBuf);
     }
    #endif
     
@@ -542,6 +592,9 @@ HRESULT Extract(
 
     CArc &arc = arcLink.Arcs.Back();
     arc.MTime.Def = !options.StdInMode
+        #ifdef Z7_HTTP
+        && !isRemote
+        #endif
         #ifdef _WIN32
         && !fi.IsDevice
         #endif
@@ -557,7 +610,7 @@ HRESULT Extract(
           false;
         #endif
 
-    RINOK(DecompressArchive(
+    const HRESULT extractResult = DecompressArchive(
         codecs,
         arcLink,
         fi.Size + arcLink.VolumesSize,
@@ -565,7 +618,12 @@ HRESULT Extract(
         options,
         calcCrc,
         extractCallback, faeCallback, ecs,
-        errorMessage, packProcessed))
+        errorMessage, packProcessed);
+    #ifdef Z7_HTTP
+    if (isRemote && !remote.Spec->Source.Error.empty())
+      errorMessage = remote.ErrorMessage().Ptr();
+    #endif
+    RINOK(extractResult)
 
     if (!options.StdInMode)
       packProcessed = fi.Size + arcLink.VolumesSize;

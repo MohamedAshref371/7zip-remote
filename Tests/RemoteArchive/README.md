@@ -1,5 +1,51 @@
 # Remote archive prototype (Windows x64)
 
+## Native 26.05 engine and integrated console
+
+The checkout now also supports an optional HTTP-enabled build of the regular
+console. Using the same portable Zig compiler, build both binaries with:
+
+```powershell
+python Tests/RemoteArchive/build_native.py --http
+python Tests/RemoteArchive/test_cli.py
+python Tests/RemoteArchive/test_remote.py --dll "$PWD/.build/native/7z.dll" --sevenzip "$PWD/.build/native/7z.exe"
+```
+
+`build_native.py` reads the upstream makefile source lists for the Windows,
+multithreaded configuration and uses C implementations instead of MASM assembly.
+It builds resources and DLL exports as well as the complete selected engine
+source list. This is a development build using Zig 0.13.0/C++17, not the upstream
+optimized release toolchain. No downloads or system installation occur.
+`--target engine|console`, `--jobs N`, `--zig PATH`, and `--out PATH` are available.
+Without `--http`, the console retains its normal local-file behavior.
+
+Keep `.build/native/7z.exe` and `.build/native/7z.dll` together:
+
+```powershell
+& .\.build\native\7z.exe l 'https://example.com/archive.zip'
+& .\.build\native\7z.exe x 'https://example.com/archive.zip' 'docs/readme.txt' -oOut
+& .\.build\native\7z.exe e 'https://example.com/archive.7z' 'docs/readme.txt' -oOut
+& .\.build\native\7z.exe t 'https://example.com/archive.7z' 'docs/readme.txt'
+```
+
+These URLs are placeholders. The same strict Range/ETag and direct-link limits
+described below apply. Formats are detected by the existing console engine;
+ZIP and 7z have integration coverage. Passwords, item selection, overwrite
+policy, timestamps, and extraction paths use the existing console mechanisms.
+URL query/userinfo is excluded from normal archive display and diagnostics.
+Remote data receives Internet-zone metadata when the selected zone policy
+requires it (`-snz1` explicitly marks all extracted files). Network progress is
+not yet shown separately from the existing archive progress. Cancellation is
+checked through console callbacks but remains subject to synchronous HTTP waits.
+
+The GCC console makefile accepts `Z7_HTTP=1` on Windows; the MSVC console build
+accepts `Z7_HTTP=1` with a compiler supporting the HTTP code's modern C++ syntax.
+Those makefile routes have been updated but not executed here because GNU make
+and the MSVC C++ toolset are unavailable. File Manager is not yet integrated.
+See [current results](../../Notes/07-cli-integration-results.md).
+
+## Standalone prototype
+
 The harness uses this repository's 7-Zip stream/COM interfaces and local file
 streams, plus an explicitly selected existing `7z.dll`. It does not modify the
 regular `7z.exe` command line or File Manager.
@@ -85,4 +131,4 @@ The internal `streamcheck raw URL` command expects byte N to equal N modulo
 - Runtime validation used installed **7-Zip 26.02**. Source headers and local
   stream code are **26.05**. This is not a full build/test of the 26.05 engine.
 
-See [the Arabic results](../../Notes/06-prototype-results.md).
+See [the initial prototype results](../../Notes/06-prototype-results.md).

@@ -57,6 +57,7 @@ typedef PROCESS_MEMORY_COUNTERS *PPROCESS_MEMORY_COUNTERS;
 #include "../../../Windows/FileDir.h"
 
 #include "../Common/ArchiveCommandLine.h"
+#include "../Common/RemoteArchiveSource.h"
 #include "../Common/Bench.h"
 #include "../Common/ExitCode.h"
 #include "../Common/Extract.h"
@@ -132,6 +133,10 @@ static const char * const kHelpString =
     "Usage: 7z"
     PROG_POSTFIX
     " <command> [<switches>...] <archive_name> [<file_names>...] [@listfile]\n"
+    #ifdef Z7_HTTP
+    "  HTTP support: l/x/e/t accept a direct HTTP(S) URL (single-volume, read-only).\n"
+    "  Requires byte ranges and a strong ETag; no redirects or full-download fallback.\n"
+    #endif
     "\n"
     "<Commands>\n"
     "  a : Add files to archive\n"
@@ -1301,6 +1306,13 @@ int Main2(
       ArchivePathsSorted.Add(options.ArcName_for_StdInMode);
       ArchivePathsFullSorted.Add(options.ArcName_for_StdInMode);
     }
+    #ifdef Z7_HTTP
+    else if (IsHttpArchiveUrl(options.ArchiveName))
+    {
+      ArchivePathsSorted.Add(options.ArchiveName);
+      ArchivePathsFullSorted.Add(options.ArchiveName);
+    }
+    #endif
     else
     {
       CExtractScanConsole scan;

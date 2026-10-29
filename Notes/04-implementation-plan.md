@@ -2,6 +2,8 @@
 
 This plan was written after the initial study. **Update:** a tracing stream, HTTP source, and standalone extraction prototype have been implemented with 72 passing scenarios; see [Implementation results](06-prototype-results.md). The remaining phases and broader product requirements are still future work. Rewriting handlers or compression algorithms is unnecessary.
 
+**Latest status:** the native 26.05 engine and initial CLI integration are now implemented and tested. Phase 2 has a working development implementation; broader interoperability, transfer-progress reporting, and fallback policy still need work. Phase 3 (File Manager) remains pending. See [CLI integration results](07-cli-integration-results.md). Historical future-tense descriptions below record the original plan.
+
 ## Initial Product Scope
 
 A direct link to a single-volume archive, file listing, extraction of selected items to disk, and item testing. Start with a small tool using the 7-Zip engine, then integrate into CLI, followed by File Manager to deliver the requested browsing experience.

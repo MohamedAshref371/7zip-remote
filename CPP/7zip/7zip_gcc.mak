@@ -454,6 +454,10 @@ $O/FilePathAutoRename.o: ../../Common/FilePathAutoRename.cpp
 	$(CXX) $(CXXFLAGS) $<
 $O/FileStreams.o: ../../Common/FileStreams.cpp
 	$(CXX) $(CXXFLAGS) $<
+$O/HttpInStream.o: ../../Common/HttpInStream.cpp
+	$(CXX) $(CXXFLAGS) $<
+$O/HttpRangeSource.o: ../../../Windows/HttpRangeSource.cpp
+	$(CXX) $(CXXFLAGS) $<
 $O/FilterCoder.o: ../../Common/FilterCoder.cpp
 	$(CXX) $(CXXFLAGS) $<
 $O/InBuffer.o: ../../Common/InBuffer.cpp

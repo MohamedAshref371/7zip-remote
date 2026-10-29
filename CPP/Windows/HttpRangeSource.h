@@ -11,6 +11,8 @@ namespace NWindows {
 struct CHttpRangeOptions
 {
   HANDLE CancelEvent = NULL; // caller-owned, must outlive the source
+  bool (*CancelCheck)(void *) = NULL;
+  void *CancelContext = NULL; // caller-owned, must outlive the source
   int TimeoutMs = 3000;
   unsigned RequestDeadlineMs = 30000;
 };

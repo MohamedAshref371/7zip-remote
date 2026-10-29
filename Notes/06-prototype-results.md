@@ -2,6 +2,8 @@
 
 Implementation date: October 29, 2026. This updates the study following the request to “start.”
 
+**Historical report:** the results below describe the initial prototype using the installed 26.02 DLL. The engine has since been built from the 26.05 source and CLI integration added; see [Current integration results](07-cli-integration-results.md).
+
 ## What Now Exists
 
 A standalone `7zremote.exe` tool lists ZIP and 7z items and extracts or tests a selected item from a local file or direct URL. It uses the 7-Zip engine through a DLL without reimplementing parsers or decompression algorithms.

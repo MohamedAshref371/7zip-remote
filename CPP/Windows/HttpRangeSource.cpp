@@ -91,7 +91,8 @@ CHttpRangeSource::~CHttpRangeSource()
 
 bool CHttpRangeSource::IsCancelled() const
 {
-  return _options.CancelEvent && WaitForSingleObject(_options.CancelEvent, 0) == WAIT_OBJECT_0;
+  return (_options.CancelEvent && WaitForSingleObject(_options.CancelEvent, 0) == WAIT_OBJECT_0)
+      || (_options.CancelCheck && _options.CancelCheck(_options.CancelContext));
 }
 
 HRESULT CHttpRangeSource::Fail(const char *message, HRESULT result)

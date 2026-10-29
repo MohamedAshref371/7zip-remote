@@ -1,6 +1,7 @@
 // ArchiveCommandLine.cpp
 
 #include "StdAfx.h"
+#include "RemoteArchiveSource.h"
 #undef printf
 #undef sprintf
 
@@ -1550,6 +1551,15 @@ void CArcCmdLineParser::Parse2(CArcCmdLineOptions &options)
     options.ArchiveName = nonSwitchStrings[curCommandIndex++];
     if (options.ArchiveName.IsEmpty())
       throw CArcCmdLineException("Archive name cannot by empty");
+    #ifdef Z7_HTTP
+    if (IsHttpArchiveUrl(options.ArchiveName))
+    {
+      if (!isExtractOrList)
+        throw CArcCmdLineException("Remote archives are read-only; use l, x, e or t");
+      if (parser[NKey::kArInclude].ThereIs || parser[NKey::kArExclude].ThereIs)
+        throw CArcCmdLineException("Archive include/exclude switches cannot be used with a URL");
+    }
+    #endif
     #ifdef _WIN32
     // options.ArchiveName.Replace(L'/', WCHAR_PATH_SEPARATOR);
     #endif
@@ -1686,7 +1696,11 @@ void CArcCmdLineParser::Parse2(CArcCmdLineOptions &options)
       AddSwitchWildcardsToCensor(arcCensor, parser[NKey::kArExclude].PostStrings, nopArc, codePage);
     }
 
-    if (thereIsArchiveName)
+    if (thereIsArchiveName
+        #ifdef Z7_HTTP
+        && !IsHttpArchiveUrl(options.ArchiveName)
+        #endif
+        )
     {
       nopArc.Include = true;
       AddNameToCensor(arcCensor, nopArc, options.ArchiveName);

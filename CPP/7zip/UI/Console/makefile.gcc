@@ -181,4 +181,10 @@ OBJS = \
   $(CONSOLE_OBJS) \
 
 
+ifdef Z7_HTTP
+LOCAL_FLAGS += -DZ7_HTTP
+MY_LIBS += -lwinhttp
+OBJS += $O/HttpInStream.o $O/HttpRangeSource.o
+endif
+
 include ../../7zip_gcc.mak
