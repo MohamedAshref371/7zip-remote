@@ -1,112 +1,112 @@
-# تصميم مقترح لمصدر HTTP
+﻿# Proposed HTTP Source Design
 
-هذا هو التصميم الأوسع من الدراسة الأولى. لتنفيذ النموذج الحالي والاختلافات المقصودة عنه، راجع [نتائج التنفيذ الأول](06-prototype-results.md).
+This is the broader design from the initial study. For the current prototype implementation and its intentional differences, see [Initial implementation results](06-prototype-results.md).
 
-كل أسماء الكلاسات والإعدادات الجديدة أدناه اقتراحات، وليست كودًا موجودًا. الهدف عزل الشبكة عن قارئات الأرشيف والحفاظ على سلوك الملفات المحلية.
+All new class and setting names below are proposals, not existing code. The goal is to isolate networking from archive readers and preserve local-file behavior.
 
-## 1. المكونات
+## 1. Components
 
-| المكون المقترح | المسؤولية |
+| Proposed component | Responsibility |
 |---|---|
-| `CArchiveSource` | نوع المصدر، metadata، الاسم المعروض، صلاحية القراءة فقط، وإنشاء/إعادة فتح الجلسة |
-| `CHttpInStream` | `Read` و`Seek` و`GetSize` ومؤشر قراءة 64-bit |
-| `IHttpTransport` | طلبات HTTP، headers، redirects، timeouts، cancel؛ ليس parser للأرشيف |
-| `CWinHttpTransport` | تنفيذ Windows |
-| `CRangeCache` | حفظ البايتات التي تم التحقق منها، مع حدود ذاكرة/قرص |
-| `CRemoteOpenCallback` | metadata وكلمة المرور، ثم resolver للأجزاء في مرحلة لاحقة |
-| `CRemoteSession` | حجم ثابت، هوية المحتوى، إحصاءات، lifetime، وسياسة التنزيل الكامل |
+| `CArchiveSource` | Source type, metadata, display name, read-only status, and session creation/reopening |
+| `CHttpInStream` | `Read`, `Seek`, `GetSize`, and a 64-bit read position |
+| `IHttpTransport` | HTTP requests, headers, redirects, timeouts, and cancellation; not an archive parser |
+| `CWinHttpTransport` | Windows implementation |
+| `CRangeCache` | Store validated bytes within memory/disk limits |
+| `CRemoteOpenCallback` | Metadata and passwords, followed by a volume resolver in a later phase |
+| `CRemoteSession` | Fixed size, content identity, statistics, lifetime, and full-download policy |
 
-نفصل `RequestUrl` عن `DisplayName` وعن أي `LocalTempPath`. امتداد الاسم المستخرج من URL أو Content-Disposition مجرد hint؛ نتحقق من التوقيع بالمحرك. لا نستعمل اسم السيرفر كمسار إخراج موثوق. لا نزيل query parameters أو نعيد ترتيبها في الطلبات الموقعة.
+Keep `RequestUrl`, `DisplayName`, and any `LocalTempPath` separate. An extension obtained from a URL or Content-Disposition is only a hint; verify the signature through the engine. Do not trust a server-supplied name as an output path. Do not remove or reorder query parameters in signed requests.
 
-## 2. أساس HTTP الذي يعتمد عليه التصميم
+## 2. HTTP Foundations
 
-يمكن طلب نطاق بايتات بـ`Range`. السيرفر قد يتجاهله؛ لذلك `Accept-Ranges` ليس دليلًا كافيًا. الرد الجزئي `206` يصف موضعه عبر `Content-Range`. `If-Match` يستخدم مقارنة ETag قوية، بينما `If-Range` قد يؤدي إلى رد كامل عند تغير المحتوى. لا يساوي Content-Length في الرد الجزئي حجم الأرشيف الكامل. هذه قواعد البروتوكول التي يبنى عليها التحقق. [RFC 9110: Range وContent-Range](https://www.rfc-editor.org/rfc/rfc9110.html#section-14)، [الشروط](https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1).
+A byte range can be requested using `Range`. The server may ignore it, so `Accept-Ranges` is insufficient evidence. A partial `206` response describes its position through `Content-Range`. `If-Match` uses strong ETag comparison, whereas `If-Range` may produce a full response when content changes. Content-Length in a partial response is not the full archive size. These protocol rules underpin validation. [RFC 9110: Range and Content-Range](https://www.rfc-editor.org/rfc/rfc9110.html#section-14), [Conditions](https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1).
 
-بقية هذا الملف سياسة تنفيذ مقترحة للمشروع، وليست ادعاء بأن المعيار يفرض كل هذه الخيارات.
+The rest of this file proposes an implementation policy for the project; it does not claim that the standard mandates all these choices.
 
-## 3. فتح الجلسة
+## 3. Opening a Session
 
-1. قبول HTTP/HTTPS فقط، مع HTTPS كاختيار مفضل. لا دعم لصفحات تسجيل الدخول أو تشغيل JavaScript أو حل روابط خدمات التخزين تلقائيًا.
-2. إجراء GET صغير، مثل `Range: bytes=0-0`، مع `Accept-Encoding: identity`. HEAD يمكن استخدامه كمعلومة مساعدة، لكن فشله لا يمنع اختبار GET.
-3. قراءة status والheaders قبل استهلاك body كبير. إن جاء `206` نتحقق من الموضع، والطول، والحجم الإجمالي، ونحتفظ بالبايت داخل cache.
-4. تثبيت الحجم وstrong ETag ووجهة الطلب وسياق المصادقة للجلسة. كل طلب لاحق يحمل `If-Match` بنفس ETag.
-5. طلب تمثيل غير محول تلقائيًا؛ لا نسمح لـHTTP backend بفك content coding وتغيير offsets من وراء stream. رفض تمثيل غير متوافق في وضع ranges؛ تنزيل snapshot متسق بديل مستقل إن سمحت السياسة.
-6. عدم معرفة الحجم أو غياب strong validator في MVP يعني full-download mode أو خطأ واضح. `Last-Modified + size` ليس بديلًا مكافئًا لإثبات نفس البايتات.
+1. Accept HTTP/HTTPS only, preferring HTTPS. Do not support login pages, execute JavaScript, or automatically resolve storage-service sharing links.
+2. Perform a small GET, such as `Range: bytes=0-0`, with `Accept-Encoding: identity`. HEAD may provide supplementary information, but its failure must not prevent a GET probe.
+3. Read status and headers before consuming a large body. For `206`, validate the position, length, and total size, and retain the byte in cache.
+4. Pin the size, strong ETag, request destination, and authentication context for the session. Every subsequent request carries `If-Match` with the same ETag.
+5. Request a representation without automatic transformation; do not allow the HTTP backend to decode content coding and silently change offsets beneath the stream. Reject incompatible representations in range mode; downloading a consistent snapshot is a separate alternative if policy permits.
+6. Unknown size or a missing strong validator in the MVP means full-download mode or a clear error. `Last-Modified + size` is not equivalent evidence of identical bytes.
 
-قرار strong ETag محافظ وقد يقلل عدد الروابط المناسبة للتنزيل الجزئي. يمكن لاحقًا دراسة رابط object-version ثابت كبديل صريح. ETag ليس checksum تشفيريًا ولا إثبات أن محتوى الأرشيف آمن.
+Requiring a strong ETag is conservative and may reduce the number of links suitable for partial downloading. A fixed object-version URL could later be studied as an explicit alternative. An ETag is neither a cryptographic checksum nor proof that archive contents are safe.
 
-## 4. آلة الحالات
+## 4. State Machine
 
 ```mermaid
 stateDiagram-v2
     [*] --> Probe
-    Probe --> RandomAccess: range صحيح وحجم معلوم وهوية ثابتة
-    Probe --> DownloadWhole: fallback متاح حسب الإعداد
-    Probe --> Failed: رد غير صالح أو fallback غير مسموح
-    DownloadWhole --> LocalSnapshot: تنزيل كامل ناجح
-    DownloadWhole --> Failed: انقطاع أو حدود موارد
-    RandomAccess --> Failed: تغير المحتوى أو فشل التحقق
-    RandomAccess --> Closed: إغلاق
-    LocalSnapshot --> Closed: إغلاق
+    Probe --> RandomAccess: Valid range, known size, stable identity
+    Probe --> DownloadWhole: Fallback enabled by policy
+    Probe --> Failed: Invalid response or fallback disallowed
+    DownloadWhole --> LocalSnapshot: Full download succeeds
+    DownloadWhole --> Failed: Interruption or resource limits
+    RandomAccess --> Failed: Content changes or validation fails
+    RandomAccess --> Closed: Close
+    LocalSnapshot --> Closed: Close
     Failed --> Closed
 ```
 
-إذا بدأ المحرك الفتح ثم اكتشفنا تغير المصدر، لا نواصل تركيب bytes جديدة على cache القديمة. نغلق العملية؛ إعادة المحاولة تبدأ جلسة ومحركًا جديدين. التحول لتنزيل كامل أثناء جلسة مفتوحة يحتاج إعادة فتح parser على snapshot جديد، وليس تبديل بايتات تحت كائن قائم.
+If the engine has started opening and a source change is detected, do not combine new bytes with the old cache. Abort the operation; a retry starts a new session and engine instance. Switching to a full download during an open session requires reopening the parser on a new snapshot, not replacing bytes beneath an existing object.
 
-## 5. عقد `Read` و`Seek`
+## 5. `Read` and `Seek` Contracts
 
-`Seek` يحسب الموضع فقط دون تنزيل الفجوة. يحمي الحساب من overflow، ويرفض origin غير صالح أو موضعًا سالبًا؛ يسمح بالموضع بعد EOF كما ينص `IStream.h`. نرفض أحجامًا غير قابلة للتمثيل الآمن في عمليات Seek الحالية بدل truncation.
+`Seek` computes the position without downloading the gap. Guard arithmetic against overflow and reject invalid origins or negative positions; positions beyond EOF are allowed by `IStream.h`. Reject sizes that cannot be represented safely in current Seek operations rather than truncating them.
 
-`Read` يبدأ بتصفير `processedSize`. طلب صفر بايت ينجح. الموضع عند/بعد نهاية المصدر يرجع EOF محليًا دون HTTP. غير ذلك، يخدم cache أو يجلب block ناقصًا، يتحقق منه ثم ينسخ البيانات ويحرك المؤشر. فشل الشبكة قبل EOF خطأ، وليس نجاحًا بصفر بايت. القراءة القصيرة مسموحة وفق عقد الواجهة، لكن لا نجعل body ناقصًا صالحًا بصمت.
+`Read` first sets `processedSize` to zero. A zero-byte request succeeds. At or beyond the source end, return EOF locally without HTTP. Otherwise, serve cached data or fetch a missing block, validate it, copy the data, and advance the position. A network failure before EOF is an error, not success with zero bytes. Short reads are permitted by the interface contract, but a truncated body must not silently become valid data.
 
-`GetSize` يعيد حجم الجلسة المثبت دون طلب جديد. لا ننفذ `IStreamGetProps2` بهوية ملف وهمية. أي metadata غير معروفة تبقى غير معروفة، ويمكن دعم `IStreamGetProps` عند وجود داعٍ مثبت.
+`GetSize` returns the pinned session size without a new request. Do not implement `IStreamGetProps2` with a fabricated file identity. Unknown metadata remains unknown; `IStreamGetProps` can be supported when a demonstrated need exists.
 
-## 6. cache والأداء
+## 6. Cache and Performance
 
-- بداية تجريبية قابلة للضبط: blocks مقدارها 256 KiB، وذاكرة 32 MiB، وطلب شبكي واحد في كل مرة. ليست أرقامًا نهائية أو قياسات.
-- دمج القراءة المتجاورة، وإعادة استخدام الاتصال، ثم read-ahead محدود عند إثبات نمط متسلسل.
-- حفظ ranges المعتمدة فقط؛ block غير مكتمل أو مختلف الهوية لا يدخل cache.
-- cache على القرص اختياري بحد مساحة واضح، وملفات خاصة بالمستخدم وتنظيف عند الإغلاق/الفشل.
-- لو استُخدم sparse file، holes ليست بيانات صالحة؛ يلزم bitmap/interval map يحدد الأجزاء المحملة. لا نسلم الملف المتقطع مباشرة لقارئ يتوقع كل بايتاته موجودة.
-- عزل cache بين الجلسات في البداية. إعادة الاستخدام بين الجلسات تحتاج ربطًا بهوية المحتوى وسياق الدخول والتمثيل، وليس URL أو اسم الملف وحده.
-- إضافة قيود مستقلة على عدد الطلبات والبايتات في مرحلة probing؛ بلوغها ينتج تشخيصًا واضحًا أو fallback، لا «أرشيف تالف» مضللًا.
+- An adjustable experimental starting point: 256 KiB blocks, 32 MiB memory, and one network request at a time. These are neither final values nor measurements.
+- Coalesce adjacent reads, reuse connections, then add bounded read-ahead when a sequential pattern is established.
+- Cache only validated ranges; incomplete blocks or blocks with a different identity must not enter the cache.
+- Optional disk caching needs an explicit space limit, user-private files, and cleanup on close/failure.
+- If a sparse file is used, holes are not valid data; a bitmap/interval map must identify downloaded regions. Do not pass the sparse file directly to a reader expecting every byte to exist.
+- Initially isolate caches between sessions. Cross-session reuse requires binding to content identity, authentication context, and representation, not just a URL or filename.
+- Add separate request-count and byte limits during probing; reaching them should produce a clear diagnostic or fallback, not a misleading “corrupt archive” error.
 
-block كبير يحسن latency لكنه قد ينزل بيانات غير مطلوبة بكثرة مع TAR/RAR. تُضبط السياسة بعد قياس القراءة الفعلية لكل صيغة.
+Large blocks improve latency but may download substantial unnecessary data with TAR/RAR. Tune the policy after measuring actual reads for each format.
 
-## 7. ردود وأخطاء يجب تمييزها
+## 7. Responses and Errors to Distinguish
 
-| الحالة | سياسة العميل المقترحة |
+| Condition | Proposed client policy |
 |---|---|
-| `206` صالح | التحقق من بداية/نهاية النطاق والحجم والهوية قبل اعتماد البيانات |
-| `200` بعد Range | لا نضع body عند offset المطلوب؛ fallback مستقل أو فشل |
-| `412` أو اختلاف ETag/الحجم | إبطال الجلسة؛ المصدر تغير |
-| `416` أثناء قراءة يفترض أنها قبل EOF | فشل اتساق؛ إعادة probe في جلسة جديدة، لا إخفاؤه كـEOF |
-| مصدر صفر الحجم | تمييزه عن تعطل الشبكة ثم إبلاغ المحرك؛ ليس أرشيفًا صالحًا بالضرورة |
-| `401/403` | مصادقة مطلوبة أو رابط منتهي؛ لا retries عمياء |
-| `404` | المصدر/الجزء غير موجود |
-| `429` أو خطأ عابر/انقطاع | retries محدودة مع backoff قابل للإلغاء، وبنفس validator |
-| HTML بدل archive | رفض واضح عند ثبوت صفحة خطأ؛ Content-Type وحده لا يحسم صلاحية الأرشيف |
-| TLS/Content-Range غير صالح أو body مبتور | خطأ نقل/بروتوكول، لا CRC error عام |
+| Valid `206` | Validate range start/end, size, and identity before accepting data |
+| `200` after Range | Do not place the body at the requested offset; use separate fallback or fail |
+| `412` or ETag/size mismatch | Invalidate the session; the source changed |
+| `416` during a read expected to be before EOF | Consistency failure; probe again in a new session rather than hiding it as EOF |
+| Zero-length source | Distinguish it from network failure, then inform the engine; it is not necessarily a valid archive |
+| `401/403` | Authentication required or expired link; no blind retries |
+| `404` | Source/volume does not exist |
+| `429` or transient failure/interruption | Bounded retries with cancellable backoff and the same validator |
+| HTML instead of an archive | Clearly reject an identified error page; Content-Type alone does not determine archive validity |
+| Invalid TLS/Content-Range or truncated body | Transport/protocol error, not a generic CRC error |
 
-في MVP نطلب نطاقًا واحدًا متصلًا؛ الرد multipart غير المتوقع يرفض بدل إدخال MIME bytes للمحرك. تبقى أخطاء كلمة المرور وCRC الخاصة بالأرشيف منفصلة عن أخطاء النقل.
+The MVP requests one contiguous range; reject an unexpected multipart response rather than passing MIME bytes to the engine. Archive password and CRC errors remain separate from transport errors.
 
-## 8. اختيار مكتبة النقل
+## 8. Choosing a Transport Library
 
-WinHTTP متاح لبرامج C/C++، ولا يشارك browser cookies أو cache أو credentials تلقائيًا. هذا يناسب رابطًا مباشرًا وسلوكًا واضحًا بين CLI وGUI، لكنه لا يجعل روابط جلسة المتصفح تعمل تلقائيًا. هذا **ترجيح هندسي**؛ ليس توصية عامة بأن كل تطبيق desktop يجب أن يستخدم WinHTTP. [وثائق Microsoft](https://learn.microsoft.com/en-us/windows/win32/winhttp/about-winhttp).
+WinHTTP is available to C/C++ programs and does not automatically share browser cookies, cache, or credentials. This suits direct links and predictable behavior across CLI and GUI, but does not automatically make browser-session links work. This is an **engineering preference**, not a general recommendation that every desktop application should use WinHTTP. [Microsoft documentation](https://learn.microsoft.com/en-us/windows/win32/winhttp/about-winhttp).
 
-نحتاج قراءة headers والتحقق منها وتحديد timeouts صريحة؛ راجع [WinHttpQueryHeaders](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/nf-winhttp-winhttpqueryheaders) و[WinHttpSetTimeouts](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/nf-winhttp-winhttpsettimeouts). تُقرأ قيم الأحجام كنص وتُحلل 64-bit مع فحص overflow، لا بافتراض DWORD يكفي.
+Headers must be read and validated, and explicit timeouts configured; see [WinHttpQueryHeaders](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/nf-winhttp-winhttpqueryheaders) and [WinHttpSetTimeouts](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/nf-winhttp-winhttpsettimeouts). Read size values as text and parse them as 64-bit integers with overflow checks; do not assume a DWORD is sufficient.
 
-libcurl بديل مناسب لتوحيد المنصات، ويتيح `CURLOPT_RANGE`، لكن استدعاء الخيار وحده لا يضمن ردًا جزئيًا؛ التطبيق يظل مسؤولًا عن التحقق. كلفته dependency وبناء وتوزيع إضافيان. [وثائق libcurl](https://curl.se/libcurl/c/CURLOPT_RANGE.html).
+libcurl is a suitable cross-platform alternative and exposes `CURLOPT_RANGE`, but setting that option alone does not guarantee a partial response; validation remains the application's responsibility. Its cost is an additional dependency and build/distribution work. [libcurl documentation](https://curl.se/libcurl/c/CURLOPT_RANGE.html).
 
-## 9. عمر الجلسة وتجربة الاستخدام
+## 9. Session Lifetime and User Experience
 
-- النقل يعمل خارج UI thread؛ callbacks الحالية تستقبل التقدم والإلغاء. `IInStream::Read` متزامن، لذلك يجب ألا يتجمد UI أثناءه.
-- وجود timeout لا يكفي وحده لإلغاء سريع. نحدد آلية cancel آمنة مع request lifetime ونختبرها؛ لا نغلق handles عشوائيًا من threads مختلفة.
-- عمليات handler الواحد متتابعة. prefetch إن أضيف يعمل على offsets مستقلة ولا يغير مؤشر stream الذي يراه المحرك.
-- progress يعرض تنزيل الشبكة منفصلًا عن فك الضغط. حجم المصدر ليس بالضرورة حجم التنزيل اللازم؛ لا نظهر نسبة شبكة مزيفة حين يكون المطلوب غير معلوم.
-- قبل fallback الكامل يظهر الحجم إن عُرف والسبب. CLI يحتاج اختيار سياسة صريحًا يناسب التشغيل غير التفاعلي؛ هذه سياسة منتج مقترحة وليست طلب موافقة أثناء الدراسة.
-- الروابط السرية لا تدخل logs/history نصيًا دون سياسة واضحة. نحجب query وuserinfo في التشخيصات؛ نحفظ النص الأصلي للطلب في الجلسة فقط.
-- نتحقق من TLS، ونحدد عدد redirects، ونمنع downgrade الصامت من HTTPS. عند تغير origin لا ننقل Authorization أو cookies تلقائيًا. دعم proxy/auth الصريح يمكن إضافته لاحقًا.
-- نسمح بتحميل من خادم يحدده المستخدم، بما فيه خادم محلي إن أراد؛ لكن أسماء volumes داخل الأرشيف لا تمنح إذنًا تلقائيًا لطلب hosts أو مسارات عشوائية.
-- remote read-only يمتد إلى عمليات التعديل والحذف وفتح ملف خارجي ثم حفظه داخل الأرشيف. يمكن لاحقًا «حفظ نسخة محلية»، لكن لا رفع تلقائي.
-- تستمر معالجة مسارات الاستخراج والروابط وسياسة Zone.Identifier عبر آليات البرنامج الحالية، مع metadata صحيحة للمصدر الشبكي.
+- Run transport work outside the UI thread; existing callbacks receive progress and cancellation. `IInStream::Read` is synchronous, so the UI must not freeze during it.
+- A timeout alone does not ensure prompt cancellation. Define and test a safe cancellation mechanism that respects request lifetime; do not close handles arbitrarily from different threads.
+- Operations on a single handler are sequential. If added, prefetch works on independent offsets and does not change the stream position seen by the engine.
+- Show network download progress separately from decompression. Source size is not necessarily the required download size; do not show a fabricated network percentage when the required amount is unknown.
+- Before full fallback, show the size if known and the reason. CLI needs an explicit policy suitable for noninteractive use; this is a proposed product policy, not an approval request during the study.
+- Secret URLs must not enter logs/history verbatim without a clear policy. Redact query and userinfo in diagnostics; keep the original request text only in the session.
+- Validate TLS, limit redirects, and prevent silent HTTPS downgrades. Do not automatically forward Authorization or cookies across origins. Explicit proxy/auth support can be added later.
+- Allow downloads from a user-selected server, including a local server if desired; volume names inside an archive do not automatically authorize requests to arbitrary hosts or paths.
+- Remote read-only behavior covers update/delete operations and opening an external file then saving it back into the archive. “Save a local copy” can be added later, but no automatic upload.
+- Continue handling extraction paths, links, and Zone.Identifier policy through existing application mechanisms, with correct metadata for the network source.

@@ -1,47 +1,47 @@
-# دراسة دعم الأرشيفات عبر رابط مباشر في 7-Zip
+﻿# Study of Direct-URL Archive Support in 7-Zip
 
-تاريخ الدراسة: 29 أكتوبر 2026.
-النسخة المحلية: **7-Zip 26.05**، بتاريخ إصدار مذكور في المصدر `2026-10-21`.
-مرجع Git وقت الدراسة: `8204ba7d01f8cd73abee5e2f82ac98e7ce3edef9`.
+Study date: October 29, 2026.
+Local version: **7-Zip 26.05**, with source release date `2026-10-21`.
+Git reference at the time of the study: `8204ba7d01f8cd73abee5e2f82ac98e7ce3edef9`.
 
-**تحديث التنفيذ:** أصبح هناك نموذج مستقل يعمل ويجتاز 72 سيناريو اختبار. راجع [نتائج النموذج وأوامر تشغيله](06-prototype-results.md). الأقسام التالية تلخص الدراسة الأصلية والتصميم الأوسع.
+**Implementation update:** a working standalone prototype now passes 72 test scenarios. See [Prototype results and commands](06-prototype-results.md). The following sections summarize the original study and broader design.
 
-## النتيجة
+## Conclusion
 
-**إضافة فتح الأرشيف من رابط مباشر، عرض محتوياته، واستخراج ملفات مختارة منه ممكنة معماريًا.** أفضل نقطة إضافة هي مصدر بيانات جديد يطبّق `IInStream` ويحوّل القراءة إلى طلبات HTTP جزئية مع cache. قارئات الصيغ وفك الضغط الحالية يمكن إعادة استخدامها.
+**Opening an archive from a direct URL, listing its contents, and extracting selected files is architecturally feasible.** The best integration point is a new data source implementing `IInStream`, translating reads into partial HTTP requests with caching. Existing format readers and decompression can be reused.
 
-المشروع يحتوي فعلًا على أجزاء منخفضة المستوى في `C` و`Asm`، لكن الإضافة المطلوبة مكانها الأساسي طبقة C++ الخاصة بمصادر البيانات وواجهات المستخدم. ليست هناك حاجة مبدئية لتعديل LZMA أو كتابة ZIP/RAR parser جديد.
+The project does contain low-level components in `C` and `Asm`, but the requested addition belongs primarily in the C++ data-source and user-interface layers. There is no initial need to modify LZMA or write a new ZIP/RAR parser.
 
-عبارة «زي الملف المحلي» ممكنة في **التصفح والقراءة والاستخراج**، لكنها لا تعني نفس السرعة، ولا تضمن تنزيل الملف المطلوب وحده، ولا تشمل تعديل الأرشيف على السيرفر. حجم التنزيل يتوقف على دعم السيرفر، صيغة الأرشيف، وطريقة الضغط.
+“Like a local file” is achievable for **browsing, reading, and extraction**, but does not imply equal speed, guarantee downloading only the requested file, or include editing the archive on the server. Download volume depends on server support, archive format, and compression method.
 
-## ملخص القرارات المقترحة
+## Proposed Decisions
 
-| الموضوع | التوصية |
+| Topic | Recommendation |
 |---|---|
-| أسلوب الدمج | `CHttpInStream` خلف `IInStream`، مع نموذج مصدر يميز الرابط عن المسار المحلي |
-| البداية | Windows، رابط HTTPS مباشر، أرشيف مفرد، عرض واستخراج واختبار |
-| الصيغ الأولى | ZIP/ZIP64 و7z، مع تمييز Solid بوضوح |
-| HTTP backend | WinHTTP لنسخة Windows الأولى؛ واجهة نقل تسمح بإضافة libcurl لاحقًا |
-| السيرفر لا يدعم القراءة الجزئية | تنزيل كامل إلى ملف مؤقت وفق إعداد واضح، أو خطأ مفهوم |
-| ثبات الأرشيف بين الطلبات | strong ETag وطلبات مشروطة؛ غياب إثبات الثبات يحوّل الوضع الافتراضي إلى تنزيل كامل |
-| الكتابة على الرابط | خارج النطاق: لا تحديث ولا حذف ولا رفع تلقائي |
-| الأجزاء المتعددة | مرحلة لاحقة بربط أسماء الأجزاء بروابط محددة |
+| Integration approach | `CHttpInStream` behind `IInStream`, with a source model distinguishing URLs from local paths |
+| Starting scope | Windows, direct HTTPS URL, single-volume archive, listing/extraction/testing |
+| Initial formats | ZIP/ZIP64 and 7z, with clear solid-compression distinctions |
+| HTTP backend | WinHTTP for the first Windows version; a transport interface allowing libcurl later |
+| Server lacks partial reads | Full download to a temporary file under an explicit setting, or a clear error |
+| Archive consistency between requests | Strong ETag and conditional requests; lack of consistency evidence defaults to full download |
+| Writing to the URL | Out of scope: no update, delete, or automatic upload |
+| Multiple volumes | Later phase mapping volume names to explicit URLs |
 
-هذا اختيار هندسي للدراسة، وليس إعدادًا موجودًا الآن في البرنامج.
+These are engineering choices for the study, not settings currently available in the application.
 
-## ملفات الدراسة
+## Study Files
 
-1. [خريطة المشروع ونقاط الدمج](01-source-map.md): مسار الفتح والاستخراج ومراجع الكود.
-2. [إمكانية القراءة الجزئية حسب الصيغة](02-format-feasibility.md): ZIP و7z وRAR وTAR والحدود العملية.
-3. [تصميم المصدر الشبكي](03-http-stream-design.md): البروتوكول، cache، الأخطاء، وثبات البيانات.
-4. [خطة التنفيذ والتحقق](04-implementation-plan.md): مراحل قابلة للتسليم واختبارات قبول.
-5. [الأدلة وحدود الدراسة](05-evidence-and-open-questions.md): ما تمت مراجعته وما يحتاج تجربة تنفيذية.
-6. [نتائج التنفيذ الأول](06-prototype-results.md): الكود الجديد والقياسات والتشغيل وحدود الاختبار.
+1. [Project map and integration points](01-source-map.md): opening/extraction paths and source references.
+2. [Partial-reading feasibility by format](02-format-feasibility.md): ZIP, 7z, RAR, TAR, and practical limits.
+3. [Network source design](03-http-stream-design.md): protocol, cache, errors, and data consistency.
+4. [Implementation and verification plan](04-implementation-plan.md): deliverable phases and acceptance tests.
+5. [Evidence and study limits](05-evidence-and-open-questions.md): what was reviewed and what requires implementation experiments.
+6. [Initial implementation results](06-prototype-results.md): new code, measurements, commands, and testing limits.
 
-## مثال يوضح الفائدة
+## Illustrative Benefit
 
-في ZIP حجمه 20 GiB، قد يكفي تنزيل فهرس الأرشيف وبيانات ملف مضغوط حجمه 5 MiB لاستخراجه، مع بعض القراءات الإضافية. هذا **مثال توضيحي مشروط، وليس قياسًا**. لو الملف نفسه داخل كتلة Solid كبيرة، قد يلزم قراءة وفك جزء كبير من تلك الكتلة. ولو السيرفر لا يتيح القراءة الجزئية، سيحتاج البرنامج تنزيل الأرشيف كاملًا.
+For a 20 GiB ZIP, downloading its directory and a 5 MiB compressed file's data, plus some additional reads, may be enough to extract that file. This is a **conditional illustration, not a measurement**. If the file is inside a large solid block, a substantial part of that block may need to be read and decompressed. If the server does not support partial reads, the application will need to download the entire archive.
 
-## حالة العمل
+## Work Status
 
-اكتملت الدراسة ثم أضيف مصدر HTTP وأداة مستقلة واختبارات تحت `CPP` و`Tests`. نجحت تجارب استخراج عبر HTTP محلي باستخدام DLL المثبت 26.02 وواجهات المصدر 26.05. لم يُدمج الدعم بعد في `7z.exe` أو File Manager، ولم يُبنَ محرك 26.05 كاملًا. التفاصيل في ملف النتائج.
+The study was completed, followed by an HTTP source, standalone tool, and tests under `CPP` and `Tests`. Extraction experiments succeeded over local HTTP using the installed 26.02 DLL and 26.05 source interfaces. Support has not yet been integrated into `7z.exe` or File Manager, and the full 26.05 engine has not been built. Details are in the results file.

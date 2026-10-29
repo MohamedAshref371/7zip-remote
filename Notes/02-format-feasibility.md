@@ -1,68 +1,68 @@
-# القراءة الجزئية: ما الممكن فعلًا؟
+﻿# Partial Reading: What Is Actually Possible?
 
-هذه استنتاجات من الكود، وليست نتائج قياس. دعم صيغة داخل 7-Zip لا يعني تلقائيًا أنها اقتصادية عبر الشبكة.
+These are conclusions from the code, not measurements. Support for a format in 7-Zip does not automatically make it economical over a network.
 
-## مقارنة الصيغ
+## Format Comparison
 
-| الصيغة | عرض المحتويات | استخراج ملف مختار | التقييم المبدئي |
+| Format | Listing contents | Extracting a selected file | Initial assessment |
 |---|---|---|---|
-| ZIP / ZIP64 سليم ومفرد | قراءة نهاية الأرشيف ثم Central Directory، مع فحوص إضافية | قراءة local header وبيانات العنصر المطلوبة | أفضل مرشح للبداية |
-| 7z غير Solid | قراءة البداية وNext Header، وأحيانًا streams للرأس المضغوط | قراءة streams الخاصة بوحدة الضغط المطلوبة | مرشح جيد جدًا |
-| 7z Solid | الفهرس يمكن أن يبقى صغيرًا نسبيًا | فك من بداية وحدة الضغط حتى العناصر المطلوبة؛ قد يقرأ المزيد بسبب buffering وطريقة الترميز | مدعوم منطقيًا؛ التوفير غير مضمون |
-| RAR/RAR5 غير Solid | السير على headers موزعة عبر الأرشيف وتجاوز البيانات | قراءة بيانات العناصر المختارة مع معالجة علاقات الصيغة | ممكن، لكن latency قد يكون مرتفعًا |
-| RAR/RAR5 Solid | كالسابق؛ التشفير قد يغير تكلفة الفتح | يلزم الرجوع إلى بداية مجموعة الضغط المناسبة | يحتاج توقعات واضحة وقياسًا |
-| TAR غير مضغوط | المرور على headers وتجاوز payload بـSeek | قراءة مواضع البيانات بعد بناء القائمة | يوفر بايتات أحيانًا، لكن كثير الملفات يعني طلبات كثيرة |
-| GZIP / TAR.GZ | GZIP نفسه stream؛ إظهار محتويات TAR داخله مرحلة أخرى | الوصول المتأخر يتطلب عادة فك البيانات السابقة | لا وعد باستخراج اقتصادي من أي offset |
-| أرشيف داخل أرشيف | حسب ما إذا كان العنصر الداخلي يقدم `IInStream` | قد يلزم materialization للعنصر الداخلي في ملف مؤقت | مرحلة لاحقة |
-| أرشيف متعدد الأجزاء | يحتاج اكتشاف وربط كل المصادر المطلوبة | قد يعتمد العنصر على عدة أجزاء | خارج MVP |
-| ISO/UDF/XZ وبقية الصيغ | لم تتم دراسة سلوكها بالتفصيل هنا | التوافق يحتاج اختبارات منفصلة | لا نعلنها مدعومة قبل التحقق |
+| Valid, single-volume ZIP / ZIP64 | Read the archive tail, then the Central Directory, with additional checks | Read the local header and required item data | Best initial candidate |
+| Non-solid 7z | Read the beginning and Next Header, sometimes including compressed-header streams | Read streams belonging to the required compression unit | Very good candidate |
+| Solid 7z | The index can remain relatively small | Decompress from the start of the compression unit through the requested items; buffering and coding method may cause additional reads | Logically supported; savings are not guaranteed |
+| Non-solid RAR/RAR5 | Walk headers distributed through the archive, skipping data | Read selected item data while handling format relationships | Possible, but latency may be high |
+| Solid RAR/RAR5 | As above; encryption may change opening costs | Return to the beginning of the relevant compression group | Needs clear expectations and measurement |
+| Uncompressed TAR | Walk headers and skip payload using Seek | Read data positions after building the list | Can save bytes, but many files mean many requests |
+| GZIP / TAR.GZ | GZIP itself is a stream; listing the TAR inside is another stage | Late access usually requires decompressing preceding data | No promise of economical extraction from arbitrary offsets |
+| Archive inside an archive | Depends on whether the inner item exposes `IInStream` | May require materializing the inner item in a temporary file | Later phase |
+| Multi-volume archive | Requires discovering and connecting all required sources | An item may depend on several volumes | Outside the MVP |
+| ISO/UDF/XZ and other formats | Their behavior has not been studied in detail here | Compatibility requires separate tests | Do not claim support before verification |
 
-## ZIP: مثال واضح لاستغلال المحرك الحالي
+## ZIP: A Clear Example of Reusing the Existing Engine
 
-في [ZipIn.cpp](../CPP/7zip/Archive/Zip/ZipIn.cpp)، `FindCd` عند 1722:
+In [ZipIn.cpp](../CPP/7zip/Archive/Zip/ZipIn.cpp), `FindCd` at 1722:
 
-1. يحصل على نهاية المصدر عن طريق Seek.
-2. يقرأ حتى `1 << 17`، أي 128 KiB، من النهاية للبحث عن سجلات نهاية الفهرس.
-3. `TryReadCd` قرب 1868 ينتقل إلى موقع Central Directory ويقرأه.
-4. [ZipHandler.cpp](../CPP/7zip/Archive/Zip/ZipHandler.cpp)، `Extract` عند 1561، يمر على العناصر المطلوبة؛ وفك العنصر يستخدم `GetItemStream` قرب 1046.
+1. Obtains the source end using Seek.
+2. Reads up to `1 << 17`, or 128 KiB, from the tail to find directory-end records.
+3. `TryReadCd` around 1868 seeks to and reads the Central Directory.
+4. [ZipHandler.cpp](../CPP/7zip/Archive/Zip/ZipHandler.cpp), `Extract` at 1561, processes the requested items; item decompression uses `GetItemStream` around 1046.
 
-هذا دليل مباشر على أن القراءة ليست مشروطة بتحميل كل الملف مسبقًا. لكن 128 KiB تخص خطوة البحث المذكورة، وليست إجمالي تكلفة listing. الفهرس قد يكون ضخمًا، والملف قد يحتوي SFX أو بيانات تالفة تدفع المحرك لمسارات أخرى.
+This directly shows that reading does not require downloading the entire file first. However, 128 KiB applies to that search step, not the total listing cost. The directory may be huge, and SFX or damaged data may send the engine through other paths.
 
-## 7z: الفهرس منفصل عن معنى Solid
+## 7z: The Index Is Separate from Solid Compression
 
-في [7zIn.cpp](../CPP/7zip/Archive/7z/7zIn.cpp)، `ReadDatabase2` عند 1633، يتم استخراج `nextHeaderOffset` و`nextHeaderSize` من الرأس، ثم الانتقال إلى Next Header وقراءته قرب 1730. البنية موضحة أيضًا في [7zFormat.txt](../DOC/7zFormat.txt).
+In [7zIn.cpp](../CPP/7zip/Archive/7z/7zIn.cpp), `ReadDatabase2` at 1633 obtains `nextHeaderOffset` and `nextHeaderSize` from the header, then seeks to and reads the Next Header around 1730. The structure is also described in [7zFormat.txt](../DOC/7zFormat.txt).
 
-قد يكون الرأس مضغوطًا أو مشفرًا؛ في الحالة الأخيرة يحتاج عرض الأسماء كلمة مرور. لا نعيد تنفيذ التشفير، بل نستخدم callbacks الموجودة.
+The header may be compressed or encrypted; encryption requires a password to list names. We reuse existing callbacks rather than reimplementing encryption.
 
-في [7zExtract.cpp](../CPP/7zip/Archive/7z/7zExtract.cpp)، قرب 260 و317، يستخدم المحرك `FileIndexToFolderIndexMap` و`FolderStartFileIndex`. كلمة Folder هنا **وحدة/سلسلة ضغط**، وليست بالضرورة مجلدًا في شجرة أسماء الملفات. يحدد المحرك بداية الوحدة ويجمع حجم فك البيانات حتى آخر عنصر مطلوب فيها.
+In [7zExtract.cpp](../CPP/7zip/Archive/7z/7zExtract.cpp), around 260 and 317, the engine uses `FileIndexToFolderIndexMap` and `FolderStartFileIndex`. Here, Folder means a **compression unit/chain**, not necessarily a directory in the filename tree. The engine identifies the unit start and accumulates the decompressed size through the last requested item in it.
 
-لذلك:
+Therefore:
 
-- اختيار ملف صغير متأخر في Solid block كبير لا يجعله قابلًا للفك منفردًا.
-- لا يصح افتراض ضرورة تنزيل كل أرشيف Solid دائمًا؛ قد توجد وحدات مستقلة، وقد يكفي جزء من الوحدة حسب الملف والطريقة.
-- لا يصح استخدام قيمة packed progress كعداد شبكة؛ الكود قد يحتسب حجم الوحدة كاملًا بينما القراءة الفعلية تختلف.
-- ترتيب ملفات يملك المستخدم إنتاجها داخل وحدات مستقلة أو تقليل حجم Solid blocks يمكن أن يحسن الاستخدام عن بُعد، مقابل أثر على نسبة الضغط. هذه خاصية إعداد الأرشيف، لا حل يفرضه القارئ على أرشيف موجود.
+- A small file late in a large solid block cannot necessarily be decompressed independently.
+- It is incorrect to assume every solid archive always requires a full download; independent units may exist, and part of a unit may suffice depending on the file and method.
+- Packed progress must not be used as a network counter; the code may count the entire unit size while actual reads differ.
+- When users control archive creation, placing files in independent units or reducing solid block sizes can improve remote access at the expense of compression ratio. This is an archive configuration choice, not a fix a reader can impose on an existing archive.
 
-## RAR وTAR
+## RAR and TAR
 
-في [RarHandler.cpp](../CPP/7zip/Archive/Rar/RarHandler.cpp)، قرب 727، و[Rar5Handler.cpp](../CPP/7zip/Archive/Rar/Rar5Handler.cpp)، قرب 2423، يتجاوز المحرك البيانات المضغوطة للوصول إلى header لاحق. وفي استخراج RAR5 قرب 2840 يرجع لعناصر سابقة وفق علاقة Solid.
+In [RarHandler.cpp](../CPP/7zip/Archive/Rar/RarHandler.cpp), around 727, and [Rar5Handler.cpp](../CPP/7zip/Archive/Rar/Rar5Handler.cpp), around 2423, the engine skips compressed data to reach a later header. During RAR5 extraction around 2840 it returns to earlier items according to solid relationships.
 
-في [TarHandler.cpp](../CPP/7zip/Archive/Tar/TarHandler.cpp)، قرب 233 و254، يقرأ header ثم يتجاوز حجم العنصر بمحاذاته. والاستخراج قرب 838 ينتقل إلى موضع البيانات. هذا يتيح توفير payload غير المطلوب، لكنه لا يوفر طلبات headers المتباعدة بالضرورة.
+In [TarHandler.cpp](../CPP/7zip/Archive/Tar/TarHandler.cpp), around 233 and 254, the engine reads a header and skips the aligned item size. Extraction around 838 seeks to the data position. This can avoid unwanted payload, but does not necessarily eliminate requests for scattered headers.
 
-في [GzHandler.cpp](../CPP/7zip/Archive/GzHandler.cpp)، `Open` عند 616 و`Extract` عند 672، يوجد تعامل مع بداية stream ونهايته؛ هذا لا يشكل index إلى كل ملفات TAR.GZ. لا نعمم على XZ أو صيغ ذات فهارس وكتل مختلفة دون دراسة.
+In [GzHandler.cpp](../CPP/7zip/Archive/GzHandler.cpp), `Open` at 616 and `Extract` at 672 handle the beginning and end of a stream; this does not provide an index to every file in TAR.GZ. Do not generalize to XZ or formats with different indexes and blocks without studying them.
 
-## نموذج أداء للتفكير والقياس
+## A Performance Model for Reasoning and Measurement
 
-تقريب مبسط لوضع طلبات متتابعة:
+A simplified approximation for sequential requests:
 
 ```text
-الزمن ≈ عدد الطلبات غير المخدومة من cache × RTT
-       + البايتات المنزلة ÷ معدل النقل
-       + تكلفة فك الضغط والقرص
+Time ≈ requests not served from cache × RTT
+       + downloaded bytes ÷ transfer rate
+       + decompression and disk cost
 ```
 
-قد تتداخل هذه التكاليف، لذلك المعادلة ليست benchmark. مثلًا 1000 طلب متتابع مع RTT يساوي 80 ms تعني نحو 80 ثانية latency وحدها؛ قد يصبح تنزيل نطاق أوسع أسرع.
+These costs may overlap, so the equation is not a benchmark. For example, 1000 sequential requests with an RTT of 80 ms imply about 80 seconds of latency alone; downloading a wider range may be faster.
 
-مقاييس مفيدة: وقت أول قائمة، وقت استخراج ملف، عدد الطلبات، payload الشبكة شاملاً الإعادات، بايتات ranges الفريدة، hit ratio، peak RAM، مساحة cache، وحجم الأرشيف الكلي. لا نَعِد بنسبة توفير قبل القياس.
+Useful metrics include time to first listing, file extraction time, request count, network payload including retries, unique range bytes, hit ratio, peak RAM, cache disk usage, and total archive size. Do not promise a savings percentage before measuring.
 
-اختبار كل محتويات الأرشيف (`t`) يحتاج عادة قراءة كل البيانات المضغوطة المعنية بالاختبار. عرض القائمة ليس فحص سلامة شاملًا للأرشيف.
+Testing all archive contents (`t`) usually requires reading all compressed data involved in the test. Listing is not a comprehensive archive integrity check.

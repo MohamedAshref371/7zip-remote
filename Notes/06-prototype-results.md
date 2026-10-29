@@ -1,77 +1,77 @@
-# التنفيذ الأول: مصدر HTTP وأداة تتبّع واستخراج
+﻿# Initial Implementation: HTTP Source, Tracing, and Extraction Tool
 
-تاريخ التنفيذ: 29 أكتوبر 2026. هذا تحديث للدراسة بعد طلب «ابدأ».
+Implementation date: October 29, 2026. This updates the study following the request to “start.”
 
-## ما أصبح موجودًا
+## What Now Exists
 
-أداة مستقلة `7zremote.exe` تعرض عناصر ZIP و7z وتستخرج عنصرًا محددًا أو تختبره، من ملف محلي أو رابط مباشر. تستخدم محرك 7-Zip من DLL، دون إعادة تنفيذ parsers أو خوارزميات فك الضغط.
+A standalone `7zremote.exe` tool lists ZIP and 7z items and extracts or tests a selected item from a local file or direct URL. It uses the 7-Zip engine through a DLL without reimplementing parsers or decompression algorithms.
 
-| الملف | الوظيفة المنفذة |
+| File | Implemented functionality |
 |---|---|
-| [HttpRangeSource.cpp](../CPP/Windows/HttpRangeSource.cpp) | WinHTTP وranges والتحقق من headers وETag والحجم والأخطاء والمهل |
-| [HttpInStream.cpp](../CPP/7zip/Common/HttpInStream.cpp) | `IInStream` و`IStreamGetSize`، مؤشر 64-bit وcache بحد 8 MiB |
-| [TracingInStream.cpp](../CPP/7zip/Common/TracingInStream.cpp) | تسجيل قراءات وانتقالات المحرك مع فصل مرحلتي الفتح والاستخراج |
-| [Remote7z.cpp](../CPP/7zip/UI/Remote7z/Remote7z.cpp) | برنامج تجريبي، listing بصيغة JSON، واختيار عنصر بالـindex |
-| [build.py](../Tests/RemoteArchive/build.py) | بناء Windows x64 باستخدام compiler محمول داخل المشروع |
-| [test_remote.py](../Tests/RemoteArchive/test_remote.py) | fixtures وخادم HTTP محلي واختبارات تكامل |
+| [HttpRangeSource.cpp](../CPP/Windows/HttpRangeSource.cpp) | WinHTTP, ranges, validation of headers/ETag/size, errors, and timeouts |
+| [HttpInStream.cpp](../CPP/7zip/Common/HttpInStream.cpp) | `IInStream` and `IStreamGetSize`, 64-bit position, and cache limited to 8 MiB |
+| [TracingInStream.cpp](../CPP/7zip/Common/TracingInStream.cpp) | Records engine reads/seeks, separating opening and extraction phases |
+| [Remote7z.cpp](../CPP/7zip/UI/Remote7z/Remote7z.cpp) | Experimental program, JSON listing, and item selection by index |
+| [build.py](../Tests/RemoteArchive/build.py) | Windows x64 build using a portable compiler inside the project |
+| [test_remote.py](../Tests/RemoteArchive/test_remote.py) | Fixtures, local HTTP server, and integration tests |
 
-استخدمت cache داخل `CHttpInStream` وطبقة WinHTTP مستقلة، بدل إنشاء كل abstraction مقترح مقدمًا. `CArchiveSource` وresolver للأجزاء ودمج الواجهات لم تُنفذ بعد.
+The implementation uses cache inside `CHttpInStream` and a separate WinHTTP layer rather than creating every proposed abstraction up front. `CArchiveSource`, a volume resolver, and UI integration are not yet implemented.
 
-## البيئة وحدود الإثبات
+## Environment and Proof Limits
 
-- واجهات المشروع والـstreams المحلي من مستودع **26.05**.
-- محرك التشغيل: `C:\Program Files\7-Zip\7z.dll`، إصدار **26.02** المثبت.
-- SHA-256 للمحرك: `69fd4df057985c40e510e2fac182881c7f85e90aa13ec703f763a8fdb2ce61f8`.
-- البناء: Zig 0.13.0 / Clang، Windows x64، C++17، مع `-Wall -Wextra -Werror` لكود التطبيق. ظهرت تحذيرات في runtime الخاص بالـtoolchain في البناء الأول.
-- Visual Studio موجود لكن C++ toolset غير متاح؛ نُزّل compiler إلى `.build/tools` دون تثبيت نظامي. قيود sandbox على compiler cache وloopback استلزمت صلاحية تنفيذ مناسبة للبناء والاختبارات.
-- لم يُبنَ محرك 26.05 كاملًا، ولم يُستبدل DLL أو `7z.exe` المثبت، ولم يتغير File Manager.
+- Project interfaces and local streams from the **26.05** repository.
+- Runtime engine: installed `C:\Program Files\7-Zip\7z.dll`, version **26.02**.
+- Engine SHA-256: `69fd4df057985c40e510e2fac182881c7f85e90aa13ec703f763a8fdb2ce61f8`.
+- Build: Zig 0.13.0 / Clang, Windows x64, C++17, with `-Wall -Wextra -Werror` for application code. Toolchain runtime warnings appeared in the first build.
+- Visual Studio is present but the C++ toolset is unavailable; a compiler was downloaded to `.build/tools` without system installation. Sandbox restrictions on the compiler cache and loopback required appropriate execution permissions for building and testing.
+- The full 26.05 engine was not built, the installed DLL and `7z.exe` were not replaced, and File Manager was not changed.
 
-النتيجة تثبت عمل stream الجديد مع محرك وواجهات 7-Zip حقيقية، وليست شهادة توافق نهائية مع build كامل من 26.05.
+The result proves the new stream works with a real 7-Zip engine and interfaces; it is not final compatibility certification for a full 26.05 build.
 
-## النتائج المقاسة
+## Measured Results
 
-**نجح التشغيل النهائي في 72 سيناريو.** الحالات الفاشلة عمدًا نجح التحقق من رفضها؛ العدد لا يعني 72 أرشيفًا مختلفًا.
+**The final run passed 72 scenarios.** Intentionally failing cases passed their rejection checks; this count does not mean 72 different archives.
 
-الملف الصغير المختار `002-target.txt` حجمه **4800 بايت**، وقبله نحو 4 MiB من بيانات شبه عشوائية. كل تشغيل يبدأ cache جديدة، والقياس يشمل فتح الأرشيف ثم استخراج العنصر:
+The selected small file, `002-target.txt`, is **4800 bytes**, preceded by roughly 4 MiB of pseudorandom data. Every run starts with a fresh cache, and measurements include opening the archive and extracting the item:
 
-| الأرشيف | حجمه بالبايت | HTTP body المقروء بالبايت | الطلبات | الملاحظة |
+| Archive | Size in bytes | HTTP body bytes read | Requests | Note |
 |---|---:|---:|---:|---|
-| ZIP مع تعليق طويل | 6,359,571 | 854,548 | 5 | نحو 13.4% من الأرشيف |
-| 7z غير Solid | 6,292,169 | 525,002 | 4 | نحو 8.3% من الأرشيف |
-| 7z Solid | 6,292,823 | 4,719,960 | 20 | نحو 75%؛ يحتاج فك البيانات السابقة |
-| 7z برأس مشفر | 6,292,337 | 525,170 | 4 | نجح بكلمة المرور الصحيحة |
-| ZIP بتشفير AES | 6,292,316 | 787,293 | 5 | نجح بكلمة المرور الصحيحة |
+| ZIP with long comment | 6,359,571 | 854,548 | 5 | About 13.4% of the archive |
+| Non-solid 7z | 6,292,169 | 525,002 | 4 | About 8.3% of the archive |
+| Solid 7z | 6,292,823 | 4,719,960 | 20 | About 75%; preceding data must be decompressed |
+| 7z with encrypted header | 6,292,337 | 525,170 | 4 | Succeeded with the correct password |
+| AES-encrypted ZIP | 6,292,316 | 787,293 | 5 | Succeeded with the correct password |
 
-تطابقت SHA-256 للمخرجات المحلية والشبكية مع الملفات الأصلية، وتطابقت قوائم العناصر. شملت الاختبارات ملفات في البداية والوسط والنهاية، وأسماء Unicode، واختبار عناصر دون إخراج.
+SHA-256 values of local and network outputs matched the original files, and item lists matched. Tests covered files at the beginning, middle, and end, Unicode names, and item testing without output.
 
-في trace المحلي للعنصر نفسه: قارئ 7z غير Solid قرأ **84 بايتًا** في مرحلة الاستخراج، بينما Solid قرأ **4,456,448 بايتًا**. كلاهما قرأ 230 بايتًا في الفتح في هذه العينة. الفارق بين احتياج المحرك وحجم HTTP يوضح كلفة prefetch؛ blocks مقدارها 256 KiB قابلة للتحسين.
+In the local trace for the same item, the non-solid 7z reader read **84 bytes** during extraction, whereas the solid reader read **4,456,448 bytes**. Both read 230 bytes during opening in this sample. The difference between engine demand and HTTP volume illustrates prefetch cost; 256 KiB blocks can be optimized.
 
-اختبار `streamcheck` تعامل مع مصدر افتراضي حجمه **4,296,015,872 بايتًا**، وقرأ **1,048,577 بايتًا** عبر 5 طلبات، مع فحص بيانات بعد حاجز 4 GiB وحدود blocks وcache hits وEOF والـoverflow.
+The `streamcheck` test used a virtual source of **4,296,015,872 bytes**, reading **1,048,577 bytes** over 5 requests, while checking data beyond 4 GiB, block boundaries, cache hits, EOF, and overflow.
 
-هذه قياسات loopback وfixtures محددة، وليست benchmark لسرعة الإنترنت أو ضمانًا للتوفير. العداد يقيس body bytes التي أعادها WinHTTP للتطبيق، دون headers/TLS أو buffering داخلي غير مسلّم للتطبيق.
+These are loopback measurements with specific fixtures, not an Internet speed benchmark or savings guarantee. The counter measures body bytes returned by WinHTTP to the application, excluding headers/TLS and internal buffering not delivered to the application.
 
-## الحالات التي تم التحقق منها
+## Verified Cases
 
-- Range صحيح دون `Accept-Ranges`، وردود chunked صحيحة، وحفظ signed query بحروفه وترتيبه.
-- تجاهل Range وإرجاع 200؛ غياب/تكرار/فساد Content-Range وETag؛ weak ETag.
-- تبدل ETag أو الحجم، وHTTP 412؛ يتوقف stream دون مزج نسختين.
-- body ناقص أو زائد، Content-Length خاطئ، content encoding غير مدعوم، ورد multipart.
-- رفض redirects في هذا النموذج، و403 و404 و416.
-- كلمة مرور مفقودة أو خاطئة؛ تنظيف الإخراج الجديد عند الفشل؛ عدم الكتابة فوق ملف موجود.
-- إلغاء قبل أول طلب وأثناء انتظار الرد، واختبار مهلة HTTP.
-- `Read(0)`، وقراءات قصيرة عند حدود cache، وSeek سالب وغير صالح وبعد النهاية، وحسابات 64-bit.
+- Valid Range without `Accept-Ranges`, valid chunked responses, and preservation of signed-query characters and order.
+- Ignored Range returning 200; missing/duplicate/invalid Content-Range and ETag; weak ETag.
+- Changed ETag or size, and HTTP 412; the stream stops without mixing versions.
+- Truncated or excess body, incorrect Content-Length, unsupported content encoding, and multipart responses.
+- Rejection of redirects in this prototype, and 403, 404, and 416.
+- Missing or incorrect password; cleanup of newly created output on failure; no overwrite of an existing file.
+- Cancellation before the first request and while waiting for a response, and an HTTP timeout test.
+- `Read(0)`, short reads at cache boundaries, negative/invalid Seek and Seek beyond end, and 64-bit arithmetic.
 
-## ملاحظات ظهرت أثناء التنفيذ
+## Observations During Implementation
 
-1. اختبار المهلة الأول كشف أن إعداد session وحده لم يحقق توقع timeout صغير؛ أضيف الضبط على request و`WINHTTP_OPTION_RECEIVE_RESPONSE_TIMEOUT`. ظل السلوك غير فوري: timeout رجع بعد نحو **4.1 ثانية** رغم إعداد 200 ms، والإلغاء أثناء انتظار رد متأخر استغرق نحو **0.9 ثانية**. لا نعلن إلغاء فوريًا أو deadline صارمًا بالآلية المتزامنة؛ تصميم async محكم مطلوب للواجهة النهائية. [مرجع WinHTTP](https://learn.microsoft.com/en-us/windows/win32/winhttp/option-flags#winhttp_option_receive_response_timeout).
-2. HTTP 200 يرفض عند headers ولا يوضع عند offset جزئي. لا يوجد تنزيل كامل تلقائي.
-3. strong ETag شرط صارم، بما فيه رده مع الطلبات اللاحقة؛ قد يرفض خوادم يمكن دعمها لاحقًا.
-4. cache ثابتة 8 MiB وblocks مقدارها 256 KiB. العينات لا تثبت الأداء تحت eviction كثيف أو RTT مرتفع.
-5. استخراج عنصر واحد لمسار صريح مع CREATE_NEW لا ينفذ timestamps والروابط وADS وZone.Identifier، ولا يشغّل المخرجات. هذه أداة إثبات وليست بديلًا كاملًا لمسار استخراج المنتج.
+1. The initial timeout test showed that session settings alone did not meet the expected short timeout; settings were added to the request and `WINHTTP_OPTION_RECEIVE_RESPONSE_TIMEOUT`. Behavior remained non-immediate: timeout returned after about **4.1 seconds** despite a 200 ms setting, and cancellation while waiting for a delayed response took about **0.9 seconds**. The synchronous mechanism does not justify claiming immediate cancellation or a strict deadline; the final UI requires a carefully designed async implementation. [WinHTTP reference](https://learn.microsoft.com/en-us/windows/win32/winhttp/option-flags#winhttp_option_receive_response_timeout).
+2. HTTP 200 is rejected at the headers and is not placed at a partial offset. There is no automatic full download.
+3. A strong ETag is a strict requirement, including its presence in subsequent responses; this may reject servers that could be supported later.
+4. Cache is fixed at 8 MiB with 256 KiB blocks. The samples do not establish performance under heavy eviction or high RTT.
+5. Single-item extraction to an explicit path with CREATE_NEW does not implement timestamps, links, ADS, or Zone.Identifier, and does not execute outputs. This is a proof tool, not a complete replacement for the product extraction path.
 
-## التشغيل
+## Running
 
-التنفيذي: `.build/remote/7zremote.exe`.
+Executable: `.build/remote/7zremote.exe`.
 
 ```powershell
 python Tests/RemoteArchive/build.py
@@ -81,12 +81,12 @@ python Tests/RemoteArchive/test_remote.py
 & .\.build\remote\7zremote.exe x zip "https://example.com/archive.zip" --dll "C:\Program Files\7-Zip\7z.dll" --index 2 --out ".\result.bin"
 ```
 
-الرابط مثال يجب استبداله برابط مباشر يدعم المتطلبات. [دليل الأداة](../Tests/RemoteArchive/README.md) يشرح البناء وكلمة المرور والـtrace والقيود.
+The URL is an example and must be replaced with a direct link meeting the requirements. The [Tool guide](../Tests/RemoteArchive/README.md) explains building, passwords, tracing, and limitations.
 
-التقرير الكامل وCSV traces داخل `.build/remote/runs/run-baybstum/`، وهي artifacts متجاهلة في Git. ملخص محفوظ في المستودع: [remote-prototype-results.json](remote-prototype-results.json).
+The full report and CSV traces are in `.build/remote/runs/run-baybstum/`, which contains Git-ignored artifacts. A summary is retained in the repository: [remote-prototype-results.json](remote-prototype-results.json).
 
-## ما تبقى قبل الدمج
+## Remaining Work Before Integration
 
-التالي بناء واختبار محرك 26.05 نفسه، ثم دمج source descriptor في CLI ومسارات metadata وOpen/ReOpen، ثم واجهة «فتح رابط» في File Manager.
+Next, build and test the 26.05 engine itself, then integrate a source descriptor into CLI and metadata/Open/ReOpen paths, followed by an “Open URL” interface in File Manager.
 
-لم تُختبر اتصالات HTTPS ناجحة أو proxy فعلي أو ZIP64 كأرشيف أو SFX أو الأجزاء المتعددة. اختبار المصدر فوق 4 GiB يخص stream وليس ZIP64 parser. TLS validation بافتراضات Windows دون flags لتجاوز الشهادات. redirects وretries وfallback والتوازي وcache القرص ليست منفذة.
+Successful HTTPS connections, a real proxy, ZIP64 archives, SFX, and multiple volumes were not tested. The source test above 4 GiB covers the stream, not the ZIP64 parser. TLS validation uses Windows defaults without certificate-bypass flags. Redirects, retries, fallback, parallelism, and disk caching are not implemented.

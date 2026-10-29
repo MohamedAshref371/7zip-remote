@@ -1,56 +1,56 @@
-# الأدلة وحدود الدراسة والأسئلة المتبقية
+﻿# Evidence, Study Limits, and Open Questions
 
-**تنبيه زمني:** هذا الملف يسجل أدلة الدراسة الأولى. بعد طلب بدء التنفيذ أُنجز النموذج والاختبارات؛ الحالة الأحدث في [نتائج التنفيذ الأول](06-prototype-results.md).
+**Timeline note:** this file records evidence from the initial study. After the request to begin implementation, the prototype and tests were completed; see [Initial implementation results](06-prototype-results.md) for the latest status.
 
-## ما تم فعله
+## Work Performed
 
-- فحص بنية المستودع وحالة Git؛ كانت شجرة العمل نظيفة عند بداية الدراسة، وكان `Notes` فارغًا.
-- التحقق من النسخة في [C/7zVersion.h](../C/7zVersion.h) وقراءة تعليمات البناء المحلية.
-- قراءة عقود streams والأرشيف، وتتبع نقاط الفتح والاستخراج المحلية في Common وConsole وAgent وFile Manager.
-- فحص مسارات ZIP و7z وRAR/RAR5 وTAR وGZIP المرتبطة بالـSeek واختيار العناصر.
-- فحص callbacks الخاصة بالأجزاء المتعددة وإعادة الفتح وخصائص القراءة فقط وZone metadata.
-- البحث في `CPP` و`C` عن `winhttp` و`wininet` و`curl_easy` و`InternetOpen` و`HttpSendRequest` و`URLDownload`؛ لم تظهر مطابقة. هذا دليل بحث محدد، وليس برهانًا على غياب كل كود شبكة محتمل بأي تسمية.
-- مراجعة مراجع HTTP وWinHTTP وlibcurl الرسمية لتثبيت صلاحية تصميم طبقة النقل.
+- Inspected repository structure and Git status; the worktree was clean at the start of the study, and `Notes` was empty.
+- Verified the version in [C/7zVersion.h](../C/7zVersion.h) and read the local build instructions.
+- Read stream/archive contracts and traced local opening/extraction paths in Common, Console, Agent, and File Manager.
+- Inspected ZIP, 7z, RAR/RAR5, TAR, and GZIP paths related to Seek and item selection.
+- Inspected callbacks for multiple volumes, reopening, read-only properties, and zone metadata.
+- Searched `CPP` and `C` for `winhttp`, `wininet`, `curl_easy`, `InternetOpen`, `HttpSendRequest`, and `URLDownload`; no matches were found. This is specific search evidence, not proof that every possible form of network code is absent.
+- Reviewed official HTTP, WinHTTP, and libcurl references to validate the transport-layer design.
 
-لم أقرأ كل ملفات المشروع سطرًا بسطر. الدراسة مركزة على الميزة المطلوبة ومساراتها الأساسية. لم أستخدم reverse engineering لأن المصدر الأصلي متاح والمطلوب تحليل معماري له.
+I did not read every project file line by line. The study focuses on the requested feature and its main paths. Reverse engineering was not used because the original source is available and the task was architectural source analysis.
 
-## درجة الثقة
+## Confidence
 
-| الاستنتاج | نوع الدليل | درجة الثقة/الحد |
+| Conclusion | Evidence type | Confidence/limit |
 |---|---|---|
-| يمكن حقن مصدر غير ملف محلي | `IInArchive::Open` و`COpenOptions.stream` و`CAgent::Open` | مرتفعة من المصدر |
-| CLI يحتاج تغييرات قبل مرحلة Open | enumeration و`CFileInfo` في Main/List/Extract | مرتفعة من المصدر |
-| ReOpen الحالي لا يحافظ على stream خارجي | تصفير stream وإنشاء `CInFileStream` | مرتفعة من المصدر |
-| ZIP مناسب للقراءة الجزئية | tail/central-directory/item-stream في handler | مرتفعة معماريًا؛ حجم التوفير يحتاج قياسًا |
-| Solid قد يوسع البيانات اللازمة لملف مختار | خرائط Folder ومسار فك الضغط السابق للعنصر | مرتفعة من المصدر؛ التكلفة العددية غير مقاسة |
-| WinHTTP مناسب كبداية Windows | وثائق API وتوافقه مع نطاق رابط مباشر | اختيار هندسي، يحتاج بناء وتجربة |
-| يمكن تجنب تعديل parsers غالبًا | فصل streams عن handlers | استنتاج معماري قوي؛ لم يُثبت بكل الصيغ |
-| الميزة جاهزة للإصدار | لم يكن هناك تنفيذ عند الدراسة | **غير صحيح**؛ النموذج اللاحق أيضًا لم يندمج في المنتج بعد |
+| A source other than a local file can be injected | `IInArchive::Open`, `COpenOptions.stream`, and `CAgent::Open` | High, from source |
+| CLI needs changes before Open | Enumeration and `CFileInfo` in Main/List/Extract | High, from source |
+| Current ReOpen does not preserve an external stream | Clears stream and creates `CInFileStream` | High, from source |
+| ZIP suits partial reading | Handler tail/central-directory/item-stream paths | High architecturally; savings require measurement |
+| Solid compression can increase data needed for a selected file | Folder maps and decompression path preceding the item | High, from source; numerical cost was not measured |
+| WinHTTP suits an initial Windows implementation | API documentation and fit with direct-link scope | Engineering choice; needs building and testing |
+| Parser changes can probably be avoided | Separation of streams and handlers | Strong architectural inference; not proven for every format |
+| The feature is release-ready | No implementation existed at study time | **False**; the later prototype is also not yet integrated into the product |
 
-## ما لم يكن قد تم وقت الدراسة الأولى
+## Work Not Yet Done at the Initial Study Stage
 
-لم يتم بناء 7-Zip، أو إضافة backend، أو تعديل كود التشغيل، أو تنزيل أرشيف تجريبي، أو قياس استهلاك الشبكة، أو اختبار TLS/proxy فعليًا. خطة الاختبارات في الملف السابق متطلبات مستقبلية، وليست اختبارات ناجحة بالفعل.
+7-Zip had not been built, no backend had been added, runtime code had not been changed, no sample archive had been downloaded, network usage had not been measured, and TLS/proxy behavior had not been tested. The preceding file's test plan described future requirements, not tests already passed.
 
-لم يتم تحديد صلاحية مكتبة أو dependency جديدة قانونيًا. عند التنفيذ والتوزيع تراجع تراخيص المكونات مع ملفات المشروع [License.txt](../DOC/License.txt)؛ لا تضيف الدراسة dependency فعلية.
+The legal suitability of a new library or dependency was not determined. During implementation and distribution, review component licenses alongside the project's [License.txt](../DOC/License.txt); the study adds no actual dependency.
 
-## قرارات يمكن حسمها عند بدء التنفيذ
+## Decisions to Resolve When Implementation Begins
 
-| السؤال | الافتراض المستخدم في الخطة | متى يحتاج الحسم؟ |
+| Question | Assumption used in the plan | When must it be resolved? |
 |---|---|---|
-| هل الهدف CLI أم File Manager؟ | الإثبات ثم CLI ثم File Manager | قبل تحديد نطاق أول إصدار؛ File Manager مطلوب لتحقيق التصفح الرسومي |
-| Windows فقط أم منصات متعددة؟ | Windows أولًا مع واجهة نقل قابلة للاستبدال | قبل تثبيت backend وbuild matrix |
-| هل يلزم التعامل مع روابط login؟ | روابط مباشرة عامة أو signed URLs، دون جلسة متصفح | قبل تصميم auth UI |
-| ماذا نفعل دون Range/validator؟ | fallback كامل بسياسة ظاهرة أو خطأ | قبل تثبيت UX وخيارات CLI |
-| ما حدود RAM/cache/download؟ | قيم تجريبية قابلة للضبط | بعد traces وقياس fixtures |
-| هل تقبل links بلا strong ETag للتنزيل الجزئي؟ | لا افتراضيًا؛ snapshot كامل | قبل توسيع التوافق أو إضافة object-version policy |
-| هل يلزم split archives؟ | مؤجل مع resolver صريح | بعد إثبات الأرشيف المفرد |
-| ما حد Windows/SDK المدعوم؟ | لم يحدد؛ عدم كسر البناء المحلي القديم دون قرار | قبل اختيار APIs وتعديل makefiles |
+| CLI or File Manager target? | Proof, then CLI, then File Manager | Before defining first-release scope; File Manager is required for graphical browsing |
+| Windows only or multiple platforms? | Windows first, with replaceable transport interface | Before finalizing backend and build matrix |
+| Must login links be supported? | Public direct links or signed URLs, without a browser session | Before designing auth UI |
+| What happens without Range/validator? | Full fallback under an explicit policy, or error | Before finalizing UX and CLI options |
+| RAM/cache/download limits? | Adjustable experimental values | After traces and fixture measurements |
+| Accept links without a strong ETag for partial downloading? | Not by default; use a full snapshot | Before expanding compatibility or adding an object-version policy |
+| Split archives required? | Deferred, with an explicit resolver | After proving single-volume archives |
+| Minimum supported Windows/SDK? | Unspecified; do not break older local builds without a decision | Before choosing APIs and changing makefiles |
 
-هذه ليست أسئلة منعت اكتمال الدراسة. طلب المستخدم اللاحق «ابدأ» أذن ببدء التنفيذ؛ استُخدمت الافتراضات المذكورة للنموذج الأول دون تحميل أرشيفات عامة كبيرة.
+These questions did not prevent completion of the study. The user's subsequent “start” request authorized implementation; the stated assumptions were used for the initial prototype without downloading large public archives.
 
-## مراجع خارجية
+## External References
 
-تمت مراجعتها في 29 أكتوبر 2026. تفاصيل استخدامها موثقة بجوار القرارات في [تصميم المصدر الشبكي](03-http-stream-design.md).
+Reviewed on October 29, 2026. Their uses are documented next to the decisions in [Network source design](03-http-stream-design.md).
 
 - [RFC 9110: Range requests](https://www.rfc-editor.org/rfc/rfc9110.html#section-14).
 - [RFC 9110: If-Match](https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.1).
@@ -59,6 +59,6 @@
 - [Microsoft: WinHttpSetTimeouts](https://learn.microsoft.com/en-us/windows/win32/api/winhttp/nf-winhttp-winhttpsettimeouts).
 - [libcurl: CURLOPT_RANGE](https://curl.se/libcurl/c/CURLOPT_RANGE.html).
 
-## الخطوة التقنية التالية الأكثر فائدة
+## Most Useful Next Technical Step
 
-تنفيذ tracing stream ثم HTTP stream صغير وتمريره إلى محرك ZIP و7z الموجود، مع خادم اختبارات محلي. نجاح هذا الإثبات يحول الاستنتاج المعماري إلى دليل تنفيذي، ويعطي أرقامًا حقيقية لاختيار cache قبل صرف جهد تكامل الواجهة.
+Implement a tracing stream, then a small HTTP stream, and pass it to the existing ZIP and 7z engine with a local test server. A successful proof turns the architectural conclusion into implementation evidence and provides real numbers for choosing cache behavior before investing in UI integration.

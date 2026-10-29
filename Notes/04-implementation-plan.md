@@ -1,26 +1,26 @@
-# خطة تنفيذ قابلة للتسليم
+﻿# Deliverable Implementation Plan
 
-هذه الخطة كتبت بعد الدراسة الأولية. **تحديث:** نُفذ tracing stream ومصدر HTTP ونموذج استخراج مستقل مع 72 سيناريو ناجح؛ راجع [نتائج التنفيذ](06-prototype-results.md). باقي المراحل ومتطلبات المنتج الأوسع ما زالت خطة لاحقة. لا يلزم إعادة كتابة handlers أو خوارزميات الضغط.
+This plan was written after the initial study. **Update:** a tracing stream, HTTP source, and standalone extraction prototype have been implemented with 72 passing scenarios; see [Implementation results](06-prototype-results.md). The remaining phases and broader product requirements are still future work. Rewriting handlers or compression algorithms is unnecessary.
 
-## نطاق المنتج الأول
+## Initial Product Scope
 
-رابط مباشر لأرشيف مفرد، فتح قائمة الملفات، استخراج عناصر مختارة إلى القرص، واختبار العناصر. يبدأ الإثبات عبر أداة صغيرة تستخدم محرك 7-Zip، ثم يدخل CLI، ثم File Manager ليحقق تجربة التصفح المطلوبة.
+A direct link to a single-volume archive, file listing, extraction of selected items to disk, and item testing. Start with a small tool using the 7-Zip engine, then integrate into CLI, followed by File Manager to deliver the requested browsing experience.
 
-الصيغ المختبرة أولًا ZIP/ZIP64 و7z، بما فيها عينات مشفرة وSolid. قبول صيغة أخرى بالمحرك لا يعني الإعلان عن ضمانات دعمها الشبكي قبل اختباراتها.
+Test ZIP/ZIP64 and 7z first, including encrypted and solid samples. Acceptance of another format by the engine does not justify claiming network support guarantees before its tests pass.
 
-خارج الإصدار الأول: الكتابة على السيرفر، cookies المتصفح، صفحات مشاركة تتطلب JavaScript، تجميع روابط متعددة تلقائيًا، البحث داخل الأرشيفات المتداخلة بلا حدود، ودعم كل منصات البناء دفعة واحدة.
+Outside the first release: server writes, browser cookies, sharing pages requiring JavaScript, automatic aggregation of multiple links, unbounded browsing inside nested archives, and support for every build platform at once.
 
-## المرحلة 0: إثبات مسار القراءة بالمحرك نفسه
+## Phase 0: Prove the Reading Path with the Actual Engine
 
-إنشاء wrapper باسم مقترح `CTracingInStream` حول `CInFileStream` يسجل offset وحجم كل Read وSeek. استعمال `IInArchive` أو مسار `CArc` الفعلي مع عينات محلية، ثم قياس فتح القائمة واستخراج عناصر في البداية والوسط والنهاية.
+Create a wrapper with the proposed name `CTracingInStream` around `CInFileStream` that records the offset and size of every Read and Seek. Use `IInArchive` or the actual `CArc` path with local samples, then measure listing and extraction of items at the beginning, middle, and end.
 
-الفائدة: تحديد نمط القراءة الحقيقي قبل ضبط cache. تجربة باستخدام Python zipfile فقط لا تثبت سلوك قارئ 7-Zip.
+Purpose: identify real read patterns before tuning the cache. An experiment using only Python zipfile does not establish 7-Zip reader behavior.
 
-**شرط الإنجاز:** traces قابلة للتكرار، وتطابق الملفات المستخرجة وSHA-256 مع الاستخراج المحلي المرجعي، وتفسير استهلاك Solid من trace.
+**Completion criterion:** reproducible traces, extracted files and SHA-256 matching the local reference extraction, and an explanation of solid-data consumption from the trace.
 
-## المرحلة 1: stream شبكي مستقل
+## Phase 1: Standalone Network Stream
 
-ملفات مقترحة، لم تُنشأ بعد:
+Proposed files, not yet created:
 
 ```text
 CPP/7zip/Common/HttpInStream.h / .cpp
@@ -29,20 +29,20 @@ CPP/7zip/UI/Common/ArchiveSource.h / .cpp
 CPP/Windows/HttpTransportWinHttp.h / .cpp
 ```
 
-مكان واجهة `IHttpTransport` النهائي يتحدد وفق اعتماد الطبقات عند التنفيذ؛ لا نجعل `CPP/Windows` يعتمد على UI. إضافة harness منفصل واختبارات HTTP محلية متحكم فيها، ثم تمرير stream إلى handler دون تعديل parser.
+The final location of `IHttpTransport` will depend on layer dependencies during implementation; `CPP/Windows` must not depend on UI. Add a separate harness and controlled local HTTP tests, then pass the stream to the handler without changing the parser.
 
-**شرط الإنجاز:** listing واستخراج ZIP و7z عبر HTTP، تطابق البايتات مع المحلي، وعدم تنزيل كل ZIP الكبير في fixture الاختيار الانتقائي. stream ينجح في اختبارات Read/Seek/EOF والإلغاء وتغير المحتوى.
+**Completion criterion:** ZIP and 7z listing/extraction over HTTP, byte-for-byte agreement with local results, and no full download of the large ZIP in the selective-extraction fixture. The stream passes Read/Seek/EOF, cancellation, and content-change tests.
 
-## المرحلة 2: CLI متكامل
+## Phase 2: Integrated CLI
 
-1. اكتشاف نوع المصدر في تحليل الأوامر قبل rules الخاصة بمسارات الملفات.
-2. تجاوز enumeration المحلي للرابط المفرد، مع إبقاء خيارات اختيار ملفات الأرشيف كما هي.
-3. إمداد listing وextract/test بـmetadata وstream بدل `Find_FollowLink` على الرابط.
-4. معالجة أسماء العرض والأخطاء وexit codes وprogress وfallback.
-5. رفض update/delete/rename وغيرها على remote source برسالة محددة.
-6. تحديث help وmakefiles ومراجعة أسماء الخيارات الجديدة لتجنب التعارض.
+1. Detect source type during command parsing before filesystem path rules.
+2. Bypass local enumeration for a single URL while preserving archive-file selection options.
+3. Supply listing and extract/test with metadata and a stream instead of calling `Find_FollowLink` on the URL.
+4. Handle display names, errors, exit codes, progress, and fallback.
+5. Reject update/delete/rename and other remote-source mutations with a specific message.
+6. Update help and makefiles, and review new option names for conflicts.
 
-شكل تجربة الاستخدام المستهدف، **غير مدعوم حاليًا في هذه النسخة**:
+Target usage, **not currently supported in this version**:
 
 ```powershell
 7z l "https://example.com/data.zip"
@@ -50,51 +50,51 @@ CPP/Windows/HttpTransportWinHttp.h / .cpp
 7z t "https://example.com/data.7z" "docs/readme.txt"
 ```
 
-لا نقرر أسماء switches جديدة قبل مراجعة parser. الاقتباس مهم في shell للروابط المحتوية على `&`، لكن الاقتباس وحده لا يصلح افتراضات البرنامج المحلية الحالية.
+Do not choose new switch names before reviewing the parser. Shell quoting matters for URLs containing `&`, but quoting alone does not fix the application's current local-file assumptions.
 
-**شرط الإنجاز:** الأوامر السابقة تعمل في build المعدل على fixture، والروابط الموقعة لا تتغير، واستخراج الملفات المحلية ما زال يعمل بنفس النتائج.
+**Completion criterion:** these commands work in the modified build against a fixture, signed URLs remain unchanged, and local extraction still produces the same results.
 
-## المرحلة 3: File Manager
+## Phase 3: File Manager
 
-- زر «فتح رابط» يعرض الحالة أثناء probing ثم شجرة العناصر.
-- تمرير stream من `OpenAsArc` إلى `CAgent` مع lifetime ممتد.
-- metadata حقيقية للمصدر: اسم آمن، حجم، قراءة فقط، origin، وإحصاءات النقل.
-- معالجة Refresh/ReOpen عبر source factory، وإبطال cache إذا تغيرت النسخة.
-- استخراج وفتح عنصر إلى ملف مؤقت، وإظهار الأخطاء والإلغاء وكلمة المرور دون تعليق UI.
-- منع مسارات تعديل الأرشيف عن بُعد، بما فيها إعادة إدخال ملف عدّله برنامج خارجي.
-- تمرير Zone metadata عبر الطبقات المتاحة بدل محاولة قراءة ADS من URL.
-- شريط العنوان وhistory/bookmarks دعم إضافي بعد نجاح المسار المستقل، مع حجب أسرار الرابط.
+- An “Open URL” button shows status during probing, then the item tree.
+- Pass the stream from `OpenAsArc` to `CAgent` with an extended lifetime.
+- Accurate source metadata: safe name, size, read-only status, origin, and transfer statistics.
+- Handle Refresh/ReOpen through a source factory, invalidating cache when the version changes.
+- Extract and open an item in a temporary file; handle errors, cancellation, and passwords without freezing the UI.
+- Block remote archive modification paths, including reinserting a file edited by an external program.
+- Pass zone metadata through the available layers instead of attempting to read ADS from a URL.
+- Address-bar and history/bookmark support can follow the standalone path, with URL secrets redacted.
 
-**شرط الإنجاز:** جلسة كاملة من فتح الرابط حتى التصفح واستخراج عنصر والإلغاء والتحديث والإغلاق، مع تحرير resources، واختبار مسار الملف المحلي كذلك.
+**Completion criterion:** a complete session from opening a URL through browsing, item extraction, cancellation, refresh, and closing, with resources released and the local-file path also tested.
 
-## المرحلة 4: توسيع التوافق
+## Phase 4: Broader Compatibility
 
-RAR/TAR أولًا بعد traces وقياسات. ثم الأجزاء المتعددة من mapping صريح `اسم الجزء → URL`؛ الروابط الموقعة لكل جزء لا تُستنتج بتبديل اسم الملف أو نسخ query عشوائيًا. تضبط سياسة origin والمسارات، ويكون لكل جزء حجمه وvalidator الخاص به.
+RAR/TAR first, after traces and measurements. Then multi-volume support through an explicit `volume name → URL` mapping; signed URLs for individual volumes must not be inferred by replacing filenames or arbitrarily copying queries. Define origin/path policy, and give each volume its own size and validator.
 
-للمجموعات متعددة الأجزاء، validators الفردية لا تثبت وحدها أن كل الأجزاء من نفس إصدار المجموعة؛ الأفضل manifest ثابت/موثوق أو object versions مع تحقق سلامة المحرك. يدعم resolver الـcallback طوال extraction وليس أثناء Open فقط.
+For multi-volume sets, individual validators alone do not prove that every volume belongs to the same set version; prefer a fixed/trusted manifest or object versions together with engine integrity checks. The resolver supports callbacks throughout extraction, not just during Open.
 
-دعم libcurl والمنصات الأخرى، والتحسين بالتوازي، وcache المستديم خطوات منفصلة بعد صحة الوظيفة الأساسية.
+libcurl and other platforms, parallel optimization, and persistent caching are separate steps after core correctness.
 
-## اختبارات القبول المطلوبة عند التنفيذ
+## Acceptance Tests Required During Implementation
 
-| المجموعة | الحالات الأساسية | النتيجة المطلوبة |
+| Group | Main cases | Required result |
 |---|---|---|
-| عقد stream | صفر بايت، partial read، EOF، Seek قبل الصفر وبعد النهاية، origins غير صالحة، offsets أكبر من 4 GiB، overflow | نفس عقد `IStream.h` بلا truncation أو EOF وهمي |
-| range عادي | 206 صحيح، header absent Accept-Ranges، HEAD غير مدعوم، Content-Length للجزء فقط | الحجم والموضع والبيانات صحيحة |
-| range معيب | 200 بعد Range، Content-Range خاطئ/مفقود، body قصير، multipart غير متوقع، 416 غير متوقع | فشل واضح أو fallback مستقل، بلا خلط بيانات |
-| ثبات المصدر | ETag تغير مع نفس الحجم، الحجم تغير، weak/missing ETag، 412 أثناء استخراج | إبطال الجلسة؛ لا نجاح مزيف |
-| اتصال | redirects، loop، انتهاء signed URL، TLS غير صالح، proxy، 429، انقطاع منتصف القراءة | سياسة محدودة قابلة للإلغاء مع أخطاء مفهومة |
-| تمثيل البيانات | content coding غير متوقع، HTTP chunked لرد جزئي صحيح | الحفاظ على offsets؛ عدم الخلط بين transfer framing وcontent coding |
-| cache | overlap، hit، eviction، مساحة القرص، block ناقص، جلسات مختلفة | لا قراءة holes كأصفار ولا بيانات من مصدر آخر |
-| ZIP | مخزن ومضغوط، ZIP64، تعليق طويل، أسماء Unicode، تشفير، SFX، فهرس تالف | تطابق listing/extraction أو نفس فشل handler المتوقع |
-| 7z | non-solid، solid واحد ومتعدد، header مضغوط/مشفر، كلمة مرور خاطئة، ملف متأخر | بيانات صحيحة وإحصاءات واقعية |
-| توسع الصيغ | RAR4/5 وTAR، archive داخل archive، missing volume | لا إعلان دعم عام قبل النجاح |
-| المنتج | l/x/e/t، اختيار ملف/مجلد، ملفات محلية، cancel، refresh، read-only، Zone metadata | سلوك متسق ورسائل غير مضللة |
+| Stream contract | Zero bytes, partial read, EOF, Seek before zero and beyond end, invalid origins, offsets above 4 GiB, overflow | Match `IStream.h` without truncation or false EOF |
+| Normal range | Valid 206, absent Accept-Ranges header, unsupported HEAD, Content-Length describing only the part | Correct size, position, and data |
+| Invalid range | 200 after Range, wrong/missing Content-Range, short body, unexpected multipart, unexpected 416 | Clear failure or separate fallback, without mixing data |
+| Source consistency | ETag changes at the same size, size changes, weak/missing ETag, 412 during extraction | Invalidate session; no false success |
+| Connection | Redirects, loops, expired signed URL, invalid TLS, proxy, 429, mid-read interruption | Bounded, cancellable policy with understandable errors |
+| Representation | Unexpected content coding, valid partial response using HTTP chunked transfer | Preserve offsets; distinguish transfer framing from content coding |
+| Cache | Overlap, hit, eviction, disk space, incomplete block, different sessions | Never read holes as zeros or data from another source |
+| ZIP | Stored/compressed, ZIP64, long comment, Unicode names, encryption, SFX, damaged directory | Matching listing/extraction or the same expected handler failure |
+| 7z | Non-solid, single/multiple solid blocks, compressed/encrypted header, wrong password, late file | Correct data and realistic statistics |
+| Format expansion | RAR4/5 and TAR, archive inside archive, missing volume | No general support claim before success |
+| Product | l/x/e/t, file/folder selection, local files, cancel, refresh, read-only, zone metadata | Consistent behavior and accurate messages |
 
-طريقة التحقق: خادم fixture محلي يدعم التحكم في كل الردود المذكورة ويسجل الطلبات، وأرشيفات معروفة ومخرجات مرجعية وhashes. اختبار HTTPS له شهادة اختبار موثوقة في بيئة الاختبار؛ لا تعطيل للتحقق في كود الإنتاج. لا نعتمد على سيرفر عام متغير لإثبات القبول.
+Verification method: a local fixture server with controllable responses for these cases and request logging, known archives, reference outputs, and hashes. HTTPS testing uses a test certificate trusted in the test environment; do not disable verification in production code. Do not depend on a changing public server to prove acceptance.
 
-نقارن **مخرجات الملفات وقوائم العناصر**، لا exit code وحده. نراجع كذلك عدد requests والبايتات، ونجري مقارنة cold/warm cache تحت RTT مضبوط. لو كان مصدر الأرشيف غير موثوق، لا تعني hashes الداخلية أن الملفات موثوقة؛ غرضها هنا كشف الاختلاف بين المسارين.
+Compare **output files and item lists**, not just exit codes. Also review request counts and bytes, and compare cold/warm cache under controlled RTT. If the archive source is untrusted, internal hashes do not establish file trust; their purpose here is to detect differences between the two paths.
 
-## حجم التغيير المتوقع
+## Expected Change Size
 
-الإثبات على مستوى stream محدود نسبيًا؛ التكامل المنتج أكبر بسبب parser وmetadata وcallbacks وreopen والواجهة والبناء. لا يوجد أساس كافٍ لتقدير أيام دقيق قبل مرحلة traces والإثبات الشبكي. أكبر عدم يقين هو التوافق الواقعي والأداء عبر صيغ وسيرفرات مختلفة، وليس القدرة على ربط `IInStream` بالمحرك.
+The stream-level proof is relatively limited; product integration is larger because of parsing, metadata, callbacks, reopening, UI, and builds. There is insufficient basis for a precise day estimate before traces and network proof. The largest uncertainty is real-world compatibility and performance across formats and servers, rather than the ability to connect `IInStream` to the engine.
