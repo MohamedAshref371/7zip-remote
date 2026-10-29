@@ -512,6 +512,7 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
     _format.AddString(L"ZIP");
     _format.AddString(L"7z");
     _format.AddString(L"RAR");
+    _format.AddString(L"ISO");
     _format.SetCurSel(0);
     CheckButton(IDC_REMOTE_SKIP_ETAG, true);
     NormalizeSize();
@@ -526,6 +527,7 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
       case 1: ArcFormat = "zip"; break;
       case 2: ArcFormat = "7z"; break;
       case 3: ArcFormat = "rar"; break;
+      case 4: ArcFormat = "iso"; break;
       default: ArcFormat.Empty(); break; // Empty uses the engine's format detection.
     }
     CModalDialog::OnOK();

@@ -16,7 +16,7 @@ design, evidence, and remaining work.
 
 - **File Manager:** File → Open URL..., archive browsing, selected extraction,
   password handling, and fresh-session Refresh.
-- **Archive type selection:** Auto, ZIP, 7z, or RAR. The single RAR choice detects
+- **Archive type selection:** Auto, ZIP, 7z, RAR, or ISO. The single RAR choice detects
   the appropriate RAR/RAR5 handler internally. Refresh retains the selected type.
 - **Console:** direct URLs for `l`, `x`, `e`, and `t`.
 - **HTTP input stream:** WinHTTP transport, seekable reads, a bounded memory
@@ -42,7 +42,7 @@ Requirements:
 From the repository root:
 
 ```powershell
-python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/rar-family
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/iso-options
 ```
 
 The script discovers Visual Studio, loads its x64 environment, and builds the
@@ -62,11 +62,11 @@ Zig/Clang build instructions are available in the [test and build guide](Tests/R
 ### File Manager
 
 ```powershell
-& .\.build\msvc\rar-family\7zFM.exe
+& .\.build\msvc\iso-options\7zFM.exe
 ```
 
 1. Choose **File → Open URL...** and paste a direct archive URL.
-2. Leave **Archive type** on **Auto**, or choose ZIP, 7z, or RAR if known.
+2. Leave **Archive type** on **Auto**, or choose ZIP, 7z, RAR, or ISO if known.
 3. Select the desired ETag policy; bypass is checked by default in this dialog.
 4. Browse and extract items through the normal File Manager controls.
 
@@ -79,7 +79,7 @@ sanitized archive name.
 ### Console
 
 ```powershell
-$sevenzip = '.\.build\msvc\rar-family\7z.exe'
+$sevenzip = '.\.build\msvc\iso-options\7z.exe'
 
 & $sevenzip l 'https://example.com/archive.zip'
 & $sevenzip x 'https://example.com/archive.zip' 'docs/readme.txt' -oOut
@@ -111,8 +111,8 @@ their existing behavior.
 ## Tests and Validation
 
 ```powershell
-python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/rar-family/7z.exe"
-python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/rar-family/agentcheck.exe"
+python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/iso-options/7z.exe"
+python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/iso-options/agentcheck.exe"
 
 # Supply your own local RAR-generation fixtures:
 python Tests/RemoteArchive/test_rar_family.py --rar4 'path/to/legacy.rar' --rar5 'path/to/modern.rar'

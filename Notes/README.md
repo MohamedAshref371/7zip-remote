@@ -4,7 +4,7 @@ Study date: October 29, 2026.
 Local version: **7-Zip 26.05**, with source release date `2026-10-21`.
 Git reference at the time of the study: `8204ba7d01f8cd73abee5e2f82ac98e7ce3edef9`.
 
-**Latest implementation update:** the Open URL dialog offers **Auto**, **ZIP**, **7z**, and one **RAR** choice covering both RAR generations. Selecting RAR restricts detection to the RAR/RAR5 handlers. ETag bypass remains checked by default in the dialog, and Refresh retains both choices. The Agent suite passed 35 scenarios and the new RAR-family suite passed 8 scenarios with matching extracted hashes for real RAR and RAR5 fixtures. Desktop interaction verification remains pending. See [Unified RAR selection](11-rar-family.md). The following sections summarize the original study and broader design.
+**Latest implementation update:** the Open URL dialog offers **Auto**, **ZIP**, **7z**, one **RAR** choice covering both RAR generations, and **ISO**. ISO selects the existing ISO handler; the updated GUI build is `.build/msvc/iso-options/`. See [ISO selection](12-iso-selection.md). Selecting RAR restricts detection to the RAR/RAR5 handlers. ETag bypass remains checked by default in the dialog, and Refresh retains both choices. The Agent suite passed 35 scenarios and the new RAR-family suite passed 8 scenarios with matching extracted hashes for real RAR and RAR5 fixtures. Desktop interaction verification remains pending. See [Unified RAR selection](11-rar-family.md). The following sections summarize the original study and broader design.
 
 ## Conclusion
 

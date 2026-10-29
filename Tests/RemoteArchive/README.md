@@ -9,11 +9,11 @@ and is retained on Refresh; the panel path shows `[HTTP; ETag off]`. Each new
 Open URL dialog starts with ETag bypass enabled.
 
 The dialog also has an **Archive type** dropdown: **Auto** (default), **ZIP**,
-**7z**, and **RAR**. RAR restricts detection to the RAR and RAR5 handlers and lets
+**7z**, **RAR**, and **ISO**. RAR restricts detection to the RAR and RAR5 handlers and lets
 the engine identify the generation. Auto uses normal format detection; other explicit
 selections are passed to the existing handler selection. Refresh retains both the
 type and ETag policy. Direct address-bar opens and the console retain their
-existing strict ETag defaults. The latest GUI build is in `.build/msvc/rar-family/`.
+existing strict ETag defaults. The latest GUI build is in `.build/msvc/iso-options/`.
 
 The unified RAR choice is covered by `test_rar_family.py --rar4 PATH --rar5 PATH`,
 using caller-supplied fixtures. It compares complete extracted file hashes with
