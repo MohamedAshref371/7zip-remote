@@ -107,4 +107,11 @@ C_OBJS = $(C_OBJS) \
   $O\Threads.obj \
 
 !include "../../Sort.mak"
+!IFDEF Z7_HTTP
+CFLAGS = $(CFLAGS) -DZ7_HTTP
+RFLAGS = $(RFLAGS) -dZ7_HTTP
+LIBS = $(LIBS) winhttp.lib
+7ZIP_COMMON_OBJS = $(7ZIP_COMMON_OBJS) $O\HttpInStream.obj
+WIN_OBJS = $(WIN_OBJS) $O\HttpRangeSource.obj
+!ENDIF
 !include "../../7zip.mak"

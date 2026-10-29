@@ -1450,6 +1450,22 @@ void CPanel::ShowColumnsContextMenu(int x, int y)
 
 void CPanel::OnReload(bool onTimer)
 {
+  #ifdef Z7_HTTP
+  if (!onTimer && !_parentFolders.IsEmpty() && !_parentFolders[0].RemoteUrl.IsEmpty())
+  {
+    const UString url = _parentFolders[0].RemoteUrl;
+    const UString folderPath = _parentFolders.Size() == 1 ? GetFolderPath(_folder) : UString();
+    COpenResult openRes;
+    if (OpenRemoteArchive(url, UString(), openRes) == S_OK && !folderPath.IsEmpty())
+    {
+      CMyComPtr<IFolderFolder> folder;
+      if (_folder->BindToFolder(folderPath, &folder) == S_OK && folder)
+        SetNewFolder(folder);
+    }
+    RefreshListCtrl();
+    return;
+  }
+  #endif
   const HRESULT res = RefreshListCtrl_SaveFocused(onTimer);
   if (res != S_OK)
     MessageBox_Error_HRESULT(res);

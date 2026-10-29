@@ -1,4 +1,4 @@
-// Optional Windows HTTP source for read-only CLI operations.
+// Optional Windows HTTP source for read-only archive operations.
 #ifndef ZIP7_INC_REMOTE_ARCHIVE_SOURCE_H
 #define ZIP7_INC_REMOTE_ARCHIVE_SOURCE_H
 
@@ -25,6 +25,13 @@ public:
 
   CRemoteArchiveSource(): Spec(NULL) {}
 
+  void Reset()
+  {
+    Stream.Release();
+    Spec = NULL;
+    DisplayName.Empty();
+  }
+
   AString ErrorMessage() const
   {
     AString message(Spec->Source.Error.c_str());
@@ -37,11 +44,11 @@ public:
     return message;
   }
 
-  HRESULT Open(const UString &url, IOpenCallbackUI *callback)
+  static UString DisplayNameFromUrl(const UString &url)
   {
     // Never use a URL as a local path or expose signed query/userinfo in output.
     // Keep only a conservative filename hint; the engine verifies the format.
-    DisplayName = "remote-archive";
+    UString name("remote-archive");
     unsigned end = url.Len();
     for (unsigned i = 0; i < url.Len(); ++i)
       if (url[i] == L'?' || url[i] == L'#') { end = i; break; }
@@ -49,22 +56,33 @@ public:
     while (start && url[start - 1] != L'/') --start;
     if (start < end && end - start <= 160)
     {
-      DisplayName.Empty();
+      name.Empty();
       for (unsigned i = start; i < end; ++i)
       {
         const wchar_t c = url[i];
-        DisplayName += ((c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z')
+        name += ((c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z')
             || (c >= L'0' && c <= L'9') || c == L'-' || c == L'_' || c == L'.') ? c : L'_';
       }
-      if (DisplayName == L"." || DisplayName == L"..")
-        DisplayName = "remote-archive";
+      if (name == L"." || name == L"..")
+        name = "remote-archive";
     }
+    return name;
+  }
+
+  HRESULT Open(const UString &url, const NWindows::CHttpRangeOptions &options)
+  {
+    DisplayName = DisplayNameFromUrl(url);
     Spec = new CHttpInStream;
     Stream = Spec;
+    return Spec->Open(url, options);
+  }
+
+  HRESULT Open(const UString &url, IOpenCallbackUI *callback)
+  {
     NWindows::CHttpRangeOptions options;
     options.CancelCheck = CheckBreak;
     options.CancelContext = callback;
-    return Spec->Open(url, options);
+    return Open(url, options);
   }
 };
 #endif

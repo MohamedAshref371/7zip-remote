@@ -1,0 +1,185 @@
+{
+  "date": "2026-10-29",
+  "repository_version": "26.05",
+  "platform": "Windows x64",
+  "toolchain": {
+    "visual_studio": "18.8.12009.203",
+    "msvc_tools": "14.51.36231",
+    "windows_sdk": "10.0.26100.0",
+    "build_route": "upstream nmake makefiles including MASM"
+  },
+  "binaries": {
+    "7z.dll": {
+      "path": ".build\\msvc\\bin\\7z.dll",
+      "sha256": "5263139749e78c609c44b8cda8b36f080aeb31797dade2dead116b8f905ae12e"
+    },
+    "7z.exe": {
+      "path": ".build\\msvc\\bin\\7z.exe",
+      "sha256": "0df8736bf0e7727059febd3dc8049c363773cf96875201a76a272e3ceaf229c0"
+    },
+    "7zFM.exe": {
+      "path": ".build\\msvc\\bin\\7zFM.exe",
+      "sha256": "c5c1199700392b9f95114f60778b2373d10df4390c80e5f489baf61b3a2269eb"
+    },
+    "agentcheck.exe": {
+      "path": ".build\\msvc\\bin\\agentcheck.exe",
+      "sha256": "66c5c78731c90463b937779ff5b54498e678e677bdd494d8381d486742adb19a"
+    }
+  },
+  "passed_scenarios": {
+    "prototype": 72,
+    "cli": 61,
+    "file_manager_agent": 21
+  },
+  "reports": {
+    "prototype": ".build\\remote\\runs\\run-fxnglaoc\\report.json",
+    "cli": ".build\\native\\runs\\cli-ix30qkze\\report.json",
+    "agent": ".build\\msvc\\runs\\agent-ipo_5f63\\report.json"
+  },
+  "agent_cases": [
+    {
+      "label": "nonsolid.7z-local",
+      "exit_code": 0,
+      "requests": 0,
+      "requested_bytes": 0
+    },
+    {
+      "label": "nonsolid.7z-remote",
+      "exit_code": 0,
+      "requests": 3,
+      "requested_bytes": 262681
+    },
+    {
+      "label": "sample.zip-local",
+      "exit_code": 0,
+      "requests": 0,
+      "requested_bytes": 0
+    },
+    {
+      "label": "sample.zip-remote",
+      "exit_code": 0,
+      "requests": 4,
+      "requested_bytes": 525869
+    },
+    {
+      "label": "secret.7z-local",
+      "exit_code": 0,
+      "requests": 0,
+      "requested_bytes": 0
+    },
+    {
+      "label": "secret.7z-remote",
+      "exit_code": 0,
+      "requests": 3,
+      "requested_bytes": 262786
+    },
+    {
+      "label": "solid.7z-local",
+      "exit_code": 0,
+      "requests": 0,
+      "requested_bytes": 0
+    },
+    {
+      "label": "solid.7z-remote",
+      "exit_code": 0,
+      "requests": 18,
+      "requested_bytes": 4195174
+    },
+    {
+      "label": "fresh-session",
+      "exit_code": 0,
+      "requests": 4,
+      "requested_bytes": 525869
+    },
+    {
+      "label": "cancel-before",
+      "exit_code": 3,
+      "requests": 0,
+      "requested_bytes": 0
+    },
+    {
+      "label": "ignore",
+      "exit_code": 1,
+      "requests": 1,
+      "requested_bytes": 1
+    },
+    {
+      "label": "missing-etag",
+      "exit_code": 1,
+      "requests": 1,
+      "requested_bytes": 1
+    },
+    {
+      "label": "weak",
+      "exit_code": 1,
+      "requests": 1,
+      "requested_bytes": 1
+    },
+    {
+      "label": "changed",
+      "exit_code": 1,
+      "requests": 2,
+      "requested_bytes": 262145
+    },
+    {
+      "label": "changed-size",
+      "exit_code": 1,
+      "requests": 2,
+      "requested_bytes": 262145
+    },
+    {
+      "label": "precondition",
+      "exit_code": 1,
+      "requests": 2,
+      "requested_bytes": 262145
+    },
+    {
+      "label": "truncated",
+      "exit_code": 1,
+      "requests": 2,
+      "requested_bytes": 262145
+    },
+    {
+      "label": "redirect",
+      "exit_code": 1,
+      "requests": 1,
+      "requested_bytes": 1
+    },
+    {
+      "label": "forbidden",
+      "exit_code": 1,
+      "requests": 1,
+      "requested_bytes": 1
+    },
+    {
+      "label": "missing",
+      "exit_code": 1,
+      "requests": 1,
+      "requested_bytes": 1
+    },
+    {
+      "label": "range416",
+      "exit_code": 1,
+      "requests": 1,
+      "requested_bytes": 1
+    }
+  ],
+  "file_manager_without_http_build": "passed; .build/msvc/filemanager/7zFM.exe",
+  "desktop_ui_verified": false,
+  "desktop_ui_blocker": "Computer-use native pipe unavailable through both available entry points",
+  "ui_implemented": [
+    "File > Open URL",
+    "background open",
+    "retained read-only source",
+    "Internet-zone metadata",
+    "fresh-session explicit refresh with subfolder rebind",
+    "safe session-only URL handling"
+  ],
+  "remaining": [
+    "Interactive desktop acceptance flow",
+    "Real HTTPS/proxy interoperability",
+    "Responsive cancellation and separate transfer progress",
+    "Redirects, retries, full-download fallback",
+    "Broader formats and remote volumes"
+  ]
+}

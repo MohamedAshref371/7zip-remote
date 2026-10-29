@@ -1,5 +1,44 @@
 # Remote archive prototype (Windows x64)
 
+## MSVC engine, console, and File Manager
+
+With the Visual Studio Desktop development with C++ workload and Windows SDK:
+
+```powershell
+python Tests/RemoteArchive/build_msvc.py --http --agent-check
+python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/bin/7z.exe"
+python Tests/RemoteArchive/test_agent.py
+python Tests/RemoteArchive/build.py
+python Tests/RemoteArchive/test_remote.py --dll "$PWD/.build/msvc/bin/7z.dll" --sevenzip "$PWD/.build/msvc/bin/7z.exe"
+```
+
+`build_msvc.py` discovers Visual Studio through vswhere, loads the x64 toolchain
+environment, and executes the upstream nmake files, including MASM assembly.
+No tools are installed and installed 7-Zip is unchanged. `--target` selects
+`engine`, `console`, `filemanager`, or `all`. Use `--rebuild` after header changes
+to force recompilation of all dependents. `--agent-check` links a headless check
+against the actual HTTP-enabled File Manager objects; it requires `--http`.
+
+HTTP-enabled binaries are collected in `.build/msvc/bin/`; builds without HTTP
+use `.build/msvc/bin-local/`. Logs and object files stay under `.build/msvc/`.
+Build the engine and keep `7z.dll` beside `7z.exe` and `7zFM.exe`.
+
+The HTTP-enabled File Manager has **File → Open URL...**. Its opening work uses
+the existing worker/progress dialog; archive contents use the normal browsing
+and extraction paths. Explicit Refresh opens a fresh source, preserving the
+current subfolder when possible; refreshing a nested archive returns to the
+outer remote archive. Failed refresh preserves the previous view. URLs and
+signed queries remain session-only; displayed/history paths use a sanitized
+`[HTTP]` name. Automatic persistence/restoration of remote sessions is not
+implemented. Remote mutation and external-editor writeback are blocked.
+
+The File Manager executable builds, and `test_agent.py` verifies its Agent
+without windows: browsing, extraction/testing, encrypted headers, solid data,
+zone marking, source consistency, callback lifetime, cancellation before open,
+and rejected mutations. **Desktop UI interaction has not been verified** because
+the computer-use native connection is unavailable in this session. See
+[MSVC/File Manager results](../../Notes/08-msvc-and-file-manager.md).
+
 ## Native 26.05 engine and integrated console
 
 The checkout now also supports an optional HTTP-enabled build of the regular
@@ -40,8 +79,8 @@ checked through console callbacks but remains subject to synchronous HTTP waits.
 
 The GCC console makefile accepts `Z7_HTTP=1` on Windows; the MSVC console build
 accepts `Z7_HTTP=1` with a compiler supporting the HTTP code's modern C++ syntax.
-Those makefile routes have been updated but not executed here because GNU make
-and the MSVC C++ toolset are unavailable. File Manager is not yet integrated.
+The GCC route remains unexecuted; the MSVC route is now tested as described above.
+The earlier portable milestone predates the initial File Manager integration.
 See [current results](../../Notes/07-cli-integration-results.md).
 
 ## Standalone prototype

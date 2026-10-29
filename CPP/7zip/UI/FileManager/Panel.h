@@ -183,6 +183,9 @@ struct CFolderLink: public CTempFileInfo
   UString ParentFolderPath; // including tail slash (doesn't include paths parts of parent in next level)
   UString Password;
   UString VirtualPath; // without tail slash
+  #ifdef Z7_HTTP
+  UString RemoteUrl; // session-only; never included in display/history paths
+  #endif
   CByteBuffer ZoneBuf; // ZoneBuf for virtaul stream (IsVirtual)
 
   CFolderLink(): IsVirtual(false), UsePassword(false) {}
@@ -564,6 +567,10 @@ public:
   void SetToRootFolder();
   HRESULT BindToPath(const UString &fullPath, const UString &arcFormat, COpenResult &openRes); // can be prefix
   HRESULT BindToPathAndRefresh(const UString &path);
+  #ifdef Z7_HTTP
+  HRESULT OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes);
+  void OpenRemoteArchiveDialog();
+  #endif
   void OpenDrivesFolder();
   
   void SetBookmark(unsigned index);

@@ -2,6 +2,8 @@
 
 **Timeline note:** this file records evidence from the initial study. After the request to begin implementation, the prototype and tests were completed; see [Initial implementation results](06-prototype-results.md) for the latest status.
 
+For the current MSVC build and initial File Manager integration, see [the latest results](08-msvc-and-file-manager.md). The sections below remain the historical study record.
+
 ## Work Performed
 
 - Inspected repository structure and Git status; the worktree was clean at the start of the study, and `Notes` was empty.

@@ -26,6 +26,10 @@ struct CThreadArchiveOpen
   UString ArcFormat;
   CMyComPtr<IInStream> InStream;
   CMyComPtr<IFolderManager> FolderManager;
+  #ifdef Z7_HTTP
+  CArchiveFolderManager *ManagerSpec;
+  UString RemoteError;
+  #endif
   CMyComPtr<IProgress> OpenCallbackProgress;
   
   COpenArchiveCallback *OpenCallbackSpec;
@@ -45,6 +49,9 @@ struct CThreadArchiveOpen
     {
       CProgressCloser closer(OpenCallbackSpec->ProgressDialog);
       Result = FolderManager->OpenFolderFile(InStream, Path, ArcFormat, &Folder, OpenCallbackProgress);
+      #ifdef Z7_HTTP
+      RemoteError = ManagerSpec->GetRemoteError();
+      #endif
     }
     catch(...) { Result = E_FAIL; }
   }
@@ -297,7 +304,13 @@ HRESULT CFfpOpen::OpenFileFolderPlugin(IInStream *inStream,
     CThreadArchiveOpen t;
 
     // if (plugin.FilePath.IsEmpty())
-      t.FolderManager = new CArchiveFolderManager;
+    {
+      CArchiveFolderManager *manager = new CArchiveFolderManager;
+      t.FolderManager = manager;
+      #ifdef Z7_HTTP
+      t.ManagerSpec = manager;
+      #endif
+    }
     /*
     else if (library.LoadAndCreateManager(plugin.FilePath, plugin.ClassID, &t.FolderManager) != S_OK)
       continue;
@@ -322,6 +335,11 @@ HRESULT CFfpOpen::OpenFileFolderPlugin(IInStream *inStream,
     // openCallbackSpec->ReOpenCallback =
       t.OpenCallbackSpec;
 
+    #ifdef Z7_HTTP
+    if (IsHttpArchiveUrl(fs2us(path)))
+      openCallbackSpec->SetSubArchiveName(CRemoteArchiveSource::DisplayNameFromUrl(fs2us(path)));
+    else
+    #endif
     if (inStream)
       openCallbackSpec->SetSubArchiveName(fs2us(fileName));
     else
@@ -357,6 +375,9 @@ HRESULT CFfpOpen::OpenFileFolderPlugin(IInStream *inStream,
       from each volume object (CInFileStreamVol) will be closed (when archive will be closed).
     */
     t.OpenCallbackProgress.Release();
+    #ifdef Z7_HTTP
+    if (!t.RemoteError.IsEmpty()) ErrorMessage = t.RemoteError;
+    #endif
 
     if (t.Result != S_FALSE && t.Result != S_OK)
       return t.Result;

@@ -4,6 +4,8 @@ This plan was written after the initial study. **Update:** a tracing stream, HTT
 
 **Latest status:** the native 26.05 engine and initial CLI integration are now implemented and tested. Phase 2 has a working development implementation; broader interoperability, transfer-progress reporting, and fallback policy still need work. Phase 3 (File Manager) remains pending. See [CLI integration results](07-cli-integration-results.md). Historical future-tense descriptions below record the original plan.
 
+**Subsequent update:** an MSVC/nmake build of the engine, console, and File Manager now succeeds. Initial Phase 3 code includes “Open URL”, a retained read-only source, Internet-zone handling, and fresh-session refresh. Agent integration tests pass; desktop UI validation is still pending. See [MSVC/File Manager results](08-msvc-and-file-manager.md).
+
 ## Initial Product Scope
 
 A direct link to a single-volume archive, file listing, extraction of selected items to disk, and item testing. Start with a small tool using the 7-Zip engine, then integrate into CLI, followed by File Manager to deliver the requested browsing experience.

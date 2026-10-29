@@ -42,6 +42,11 @@ public:
   HRESULT Open(const wchar_t *url, const CHttpRangeOptions &options);
   HRESULT Fetch(ULONGLONG start, unsigned length, std::vector<unsigned char> &data);
   bool IsCancelled() const;
+  void SetCancelCheck(bool (*check)(void *), void *context)
+  {
+    _options.CancelCheck = check;
+    _options.CancelContext = context;
+  }
 };
 
 }

@@ -747,6 +747,9 @@ bool ExecuteFileCommand(unsigned id)
   {
     // File
     case IDM_OPEN: g_App.OpenItem(); break;
+    #ifdef Z7_HTTP
+    case IDM_OPEN_URL: g_App.GetFocusedPanel().OpenRemoteArchiveDialog(); break;
+    #endif
     
     case IDM_OPEN_INSIDE:        g_App.OpenItemInside(NULL); break;
     case IDM_OPEN_INSIDE_ONE:    g_App.OpenItemInside(L"*"); break;

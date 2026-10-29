@@ -2,6 +2,10 @@
 
 Date: October 29, 2026.
 
+**Historical milestone:** this file records the earlier portable-toolchain build.
+Visual Studio C++ tools have since been installed, and an initial File Manager
+integration added. See [the latest MSVC results](08-msvc-and-file-manager.md).
+
 The current milestone builds the 26.05 engine and console from this repository
 and adds optional direct-URL support to the regular console. File Manager is
 still pending; the project is not yet release-ready.

@@ -103,6 +103,11 @@ Z7_COM7F_IMF(CArchiveFolderManager::OpenFolderFile(IInStream *inStream,
   CMyComPtr<IInFolderArchive> archive = agent;
   
   const HRESULT res = archive->Open(inStream, filePath, arcFormat, NULL, openArchiveCallback);
+  #ifdef Z7_HTTP
+  RemoteError.Empty();
+  if (agent->IsRemote() && !agent->RemoteSource.Spec->Source.Error.empty())
+    RemoteError = agent->RemoteSource.ErrorMessage().Ptr();
+  #endif
   
   if (res != S_OK)
   {

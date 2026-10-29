@@ -1535,7 +1535,15 @@ Z7_COM7F_IMF(CAgentFolder::Extract(const UInt32 *indices,
   #if defined(_WIN32) && !defined(UNDER_CE)
     if (_zoneMode != NExtract::NZoneIdMode::kNone)
     {
-      ReadZoneFile_Of_BaseFile(us2fs(_agentSpec->_archiveFilePath), extractCallbackSpec->ZoneBuf);
+      #ifdef Z7_HTTP
+      if (_agentSpec->IsRemote())
+      {
+        static const char zone[] = "[ZoneTransfer]\r\nZoneId=3\r\n";
+        extractCallbackSpec->ZoneBuf.CopyFrom((const Byte *)zone, sizeof(zone) - 1);
+      }
+      else
+      #endif
+        ReadZoneFile_Of_BaseFile(us2fs(_agentSpec->_archiveFilePath), extractCallbackSpec->ZoneBuf);
       if (_zoneBuf.Size() != 0)
         extractCallbackSpec->ZoneBuf = _zoneBuf;
     }
@@ -1611,6 +1619,9 @@ CAgent::~CAgent()
 
 bool CAgent::CanUpdate() const
 {
+  #ifdef Z7_HTTP
+  if (IsRemote()) return false;
+  #endif
   if (_proxy && _proxy->Are_Changed_LongPaths)
     return false;
   // FAR plugin uses empty agent to create new archive !!!
@@ -1625,6 +1636,24 @@ bool CAgent::CanUpdate() const
   return true;
 }
 
+#ifdef Z7_HTTP
+static bool RemoteOpen_CheckBreak(void *context)
+{
+  return context && static_cast<IArchiveOpenCallback *>(context)->SetCompleted(NULL, NULL) != S_OK;
+}
+
+struct CRemoteOpenCancelScope
+{
+  CRemoteArchiveSource &Source;
+  explicit CRemoteOpenCancelScope(CRemoteArchiveSource &source): Source(source) {}
+  ~CRemoteOpenCancelScope()
+  {
+    // The opening callback is temporary; never retain it while browsing/extracting.
+    if (Source.Spec) Source.Spec->Source.SetCancelCheck(NULL, NULL);
+  }
+};
+#endif
+
 Z7_COM7F_IMF(CAgent::Open(
     IInStream *inStream,
     const wchar_t *filePath,
@@ -1634,8 +1663,24 @@ Z7_COM7F_IMF(CAgent::Open(
 {
   COM_TRY_BEGIN
   _archiveFilePath = filePath;
+  #ifdef Z7_HTTP
+  CRemoteOpenCancelScope cancelScope(RemoteSource);
+  RemoteSource.Reset();
+  if (!inStream && IsHttpArchiveUrl(_archiveFilePath))
+  {
+    NWindows::CHttpRangeOptions remoteOptions;
+    remoteOptions.CancelCheck = RemoteOpen_CheckBreak;
+    remoteOptions.CancelContext = openArchiveCallback;
+    RINOK(RemoteSource.Open(_archiveFilePath, remoteOptions))
+    inStream = RemoteSource.Stream;
+    _archiveFilePath = RemoteSource.DisplayName;
+  }
+  #endif
   _hashBaseFolderPrefix.Empty();
   _attrib = 0;
+  #ifdef Z7_HTTP
+  if (IsRemote()) _attrib = FILE_ATTRIBUTE_READONLY;
+  #endif
   _isDeviceFile = false;
   _isHashHandler = false;
   NFile::NFind::CFileInfo fi;
@@ -1685,6 +1730,10 @@ Z7_COM7F_IMF(CAgent::Open(
   options.callback = openArchiveCallback;
 
   HRESULT res = _archiveLink.Open(options);
+  #ifdef Z7_HTTP
+  if (IsRemote() && !RemoteSource.Spec->Source.Error.empty() && res == S_OK)
+    res = E_FAIL;
+  #endif
 
   if (!_archiveLink.Arcs.IsEmpty())
   {
@@ -1714,6 +1763,10 @@ Z7_COM7F_IMF(CAgent::Open(
 Z7_COM7F_IMF(CAgent::ReOpen(IArchiveOpenCallback *openArchiveCallback))
 {
   COM_TRY_BEGIN
+  #ifdef Z7_HTTP
+  // Remote refresh uses a fresh source/agent in the panel, never a local path.
+  if (IsRemote()) return E_NOTIMPL;
+  #endif
   if (_proxy2)
   {
     delete _proxy2;
@@ -1745,7 +1798,11 @@ Z7_COM7F_IMF(CAgent::ReOpen(IArchiveOpenCallback *openArchiveCallback))
 Z7_COM7F_IMF(CAgent::Close())
 {
   COM_TRY_BEGIN
-  return _archiveLink.Close();
+  const HRESULT res = _archiveLink.Close();
+  #ifdef Z7_HTTP
+  RemoteSource.Reset();
+  #endif
+  return res;
   COM_TRY_END
 }
 

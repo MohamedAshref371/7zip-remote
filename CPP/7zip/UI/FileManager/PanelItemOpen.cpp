@@ -21,6 +21,8 @@
 #include "../Common/ExtractingFilePath.h"
 
 #include "App.h"
+#include "ComboDialog.h"
+#include "../Common/RemoteArchiveSource.h"
 
 #include "FileFolderPluginOpen.h"
 #include "FormatUtils.h"
@@ -451,6 +453,64 @@ public:
 };
 
 void GetFolderError(CMyComPtr<IFolderFolder> &folder, UString &s);
+
+#ifdef Z7_HTTP
+HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes)
+{
+  CDisableTimerProcessing disableTimerProcessing(*this);
+  CDisableNotify disableNotify(*this);
+  openRes.ArchiveIsOpened = false;
+  openRes.Encrypted = false;
+  CFfpOpen ffp;
+  const HRESULT res = ffp.OpenFileFolderPlugin(NULL, us2fs(url), arcFormat, GetParent());
+  openRes.Encrypted = ffp.Encrypted;
+  openRes.ErrorMessage = ffp.ErrorMessage;
+  if (res != S_OK)
+  {
+    if (res != E_ABORT)
+      MessageBox_Error(!ffp.ErrorMessage.IsEmpty() ? ffp.ErrorMessage.Ptr() :
+          (res == S_FALSE ? L"Cannot open remote archive." : HResultToMessage(res).Ptr()));
+    return res;
+  }
+
+  CFolderLink link;
+  link.IsVirtual = true;
+  link.RemoteUrl = url;
+  link.RelPath = "[HTTP] ";
+  link.RelPath += CRemoteArchiveSource::DisplayNameFromUrl(url);
+  link.VirtualPath = link.RelPath;
+  link.ParentFolderPath = _parentFolders.IsEmpty() ? _currentFolderPrefix : _parentFolders[0].ParentFolderPath;
+  link.Password = ffp.Password;
+  link.UsePassword = ffp.Encrypted;
+  static const char zone[] = "[ZoneTransfer]\r\nZoneId=3\r\n";
+  link.ZoneBuf.CopyFrom((const Byte *)zone, sizeof(zone) - 1);
+
+  // Replace the old view only after a complete new session has opened.
+  CloseOpenFolders();
+  _parentFolders.Add(link);
+  SetNewFolder(ffp.Folder);
+  _library.Attach(ffp.Library.Detach());
+  _flatMode = _flatModeForArc;
+  _thereAreDeletedItems = false;
+  openRes.ArchiveIsOpened = true;
+  return S_OK;
+}
+
+void CPanel::OpenRemoteArchiveDialog()
+{
+  CComboDialog dialog;
+  dialog.Title = "Open URL";
+  dialog.Static = "Direct HTTP or HTTPS archive URL:";
+  if (dialog.Create(GetParent()) != IDOK) return;
+  if (!IsHttpArchiveUrl(dialog.Value))
+  {
+    MessageBox_Error(L"Enter a direct HTTP or HTTPS archive URL.");
+    return;
+  }
+  BindToPathAndRefresh(dialog.Value);
+  SetFocusToList();
+}
+#endif
 
 
 HRESULT CPanel::OpenAsArc(IInStream *inStream,

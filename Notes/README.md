@@ -4,7 +4,7 @@ Study date: October 29, 2026.
 Local version: **7-Zip 26.05**, with source release date `2026-10-21`.
 Git reference at the time of the study: `8204ba7d01f8cd73abee5e2f82ac98e7ce3edef9`.
 
-**Latest implementation update:** the 26.05 engine and console now build from this checkout. The optional HTTP-enabled `7z.exe` supports `l`, `x`, `e`, and `t` with direct URLs. The prototype suite passed 72 scenarios on the new engine, and the CLI suite passed 61 scenarios. See [CLI integration results and commands](07-cli-integration-results.md). File Manager integration is still pending. The following sections summarize the original study and broader design.
+**Latest implementation update:** the engine, console, and File Manager now build with MSVC/nmake. The optional HTTP-enabled File Manager includes an initial “Open URL” implementation, backed by an Agent tested for browsing, extraction, and read-only enforcement. The prototype, CLI, and Agent suites passed 72, 61, and 21 scenarios respectively. Desktop UI verification remains pending because the computer-use connection is unavailable. See [MSVC and File Manager results](08-msvc-and-file-manager.md). The following sections summarize the original study and broader design.
 
 ## Conclusion
 
@@ -38,6 +38,7 @@ These are engineering choices for the study, not settings currently available in
 5. [Evidence and study limits](05-evidence-and-open-questions.md): what was reviewed and what requires implementation experiments.
 6. [Initial implementation results](06-prototype-results.md): new code, measurements, commands, and testing limits.
 7. [26.05 build and CLI integration](07-cli-integration-results.md): current development binaries, CLI verification, and remaining work.
+8. [MSVC build and File Manager integration](08-msvc-and-file-manager.md): latest build commands, Agent verification, and desktop-testing limits.
 
 ## Illustrative Benefit
 
@@ -45,4 +46,4 @@ For a 20 GiB ZIP, downloading its directory and a 5 MiB compressed file's data, 
 
 ## Work Status
 
-The study, standalone prototype, native 26.05 engine build, and initial CLI integration are complete. The development console can list, selectively extract, and test remote ZIP and 7z archives using existing handlers and extraction callbacks. Local HTTP fixtures verify the behavior; successful public HTTPS/proxy interoperability remains untested. File Manager, redirects, retries, full-download fallback, and remote volume resolution remain future work. This is a development milestone, not a release-ready product.
+The study, standalone prototype, 26.05 engine build, and CLI integration are complete. Initial File Manager code now supports opening direct URLs and refreshing with a fresh session, with Agent-level coverage for local/remote browsing, extraction, passwords, zones, and rejected mutations. The desktop interaction itself has not been verified. Successful public HTTPS/proxy interoperability, redirects, retries, full-download fallback, and remote volume resolution remain future work. This is a development milestone, not a release-ready product.

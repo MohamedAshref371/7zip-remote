@@ -1,6 +1,7 @@
 // PanelFolderChange.cpp
 
 #include "StdAfx.h"
+#include "../Common/RemoteArchiveSource.h"
 
 #include "../../../Common/StringConvert.h"
 #include "../../../Common/Wildcard.h"
@@ -75,6 +76,10 @@ static bool DoesNameContainWildcard_SkipRoot(const UString &path)
 
 HRESULT CPanel::BindToPath(const UString &fullPath, const UString &arcFormat, COpenResult &openRes)
 {
+  #ifdef Z7_HTTP
+  if (IsHttpArchiveUrl(fullPath))
+    return OpenRemoteArchive(fullPath, arcFormat, openRes);
+  #endif
   UString path = fullPath;
   #ifdef _WIN32
   path.Replace(L'/', WCHAR_PATH_SEPARATOR);

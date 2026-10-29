@@ -154,7 +154,7 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
 {
   data.clear();
   if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
-  const ULONGLONG begun = GetTickCount64();
+  const DWORD begun = GetTickCount();
   CRequestHandle request(WinHttpOpenRequest(_connection, L"GET", _path.c_str(), NULL,
       WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
       (_secure ? WINHTTP_FLAG_SECURE : 0) | WINHTTP_FLAG_ESCAPE_DISABLE));
@@ -222,7 +222,8 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
   for (;;)
   {
     if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
-    if (GetTickCount64() - begun >= _options.RequestDeadlineMs)
+    // Unsigned subtraction also handles the 32-bit tick counter wrapping.
+    if (static_cast<DWORD>(GetTickCount() - begun) >= _options.RequestDeadlineMs)
       return Fail("HTTP request deadline exceeded.", HRESULT_FROM_WIN32(ERROR_TIMEOUT));
     unsigned char extra;
     DWORD got = 0;

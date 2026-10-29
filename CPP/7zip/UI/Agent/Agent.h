@@ -9,6 +9,7 @@
 
 #include "../Common/LoadCodecs.h"
 #include "../Common/OpenArchive.h"
+#include "../Common/RemoteArchiveSource.h"
 #include "../Common/UpdateAction.h"
 
 #include "../FileManager/IFolder.h"
@@ -231,6 +232,10 @@ public:
   CAgentFolder *_agentFolder;
 
   UString _archiveFilePath; // it can be path of non-existing file if file is virtual
+  #ifdef Z7_HTTP
+  CRemoteArchiveSource RemoteSource;
+  bool IsRemote() const { return RemoteSource.Spec != NULL; }
+  #endif
   
   DWORD _attrib;
   bool _updatePathPrefix_is_AltFolder;
@@ -351,6 +356,9 @@ Z7_CLASS_IMP_COM_1(
   CObjectVector<CCodecIcons> CodecIconsVector;
   CCodecIcons InternalIcons;
   bool WasLoaded;
+  #ifdef Z7_HTTP
+  UString RemoteError;
+  #endif
 
   void LoadFormats();
   // int FindFormat(const UString &type);
@@ -358,6 +366,9 @@ public:
   CArchiveFolderManager():
       WasLoaded(false)
       {}
+  #ifdef Z7_HTTP
+  const UString &GetRemoteError() const { return RemoteError; }
+  #endif
 };
 
 // #endif
