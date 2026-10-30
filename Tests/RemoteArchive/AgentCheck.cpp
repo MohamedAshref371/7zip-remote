@@ -4,14 +4,18 @@
 #include "../../CPP/7zip/UI/Agent/Agent.h"
 #include "../../CPP/Common/StringConvert.h"
 #include "../../C/DllSecur.h"
+#include "../../CPP/7zip/UI/FileManager/OpenCallback.h"
+#include "../../CPP/7zip/UI/FileManager/ExtractCallback.h"
 
 extern HINSTANCE g_hInstance;
 
 class CTestCallback Z7_final:
     public IFolderArchiveExtractCallback, public IArchiveOpenCallback,
     public ICryptoGetTextPassword, public CMyUnknownImp
+    , public IRemoteProgress
 {
-  Z7_COM_UNKNOWN_IMP_3(IFolderArchiveExtractCallback, IArchiveOpenCallback, ICryptoGetTextPassword)
+  Z7_COM_UNKNOWN_IMP_4(IFolderArchiveExtractCallback, IArchiveOpenCallback, ICryptoGetTextPassword, IRemoteProgress)
+  Z7_IFACE_COM7_IMP(IRemoteProgress)
   Z7_IFACE_COM7_IMP(IProgress)
   Z7_IFACE_COM7_IMP(IArchiveOpenCallback)
   Z7_IFACE_COM7_IMP(IFolderArchiveExtractCallback)
@@ -19,7 +23,32 @@ class CTestCallback Z7_final:
 public:
   bool Cancel = false;
   bool Failed = false;
+  bool NetworkDefined = false;
+  bool NetworkMonotonic = true;
+  UInt64 NetworkBytes = 0, NetworkSize = 0, NetworkRequests = 0;
+  void PrintNetwork(const char *phase)
+  {
+    if (NetworkDefined)
+      printf("NETWORK %s %llu %llu %llu\n", phase,
+          (unsigned long long)NetworkBytes, (unsigned long long)NetworkSize,
+          (unsigned long long)NetworkRequests);
+  }
+  void ResetNetwork()
+  {
+    NetworkDefined = false;
+    NetworkBytes = NetworkSize = NetworkRequests = 0;
+  }
 };
+
+Z7_COM7F_IMF(CTestCallback::SetNetworkProgress(UInt64 bytes, UInt64 size, UInt64 requests))
+{
+  if (NetworkDefined && (bytes < NetworkBytes || requests < NetworkRequests)) NetworkMonotonic = false;
+  NetworkDefined = true;
+  NetworkBytes = bytes;
+  NetworkSize = size;
+  NetworkRequests = requests;
+  return S_OK;
+}
 
 Z7_COM7F_IMF(CTestCallback::SetTotal(UInt64)) { return Cancel ? E_ABORT : S_OK; }
 Z7_COM7F_IMF(CTestCallback::SetCompleted(const UInt64 *)) { return Cancel ? E_ABORT : S_OK; }
@@ -39,11 +68,39 @@ Z7_COM7F_IMF(CTestCallback::CryptoGetTextPassword(BSTR *password))
   fprintf(stderr, "line %u: HRESULT %08lx\n", __LINE__, (unsigned long)hr_); return 1; } } while (0)
 #define CHECK(value) do { if (!(value)) { fprintf(stderr, "line %u: check failed\n", __LINE__); return 1; } } while (0)
 
+static int CheckNetworkSync()
+{
+  COpenArchiveCallback open;
+  COpenCallbackImp *bridge = new COpenCallbackImp;
+  CMyComPtr<IArchiveOpenCallback> bridgeRef = bridge;
+  bridge->Callback = &open;
+  CMyComPtr<IRemoteProgress> progress;
+  CHECK_HR(bridgeRef.QueryInterface(IID_IRemoteProgress, &progress));
+  CHECK_HR(progress->SetNetworkProgress(123, 456, 2));
+  CHECK(open.ProgressDialog.Sync._networkDefined);
+  CHECK(open.ProgressDialog.Sync._networkBytes == 123);
+  CHECK(open.ProgressDialog.Sync._networkSize == 456);
+  CHECK(open.ProgressDialog.Sync._networkRequests == 2);
+  CHECK(open.ProgressDialog.Sync._completedBytes == 0);
+  bridge->Callback = NULL;
+
+  CExtractCallbackImp *extract = new CExtractCallbackImp;
+  CMyComPtr<IFolderArchiveExtractCallback> extractRef = extract;
+  CProgressDialog dialog;
+  extract->ProgressDialog = &dialog;
+  CHECK_HR(extractRef.QueryInterface(IID_IRemoteProgress, &progress));
+  CHECK_HR(progress->SetNetworkProgress(789, 1024, 3));
+  CHECK(dialog.Sync._networkBytes == 789 && dialog.Sync._networkRequests == 3);
+  CHECK(dialog.Sync._networkSize == 1024 && dialog.Sync._completedBytes == 0);
+  return 0;
+}
+
 int __cdecl wmain(int argc, wchar_t **argv)
 {
   if (argc < 3) return 2;
   g_hInstance = GetModuleHandleW(NULL);
   My_SetDefaultDllDirectories();
+  CHECK(CheckNetworkSync() == 0);
   const bool remote = IsHttpArchiveUrl(UString(argv[1]));
   CArchiveFolderManager *manager = new CArchiveFolderManager;
   CMyComPtr<IFolderManager> managerRef = manager;
@@ -68,6 +125,9 @@ int __cdecl wmain(int argc, wchar_t **argv)
       return result == E_ABORT ? 3 : 1;
     }
     callback->Cancel = true;
+    CHECK(callback->NetworkMonotonic);
+    CHECK(callback->NetworkDefined == remote);
+    callback->PrintNetwork("open");
   } // Destroy the open callback before subsequent reads: no retained raw pointer.
   CHECK_HR(folder->LoadItems());
   NWindows::NCOM::CPropVariant readOnly;
@@ -139,9 +199,14 @@ int __cdecl wmain(int argc, wchar_t **argv)
   CHECK_HR(archive->Extract(&selected, 1, 0, 0, NExtract::NPathMode::kNoPaths,
       NExtract::NOverwriteMode::kOverwrite, argv[2], 0, callback));
   CHECK(!extract->Failed);
+  CHECK(extract->NetworkMonotonic && extract->NetworkDefined == remote);
+  extract->PrintNetwork("extract");
+  extract->ResetNetwork();
   CHECK_HR(archive->Extract(&selected, 1, 0, 0, NExtract::NPathMode::kNoPaths,
       NExtract::NOverwriteMode::kOverwrite, argv[2], 1, callback));
   CHECK(!extract->Failed);
+  CHECK(extract->NetworkMonotonic && extract->NetworkDefined == remote);
+  extract->PrintNetwork("test");
   printf("Agent open/browse/extract/test/read-only checks passed.\n");
   return 0;
 }

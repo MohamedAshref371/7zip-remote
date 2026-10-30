@@ -102,6 +102,12 @@ HRESULT CHttpRangeSource::Fail(const char *message, HRESULT result)
   return result;
 }
 
+void CHttpRangeSource::ReportProgress() const
+{
+  if (_options.Progress)
+    _options.Progress(_options.ProgressContext, Downloaded, Size, Requests);
+}
+
 HRESULT CHttpRangeSource::FailNetwork()
 {
   const DWORD error = GetLastError();
@@ -199,6 +205,7 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
       std::to_wstring(start) + L"-" + std::to_wstring(start + length - 1) + L"\r\n" +
       (probe || _options.SkipETagVerification ? L"" : L"If-Match: " + _etag + L"\r\n");
   ++Requests;
+  ReportProgress();
   Status = 0; // A failed request must not report the previous response's status.
   if (!WinHttpSendRequest(request.Value, headers.c_str(), static_cast<DWORD>(headers.size()),
       WINHTTP_NO_REQUEST_DATA, 0, 0, 0) || !WinHttpReceiveResponse(request.Value, NULL))
@@ -265,12 +272,14 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
     if (!WinHttpReadData(request.Value, done < length ? body.data() + done : &extra, want, &got))
       return FailNetwork();
     Downloaded += got;
+    ReportProgress();
     if (!got) break;
     if (done == length) return Fail("Range body exceeds its declared length.");
     done += got;
   }
   if (done != length) return Fail("The server sent an incomplete byte range. Check your connection and reopen the archive.");
   if (probe) { Size = total; _etag = tag; }
+  ReportProgress();
   data.swap(body); // Publish only a complete, validated range.
   return S_OK;
 }

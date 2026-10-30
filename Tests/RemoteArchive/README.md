@@ -47,6 +47,10 @@ work. See [ETag option results](../../Notes/09-etag-option.md).
 
 ## MSVC engine, console, and File Manager
 
+The HTTP-enabled File Manager progress dialog now shows downloaded body bytes,
+archive size, average network speed, and request count for the current operation.
+See [network progress](../../Notes/14-network-progress.md) for semantics and checks.
+
 For a manual desktop test after building, start a loopback-only fixture server:
 
 ```powershell

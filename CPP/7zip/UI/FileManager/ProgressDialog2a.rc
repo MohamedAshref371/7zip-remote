@@ -27,7 +27,11 @@
 #define y3 (y2 + k)
 #define y4 (y3 + k)
 
+#ifdef Z7_HTTP
+#define z3 (y4 + k + k + k + k + 1)
+#else
 #define z3 (y4 + k + 1)
+#endif
 
 #define z2 (z3 + k + 1)
 #define z2s 24
@@ -75,6 +79,11 @@ CAPTION "Progress"
   RTEXT  "",  IDT_PROGRESS_RATIO_VAL,     x3, y4, x3s, MY_TEXT_NOPREFIX
 
   LTEXT  "", IDT_PROGRESS_STATUS, m, z3, xc, MY_TEXT_NOPREFIX
+ #ifdef Z7_HTTP
+  LTEXT  "", IDT_PROGRESS_NETWORK, m, (y4 + k), xc, MY_TEXT_NOPREFIX
+  LTEXT  "", IDT_PROGRESS_NETWORK_SPEED, m, (y4 + k + k), xc, MY_TEXT_NOPREFIX
+  LTEXT  "", IDT_PROGRESS_NETWORK_REQUESTS, m, (y4 + k + k + k), xc, MY_TEXT_NOPREFIX
+ #endif
   CONTROL  "", IDT_PROGRESS_FILE_NAME, "Static", SS_NOPREFIX | SS_LEFTNOWORDWRAP, m, z2, xc, z2s
   
   CONTROL  "Progress1", IDC_PROGRESS1, "msctls_progress32", PBS_SMOOTH | WS_BORDER, m, z1, xc, z1s

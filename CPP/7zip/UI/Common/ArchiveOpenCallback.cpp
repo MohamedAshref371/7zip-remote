@@ -27,6 +27,21 @@
 
 using namespace NWindows;
 
+#ifdef Z7_HTTP
+Z7_COM7F_IMF(COpenCallbackImp::SetNetworkProgress(UInt64 downloaded, UInt64 size, UInt64 requests))
+{
+  COM_TRY_BEGIN
+  if (ReOpenCallback)
+  {
+    CMyComPtr<IRemoteProgress> progress;
+    ReOpenCallback->QueryInterface(IID_IRemoteProgress, (void **)&progress);
+    return progress ? progress->SetNetworkProgress(downloaded, size, requests) : S_OK;
+  }
+  return Callback ? Callback->Open_NetworkProgress(downloaded, size, requests) : S_OK;
+  COM_TRY_END
+}
+#endif
+
 HRESULT COpenCallbackImp::Init2(const FString &folderPrefix, const FString &fileName)
 {
   Volumes.Init();

@@ -1486,6 +1486,10 @@ Z7_COM7F_IMF(CAgentFolder::Extract(const UInt32 *indices,
   if (!testMode && _agentSpec->_isHashHandler)
     return E_NOTIMPL;
 
+  #ifdef Z7_HTTP
+  CRemoteProgressScope networkProgress(_agentSpec->RemoteSource, extractCallback2);
+  #endif
+
   CArchiveExtractCallback *extractCallbackSpec = new CArchiveExtractCallback;
   CMyComPtr<IArchiveExtractCallback> extractCallback = extractCallbackSpec;
   UStringVector pathParts;
@@ -1666,9 +1670,11 @@ Z7_COM7F_IMF(CAgent::Open(
   #ifdef Z7_HTTP
   CRemoteOpenCancelScope cancelScope(RemoteSource);
   RemoteSource.Reset();
+  CRemoteProgressScope networkProgress(RemoteSource, openArchiveCallback);
   if (!inStream && IsHttpArchiveUrl(_archiveFilePath))
   {
     NWindows::CHttpRangeOptions remoteOptions;
+    networkProgress.Configure(remoteOptions);
     remoteOptions.CancelCheck = RemoteOpen_CheckBreak;
     remoteOptions.CancelContext = openArchiveCallback;
     remoteOptions.SkipETagVerification = SkipHttpETag;

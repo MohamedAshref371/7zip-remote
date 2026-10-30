@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import random
+import re
 import subprocess
 import tempfile
 import threading
@@ -53,6 +54,15 @@ def main():
             assert (output_dir / 'target.txt').read_bytes() == target
             if str(source).startswith('http'):
                 assert b'ZoneId=3' in Path(str(output_dir / 'target.txt') + ':Zone.Identifier').read_bytes()
+                stats = re.findall(r'NETWORK (open|extract|test) (\d+) (\d+) (\d+)', text)
+                assert [s[0] for s in stats] == ['open', 'extract', 'test'], text
+                assert all(int(s[2]) == len(files[source.split('?')[0].rsplit('/', 1)[1]])
+                           for s in stats), stats
+                assert sum(int(s[1]) for s in stats) == sum(
+                    r['end'] - r['start'] + 1 for r in ranges), (stats, ranges)
+                assert sum(int(s[3]) for s in stats) == len(ranges), (stats, ranges)
+            else:
+                assert 'NETWORK ' not in text, text
         print('PASS ' + label, flush=True)
         return text
 

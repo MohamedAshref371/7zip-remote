@@ -19,6 +19,14 @@
 #include "DialogSize.h"
 #include "ProgressDialog2.h"
 #include "ProgressDialog2Res.h"
+#ifdef Z7_HTTP
+#include <chrono>
+static UInt64 NetworkTimeMs()
+{
+  return static_cast<UInt64>(std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now().time_since_epoch()).count());
+}
+#endif
 
 using namespace NWindows;
 
@@ -86,7 +94,24 @@ CProgressSync::CProgressSync():
     _totalFiles(UNDEFINED_VAL), _curFiles(0),
     _inSize(UNDEFINED_VAL),
     _outSize(UNDEFINED_VAL)
+   #ifdef Z7_HTTP
+    , _networkDefined(false), _networkBytes(0), _networkSize(0),
+    _networkRequests(0), _networkStarted(0)
+   #endif
     {}
+
+#ifdef Z7_HTTP
+void CProgressSync::Set_NetworkProgress(UInt64 downloaded, UInt64 size, UInt64 requests)
+{
+  NSynchronization::CCriticalSectionLock lock(_cs);
+  if (!_networkDefined || downloaded < _networkBytes || requests < _networkRequests)
+    _networkStarted = NetworkTimeMs();
+  _networkDefined = true;
+  _networkBytes = downloaded;
+  _networkSize = size;
+  _networkRequests = requests;
+}
+#endif
 
 #define CHECK_STOP  if (_stopped) return E_ABORT; if (!_paused) return S_OK;
 #define CRITICAL_LOCK NSynchronization::CCriticalSectionLock lock(_cs);
@@ -476,6 +501,11 @@ bool CProgressDialog::OnSize(WPARAM /* wParam */, int xSize, int ySize)
   int yPos = ySize - my - _buttonSizeY;
 
   ChangeSubWindowSizeX(GetItem(IDT_PROGRESS_STATUS), xSize - mx * 2);
+ #ifdef Z7_HTTP
+  ChangeSubWindowSizeX(GetItem(IDT_PROGRESS_NETWORK), xSize - mx * 2);
+  ChangeSubWindowSizeX(GetItem(IDT_PROGRESS_NETWORK_SPEED), xSize - mx * 2);
+  ChangeSubWindowSizeX(GetItem(IDT_PROGRESS_NETWORK_REQUESTS), xSize - mx * 2);
+ #endif
   ChangeSubWindowSizeX(GetItem(IDT_PROGRESS_FILE_NAME), xSize - mx * 2);
   ChangeSubWindowSizeX(GetItem(IDC_PROGRESS1), xSize - mx * 2);
 
@@ -694,6 +724,10 @@ static UInt64 MyMultAndDiv(UInt64 mult1, UInt64 mult2, UInt64 divider)
 
 void CProgressDialog::UpdateStatInfo(bool showAll)
 {
+ #ifdef Z7_HTTP
+  bool networkDefined;
+  UInt64 networkBytes, networkSize, networkRequests, networkStarted;
+ #endif
   UInt64 total, completed, totalFiles, completedFiles, inSize, outSize;
   bool filesProgressMode;
 
@@ -710,6 +744,13 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
     inSize = Sync._inSize;
     outSize = Sync._outSize;
     filesProgressMode = Sync._filesProgressMode;
+   #ifdef Z7_HTTP
+    networkDefined = Sync._networkDefined;
+    networkBytes = Sync._networkBytes;
+    networkSize = Sync._networkSize;
+    networkRequests = Sync._networkRequests;
+    networkStarted = Sync._networkStarted;
+   #endif
 
     GetChangedString(Sync._titleFileName, _titleFileName, titleFileName_Changed);
     GetChangedString(Sync._filePath, _filePath, curFilePath_Changed);
@@ -723,6 +764,41 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
   }
 
   UInt32 curTime = ::GetTickCount();
+
+ #ifdef Z7_HTTP
+  if (networkDefined)
+  {
+    // Body bytes for this operation, not unique archive coverage or extraction %.
+    wchar_t value[48];
+    UString text(L"Downloaded: ");
+    ConvertSizeToString(networkBytes, value);
+    text += value;
+    if (networkBytes < 100000) text += L" B";
+    text += L" / archive: ";
+    if (networkSize)
+    {
+      ConvertSizeToString(networkSize, value);
+      text += value;
+      if (networkSize < 100000) text += L" B";
+    }
+    else text += L"?";
+    SetItemText(IDT_PROGRESS_NETWORK, text);
+
+    const UInt64 elapsed = NetworkTimeMs() - networkStarted;
+    text = L"Network speed (average): ";
+    // Divide before multiplying to avoid overflow for very large transfers.
+    const UInt64 rate = elapsed ? (networkBytes / elapsed) * 1000
+        + ((networkBytes % elapsed) * 1000) / elapsed : 0;
+    ConvertSizeToString(rate, value);
+    text += value;
+    if (rate < 100000) text += L" B";
+    text += L"/s";
+    SetItemText(IDT_PROGRESS_NETWORK_SPEED, text);
+    text = L"HTTP requests: ";
+    text.Add_UInt64(networkRequests);
+    SetItemText(IDT_PROGRESS_NETWORK_REQUESTS, text);
+  }
+ #endif
 
   const UInt64 progressTotal = filesProgressMode ? totalFiles : total;
   const UInt64 progressCompleted = filesProgressMode ? completedFiles : completed;

@@ -44,6 +44,13 @@ public:
   */
 
   Z7_IFACE_IMP(IOpenCallbackUI)
+ #if defined(Z7_HTTP) && !defined(Z7_SFX)
+  HRESULT Open_NetworkProgress(UInt64 downloaded, UInt64 size, UInt64 requests) Z7_override
+  {
+    ProgressDialog.Sync.Set_NetworkProgress(downloaded, size, requests);
+    return S_OK;
+  }
+ #endif
 
   COpenArchiveCallback():
       ParentWindow(NULL)

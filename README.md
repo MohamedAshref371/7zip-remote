@@ -24,6 +24,9 @@ design, evidence, and remaining work.
 - **Network diagnostics:** actionable messages for denied or expired links,
   authentication requirements, rate limits, server failures, unsupported partial
   downloads, and connection errors. Messages exclude URLs and access tokens.
+- **File Manager network progress:** downloaded body bytes compared with archive
+  size, average transfer speed, and HTTP request count for the current opening,
+  extraction, or test operation, separate from archive progress.
 - **ETag policy:** the Open URL dialog defaults to **Skip ETag verification**
   checked. Uncheck it to require a strong ETag. The console verifies ETags by
   default and exposes `-shttp-no-etag` to opt out.
@@ -107,7 +110,8 @@ their existing behavior.
 - Solid compression may require reading and decompressing preceding data,
   potentially most or all of the archive. Savings depend on the archive layout.
 - HTTP operations are synchronous; cancellation can wait for a request to return
-  or time out. Separate network-progress reporting remains future work.
+  or time out. Separate network statistics are shown in File Manager progress
+  dialogs; the console does not yet display these statistics.
 - Remote compatibility has coverage for ZIP, 7z, and single-volume RAR/RAR5
   samples. Other handlers and advanced format features need separate validation.
 

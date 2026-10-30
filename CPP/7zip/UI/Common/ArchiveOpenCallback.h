@@ -13,6 +13,9 @@
 #include "../../IPassword.h"
 #endif
 #include "../../Archive/IArchive.h"
+#ifdef Z7_HTTP
+#include "RemoteProgress.h"
+#endif
 
 Z7_PURE_INTERFACES_BEGIN
 
@@ -37,7 +40,13 @@ Z7_PURE_INTERFACES_BEGIN
   virtual HRESULT Open_Finished() x \
   Z7_IFACEM_IOpenCallbackUI_Crypto(x)
 
-Z7_IFACE_DECL_PURE(IOpenCallbackUI)
+DECLARE_INTERFACE(IOpenCallbackUI)
+{
+  Z7_IFACE_PURE(IOpenCallbackUI)
+ #ifdef Z7_HTTP
+  virtual HRESULT Open_NetworkProgress(UInt64, UInt64, UInt64) { return S_OK; }
+ #endif
+};
 
 Z7_PURE_INTERFACES_END
 
@@ -96,6 +105,9 @@ public:
 
 class COpenCallbackImp Z7_final:
   public IArchiveOpenCallback,
+ #ifdef Z7_HTTP
+  public IRemoteProgress,
+ #endif
   public IArchiveOpenVolumeCallback,
   public IArchiveOpenSetSubArchiveName,
  #ifndef Z7_NO_CRYPTO
@@ -105,6 +117,9 @@ class COpenCallbackImp Z7_final:
   public CMyUnknownImp
 {
   Z7_COM_QI_BEGIN2(IArchiveOpenCallback)
+ #ifdef Z7_HTTP
+  Z7_COM_QI_ENTRY(IRemoteProgress)
+ #endif
   Z7_COM_QI_ENTRY(IArchiveOpenVolumeCallback)
   Z7_COM_QI_ENTRY(IArchiveOpenSetSubArchiveName)
  #ifndef Z7_NO_CRYPTO
@@ -115,6 +130,9 @@ class COpenCallbackImp Z7_final:
   Z7_COM_ADDREF_RELEASE
   
   Z7_IFACE_COM7_IMP(IArchiveOpenCallback)
+ #ifdef Z7_HTTP
+  Z7_IFACE_COM7_IMP(IRemoteProgress)
+ #endif
   Z7_IFACE_COM7_IMP(IArchiveOpenVolumeCallback)
   Z7_IFACE_COM7_IMP(IProgress)
 public:

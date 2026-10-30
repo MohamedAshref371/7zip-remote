@@ -5,6 +5,7 @@
 #ifdef Z7_HTTP
 #include "../../Common/HttpInStream.h"
 #include "ArchiveOpenCallback.h"
+#include "RemoteProgress.h"
 
 inline bool IsHttpArchiveUrl(const UString &path)
 {
@@ -85,6 +86,45 @@ public:
     options.SkipETagVerification = skipETagVerification;
     return Open(url, options);
   }
+};
+
+// Keep callbacks alive only for the operation, never for the browsing session.
+class CRemoteProgressScope
+{
+  CRemoteArchiveSource &_source;
+  CMyComPtr<IRemoteProgress> _callback;
+  UInt64 _bytesBase;
+  UInt64 _requestsBase;
+  static void Report(void *context, ULONGLONG bytes, ULONGLONG size, ULONGLONG requests)
+  {
+    CRemoteProgressScope &self = *static_cast<CRemoteProgressScope *>(context);
+    if (self._callback)
+      self._callback->SetNetworkProgress(bytes - self._bytesBase, size, requests - self._requestsBase);
+  }
+public:
+  CRemoteProgressScope(CRemoteArchiveSource &source, IUnknown *callback):
+      _source(source), _bytesBase(0), _requestsBase(0)
+  {
+    if (callback) callback->QueryInterface(IID_IRemoteProgress, (void **)&_callback);
+    if (source.Spec)
+    {
+      _bytesBase = source.Spec->Source.Downloaded;
+      _requestsBase = source.Spec->Source.Requests;
+      source.Spec->Source.SetProgress(Report, this);
+    }
+  }
+  void Configure(NWindows::CHttpRangeOptions &options)
+  {
+    options.Progress = Report;
+    options.ProgressContext = this;
+  }
+  ~CRemoteProgressScope()
+  {
+    if (_source.Spec) _source.Spec->Source.SetProgress(NULL, NULL);
+  }
+private:
+  CRemoteProgressScope(const CRemoteProgressScope &);
+  CRemoteProgressScope &operator=(const CRemoteProgressScope &);
 };
 #endif
 #endif

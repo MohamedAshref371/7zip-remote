@@ -31,6 +31,8 @@ These are engineering choices for the study, not settings currently available in
 
 ## Study Files
 
+Latest follow-up: [File Manager network progress](14-network-progress.md).
+
 Latest follow-up: [Actionable network diagnostics](13-network-diagnostics.md),
 with 99 passing CLI scenarios and 42 passing File Manager Agent scenarios.
 

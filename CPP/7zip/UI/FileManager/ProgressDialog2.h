@@ -42,6 +42,12 @@ public:
   UInt64 _curFiles;
   UInt64 _inSize;
   UInt64 _outSize;
+ #ifdef Z7_HTTP
+  bool _networkDefined;
+  UInt64 _networkBytes, _networkSize, _networkRequests;
+  ULONGLONG _networkStarted;
+  void Set_NetworkProgress(UInt64 downloaded, UInt64 size, UInt64 requests);
+ #endif
   
   UString _titleFileName;
   UString _status;

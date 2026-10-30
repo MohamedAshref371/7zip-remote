@@ -180,6 +180,9 @@ public:
 
 class CExtractCallbackImp Z7_final:
   public IFolderArchiveExtractCallback,
+ #ifdef Z7_HTTP
+  public IRemoteProgress,
+ #endif
   /* IExtractCallbackUI:
        before v23.00 : it         included IFolderArchiveExtractCallback
        since  v23.00 : it doesn't include  IFolderArchiveExtractCallback
@@ -199,6 +202,9 @@ class CExtractCallbackImp Z7_final:
   public CMyUnknownImp
 {
   Z7_COM_QI_BEGIN2(IFolderArchiveExtractCallback)
+ #ifdef Z7_HTTP
+  Z7_COM_QI_ENTRY(IRemoteProgress)
+ #endif
   Z7_COM_QI_ENTRY(IFolderArchiveExtractCallback2)
  #ifndef Z7_SFX
   Z7_COM_QI_ENTRY(IFolderOperationsExtractCallback)
@@ -214,6 +220,13 @@ class CExtractCallbackImp Z7_final:
 
   Z7_IFACE_IMP(IExtractCallbackUI)
   Z7_IFACE_IMP(IOpenCallbackUI)
+ #ifdef Z7_HTTP
+  Z7_IFACE_COM7_IMP(IRemoteProgress)
+  HRESULT Open_NetworkProgress(UInt64 downloaded, UInt64 size, UInt64 requests) Z7_override
+  {
+    return SetNetworkProgress(downloaded, size, requests);
+  }
+ #endif
   Z7_IFACE_COM7_IMP(IProgress)
   Z7_IFACE_COM7_IMP(IFolderArchiveExtractCallback)
   Z7_IFACE_COM7_IMP(IFolderArchiveExtractCallback2)

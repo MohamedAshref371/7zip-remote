@@ -39,6 +39,14 @@ using namespace NFind;
 
 extern bool g_DisableUserQuestions;
 
+#ifdef Z7_HTTP
+Z7_COM7F_IMF(CExtractCallbackImp::SetNetworkProgress(UInt64 downloaded, UInt64 size, UInt64 requests))
+{
+  ProgressDialog->Sync.Set_NetworkProgress(downloaded, size, requests);
+  return S_OK;
+}
+#endif
+
 CExtractCallbackImp::~CExtractCallbackImp() {}
 
 void CExtractCallbackImp::Init()

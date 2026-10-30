@@ -16,6 +16,8 @@ struct CHttpRangeOptions
   int TimeoutMs = 3000;
   unsigned RequestDeadlineMs = 30000;
   bool SkipETagVerification = false; // explicit per-session opt-in; range/size checks remain mandatory
+  void (*Progress)(void *, ULONGLONG, ULONGLONG, ULONGLONG) = NULL;
+  void *ProgressContext = NULL; // scoped to the current operation
 };
 
 class CHttpRangeSource
@@ -31,6 +33,7 @@ class CHttpRangeSource
       std::vector<unsigned char> &data);
   HRESULT Fail(const char *message, HRESULT result = E_FAIL);
   HRESULT FailNetwork();
+  void ReportProgress() const;
   CHttpRangeSource(const CHttpRangeSource &) = delete;
   CHttpRangeSource &operator=(const CHttpRangeSource &) = delete;
 public:
@@ -44,6 +47,12 @@ public:
   HRESULT Open(const wchar_t *url, const CHttpRangeOptions &options);
   HRESULT Fetch(ULONGLONG start, unsigned length, std::vector<unsigned char> &data);
   bool IsCancelled() const;
+  void SetProgress(void (*progress)(void *, ULONGLONG, ULONGLONG, ULONGLONG), void *context)
+  {
+    _options.Progress = progress;
+    _options.ProgressContext = context;
+    ReportProgress();
+  }
   void SetCancelCheck(bool (*check)(void *), void *context)
   {
     _options.CancelCheck = check;
