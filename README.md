@@ -45,8 +45,8 @@ design, evidence, and remaining work.
   Exact resource/strong-ETag matches can reuse parts automatically. Changed URLs
   and ETag bypass need separate consent to partial verification before reusing
   old data. See [cache settings and verification](Notes/21-persistent-cache.md).
-- **ETag policy:** the Open URL dialog defaults to **Skip ETag verification**
-  checked. Uncheck it to require a strong ETag. The console verifies ETags by
+- **ETag policy:** the Open URL dialog initially leaves **Skip ETag verification**
+  unchecked and remembers the user's choice. The console verifies ETags by
   default and exposes `-shttp-no-etag` to opt out.
 - **Read-only remote sessions:** archive update, deletion, renaming, and editor
   writeback are blocked. Extraction uses the existing output and zone policies.
@@ -91,7 +91,8 @@ Zig/Clang build instructions are available in the [test and build guide](Tests/R
 
 1. Choose **File → Open URL...** and paste a direct archive URL.
 2. Leave **Archive type** on **Auto**, or choose ZIP, 7z, RAR, or ISO if known.
-3. Select the desired ETag policy; bypass is checked by default in this dialog.
+3. Select the desired ETag policy; bypass is initially unchecked. Both the ETag
+   bypass and unverified cache reuse choices are remembered after pressing OK.
 4. Browse and extract items through the normal File Manager controls.
 
 **View → Refresh** opens a fresh source and retains the type and ETag choices.

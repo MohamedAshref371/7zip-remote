@@ -77,11 +77,14 @@ extraction, Refresh and cancellation acceptance tests.
 
 ## Optional ETag verification bypass
 
-The transport and console verify ETags by default. At the user's request, the
-File Manager's **File → Open URL...** dialog now starts with **Skip ETag verification**
-checked. Uncheck it to require a strong ETag. It applies to that session
-and is retained on Refresh; the panel path shows `[HTTP; ETag off]`. Each new
-Open URL dialog starts with ETag bypass enabled.
+The transport and console verify ETags by default. File Manager's
+**File → Open URL...** dialog initially leaves **Skip ETag verification** unchecked.
+It remembers this checkbox and **Reuse old cache without full version verification**
+after OK, including across restarts. Cancelling the dialog leaves the saved choices
+unchanged. The reuse choice survives visits to Cache settings and remains remembered
+while caching is disabled, but only takes effect when caching is enabled. The
+partial-verification confirmation remains in place. Refresh retains the session
+policy; the panel path shows `[HTTP; ETag off]` when bypass is enabled.
 
 The dialog also has an **Archive type** dropdown: **Auto** (default), **ZIP**,
 **7z**, **RAR**, and **ISO**. RAR restricts detection to the RAR and RAR5 handlers and lets

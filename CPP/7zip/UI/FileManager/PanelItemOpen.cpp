@@ -568,7 +568,10 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
     _format.AddString(L"RAR");
     _format.AddString(L"ISO");
     _format.SetCurSel(0);
-    CheckButton(IDC_REMOTE_SKIP_ETAG, true);
+    bool reuseUnverified = false;
+    LoadRemoteOpenSettings(SkipHttpETag, reuseUnverified);
+    CheckButton(IDC_REMOTE_SKIP_ETAG, SkipHttpETag);
+    CheckButton(IDC_REMOTE_CACHE_TRUST, reuseUnverified);
     NormalizeSize();
     return CModalDialog::OnInit();
   }
@@ -576,7 +579,8 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
   {
     _url.GetText(Value);
     SkipHttpETag = IsButtonCheckedBool(IDC_REMOTE_SKIP_ETAG);
-    CacheOptions.AllowUnverified = CacheOptions.Enabled && IsButtonCheckedBool(IDC_REMOTE_CACHE_TRUST);
+    const bool reuseUnverified = IsButtonCheckedBool(IDC_REMOTE_CACHE_TRUST);
+    CacheOptions.AllowUnverified = CacheOptions.Enabled && reuseUnverified;
     CacheOptions.ReuseId.clear();
     const int saved = _reuse.GetCurSel();
     if (CacheOptions.Enabled && saved > 0 && (size_t)saved <= _entries.size()) CacheOptions.ReuseId = _entries[(size_t)saved - 1].Id;
@@ -593,6 +597,8 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
       case 4: ArcFormat = "iso"; break;
       default: ArcFormat.Empty(); break; // Empty uses the engine's format detection.
     }
+    if (!SaveRemoteOpenSettings(SkipHttpETag, reuseUnverified))
+    { MessageBoxW(*this, L"Cannot save Open URL settings.", L"Open URL", MB_OK | MB_ICONWARNING); return; }
     CModalDialog::OnOK();
   }
   bool OnButtonClicked(unsigned id, HWND hwnd) Z7_override
@@ -603,7 +609,7 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
       dialog.Options = CacheOptions;
       if (dialog.Create(*this) == IDOK) CacheOptions = dialog.Options;
       // Clear is immediate even if the settings dialog is subsequently cancelled.
-      CacheEntries(); CheckButton(IDC_REMOTE_CACHE_TRUST, false);
+      CacheEntries();
       return true;
     }
     return CModalDialog::OnButtonClicked(id, hwnd);
@@ -611,7 +617,7 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
 public:
   UString Value;
   UString ArcFormat;
-  bool SkipHttpETag = true;
+  bool SkipHttpETag = false;
   NWindows::CHttpDiskCacheOptions CacheOptions;
   INT_PTR Create(HWND parent) { return CModalDialog::Create(IDD_REMOTE_OPEN, parent); }
 };

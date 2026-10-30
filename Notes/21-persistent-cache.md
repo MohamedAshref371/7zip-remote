@@ -4,8 +4,11 @@ File Manager's **Open URL** dialog now has **Cache settings...**. Disk caching i
 off by default. Settings let the user enable it, choose a writable directory,
 set a positive limit in MiB (1 GiB initially), choose unlimited storage, inspect
 usage, and clear stored data. Enable/path/limit settings persist under the current
-user's `Software\7-Zip\FM\RemoteCache` key. Consent and the selected cache entry
-are session choices and are never saved as global permission.
+user's `Software\7-Zip\FM\RemoteCache` key. The Open URL choices for ETag bypass
+and unverified cache reuse are also saved after pressing OK and restored on later
+opens, including after restarting File Manager. Both initially default to off.
+The selected cache entry remains a session choice. The partial-verification
+confirmation still appears when opening with unverified reuse enabled.
 
 ## Using it
 
@@ -13,8 +16,8 @@ are session choices and are never saved as global permission.
 2. Enable **Keep downloaded archive parts on disk**, choose a directory and limit,
    and save. Changes apply to newly opened archives.
 3. For automatic verified reuse, uncheck **Skip ETag verification** when the
-   server supports a strong ETag. The existing default of checking that bypass
-   in each new Open URL dialog is retained.
+   server supports a strong ETag. This is the initial default; subsequent opens
+   retain the user's last saved choice.
 4. For a changed URL, select the previous archive from **Saved archive cache**.
    Entries show a sanitized filename hint, source size, cache usage and local
    last-use date/time.
