@@ -1,5 +1,8 @@
 # Selected-download estimates
 
+The subsequent [RAR/ISO update](16-rar-iso-estimates.md) extends this feature to
+RAR, RAR5 and ISO. Restrictions below describe the initial ZIP/7z milestone.
+
 File Manager shows `Downloaded: ... / estimated total: ~...` for selected ZIP/7z
 extraction and testing. Archive size remains a separate reference alongside the
 request count. Opening, unsupported formats (including RAR and ISO), nested

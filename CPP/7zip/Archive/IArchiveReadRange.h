@@ -13,4 +13,25 @@ struct Z7_DECLSPEC_NOVTABLE IArchiveReadRange: public IUnknown
   Z7_IFACE_COM7_PURE(IArchiveReadRange)
 };
 Z7_PURE_INTERFACES_END
+
+// Multi-range extension; the handler calls the sink synchronously and never
+// retains it. Separate IIDs preserve the original single-range interface.
+static const GUID IID_IArchiveReadRangeSink =
+    { 0x7b644153, 0xc2a8, 0x4a1f, { 0xbc, 0xb2, 0x97, 0x81, 0x0d, 0x45, 0x6b, 0xa8 } };
+static const GUID IID_IArchiveReadRanges =
+    { 0xd61d0c73, 0x3b16, 0x4895, { 0x93, 0xd1, 0x5e, 0x07, 0x19, 0xbd, 0xc5, 0x11 } };
+#define Z7_IFACEM_IArchiveReadRangeSink(x) \
+  x(AddReadRange(UInt64 start, UInt64 length))
+#define Z7_IFACEM_IArchiveReadRanges(x) \
+  x(GetItemReadRanges(UInt32 index, IArchiveReadRangeSink *sink))
+Z7_PURE_INTERFACES_BEGIN
+struct Z7_DECLSPEC_NOVTABLE IArchiveReadRangeSink: public IUnknown
+{
+  Z7_IFACE_COM7_PURE(IArchiveReadRangeSink)
+};
+struct Z7_DECLSPEC_NOVTABLE IArchiveReadRanges: public IUnknown
+{
+  Z7_IFACE_COM7_PURE(IArchiveReadRanges)
+};
+Z7_PURE_INTERFACES_END
 #endif

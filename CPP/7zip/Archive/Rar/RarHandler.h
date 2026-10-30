@@ -4,6 +4,7 @@
 #define ZIP7_INC_RAR_HANDLER_H
 
 #include "../IArchive.h"
+#include "../IArchiveReadRange.h"
 
 #include "../../Common/CreateCoder.h"
 
@@ -69,15 +70,18 @@ struct CRefItem
 
 class CHandler Z7_final:
   public IInArchive,
+  public IArchiveReadRanges,
   Z7_PUBLIC_ISetCompressCodecsInfo_IFEC
   public CMyUnknownImp
 {
   Z7_COM_QI_BEGIN2(IInArchive)
+  Z7_COM_QI_ENTRY(IArchiveReadRanges)
   Z7_COM_QI_ENTRY_ISetCompressCodecsInfo_IFEC
   Z7_COM_QI_END
   Z7_COM_ADDREF_RELEASE
   
   Z7_IFACE_COM7_IMP(IInArchive)
+  Z7_IFACE_COM7_IMP(IArchiveReadRanges)
   DECL_ISetCompressCodecsInfo
 
   bool _isArc;

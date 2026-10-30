@@ -12,6 +12,7 @@
 #include "../../Common/CreateCoder.h"
 
 #include "../IArchive.h"
+#include "../IArchiveReadRange.h"
 
 namespace NArchive {
 namespace NRar5 {
@@ -462,12 +463,14 @@ struct CArc
 
 class CHandler Z7_final:
   public IInArchive,
+  public IArchiveReadRanges,
   public IArchiveGetRawProps,
   public ISetProperties,
   Z7_PUBLIC_ISetCompressCodecsInfo_IFEC
   public CMyUnknownImp
 {
   Z7_COM_QI_BEGIN2(IInArchive)
+  Z7_COM_QI_ENTRY(IArchiveReadRanges)
   Z7_COM_QI_ENTRY(IArchiveGetRawProps)
   Z7_COM_QI_ENTRY(ISetProperties)
   Z7_COM_QI_ENTRY_ISetCompressCodecsInfo_IFEC
@@ -475,6 +478,7 @@ class CHandler Z7_final:
   Z7_COM_ADDREF_RELEASE
   
   Z7_IFACE_COM7_IMP(IInArchive)
+  Z7_IFACE_COM7_IMP(IArchiveReadRanges)
   Z7_IFACE_COM7_IMP(IArchiveGetRawProps)
   Z7_IFACE_COM7_IMP(ISetProperties)
   DECL_ISetCompressCodecsInfo

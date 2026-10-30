@@ -824,6 +824,26 @@ UInt64 CHandler::GetPackSize(unsigned refIndex) const
   return totalPackSize;
 }
 
+Z7_COM7F_IMF(CHandler::GetItemReadRanges(UInt32 index, IArchiveReadRangeSink *sink))
+{
+  if (!sink) return E_POINTER;
+  if (index >= _refItems.Size()) return E_INVALIDARG;
+  if (!_isArc || _arcs.Size() != 1 || _arcInfo.IsVolume() || _errorFlags) return S_FALSE;
+  if (_items[_refItems[index].ItemIndex].IsDir()) return S_OK;
+  unsigned first = index;
+  // Match Extract's solid reset boundaries, including pre-RAR2 archive flags.
+  while (first > 0 && IsSolid(first)) --first;
+  for (unsigned i = first; i <= index; ++i)
+  {
+    const CRefItem &ref = _refItems[i];
+    if (ref.NumItems != 1 || ref.VolumeIndex != 0) return S_FALSE;
+    const CItem &item = _items[ref.ItemIndex];
+    if (item.IsSplitBefore() || item.IsSplitAfter()) return S_FALSE;
+    RINOK(sink->AddReadRange(item.GetDataPosition(), item.PackSize))
+  }
+  return S_OK;
+}
+
 bool CHandler::IsSolid(unsigned refIndex) const
 {
   const CItem &item = _items[_refItems[refIndex].ItemIndex];

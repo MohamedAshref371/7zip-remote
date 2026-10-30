@@ -1413,6 +1413,37 @@ UInt64 CHandler::GetPackSize(unsigned refIndex) const
   }
 }
 
+Z7_COM7F_IMF(CHandler::GetItemReadRanges(UInt32 index, IArchiveReadRangeSink *sink))
+{
+  if (!sink) return E_POINTER;
+  if (index >= _refs.Size()) return E_INVALIDARG;
+  if (!_isArc || _arcs.Size() != 1 || _arcs[0].Info.IsVolume()
+      || _errorFlags || _split_Error) return S_FALSE;
+  const CItem &selected = _items[_refs[index].Item];
+  if (selected.IsDir()) return S_OK;
+  if (selected.IsService()) return S_FALSE;
+  unsigned first = index;
+  if (selected.IsSolid())
+    while (first > 0)
+    {
+      --first;
+      const CItem &item = _items[_refs[first].Item];
+      // Service records do not reset the main file's solid dictionary.
+      if (!item.IsService() && !item.IsSolid()) break;
+    }
+  for (unsigned i = first; i <= index; ++i)
+  {
+    const CRefItem &ref = _refs[i];
+    const CItem &item = _items[ref.Item];
+    if (item.IsService()) continue;
+    CLinkInfo link;
+    if (ref.Item != ref.Last || ref.Link >= 0 || item.VolIndex != 0
+        || item.IsSplit() || item.NextItem >= 0 || item.FindExtra_Link(link)) return S_FALSE;
+    RINOK(sink->AddReadRange(item.GetDataPosition(), item.PackSize))
+  }
+  return S_OK;
+}
+
 static char *PrintDictSize(char *s Z7_lifetimebound, UInt64 w)
 {
   char                               c = 'K'; w >>= 10;

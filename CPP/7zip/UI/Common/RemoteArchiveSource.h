@@ -90,6 +90,23 @@ public:
 };
 
 // Keep callbacks alive only for the operation, never for the browsing session.
+class CRemoteReadRangeSink Z7_final: public IArchiveReadRangeSink, public CMyUnknownImp
+{
+  Z7_COM_UNKNOWN_IMP_1(IArchiveReadRangeSink)
+public:
+  std::vector<CHttpReadRange> Ranges;
+  Z7_COM7F_IMF(AddReadRange(UInt64 start, UInt64 length)) Z7_override
+  {
+    try
+    {
+      CHttpReadRange range = {start, length};
+      Ranges.push_back(range);
+      return S_OK;
+    }
+    catch (...) { return E_OUTOFMEMORY; }
+  }
+};
+
 class CRemoteProgressScope
 {
   CRemoteArchiveSource &_source;
@@ -131,17 +148,27 @@ public:
     try
     {
       CMyComPtr<IArchiveReadRange> plan;
+      CMyComPtr<IArchiveReadRanges> multiPlan;
       archive->QueryInterface(IID_IArchiveReadRange, (void **)&plan);
-      if (!plan) return;
-      std::vector<CHttpReadRange> ranges;
-      ranges.reserve(count);
+      archive->QueryInterface(IID_IArchiveReadRanges, (void **)&multiPlan);
+      if (!plan && !multiPlan) return;
+      CRemoteReadRangeSink *sink = new CRemoteReadRangeSink;
+      CMyComPtr<IArchiveReadRangeSink> sinkRef = sink;
+      sink->Ranges.reserve(count);
       for (UInt32 i = 0; i < count; ++i)
       {
-        CHttpReadRange range;
-        if (plan->GetItemReadRange(indices[i], &range.Start, &range.Size) != S_OK) return;
-        ranges.push_back(range);
+        if (multiPlan)
+        {
+          if (multiPlan->GetItemReadRanges(indices[i], sinkRef) != S_OK) return;
+        }
+        else
+        {
+          CHttpReadRange range;
+          if (plan->GetItemReadRange(indices[i], &range.Start, &range.Size) != S_OK) return;
+          if (sink->AddReadRange(range.Start, range.Size) != S_OK) return;
+        }
       }
-      _estimateDefined = _source.Spec->EstimateMissingBytes(ranges, _estimate);
+      _estimateDefined = _source.Spec->EstimateMissingBytes(sink->Ranges, _estimate);
       _callback->SetNetworkEstimate(_estimate, _estimateDefined);
     }
     catch (...) { /* Optional estimate unavailable; normal extraction continues. */ }

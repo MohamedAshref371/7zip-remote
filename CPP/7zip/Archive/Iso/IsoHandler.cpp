@@ -22,6 +22,32 @@ using namespace NTime;
 namespace NArchive {
 namespace NIso {
 
+Z7_COM7F_IMF(CHandler::GetItemReadRanges(UInt32 index, IArchiveReadRangeSink *sink))
+{
+  if (!sink) return E_POINTER;
+  if (!_stream) return S_FALSE;
+  if (index < _archive.Refs.Size())
+  {
+    const CRef &ref = _archive.Refs[index];
+    if (!ref.Dir || ref.Index >= ref.Dir->_subItems.Size()
+        || ref.NumExtents > ref.Dir->_subItems.Size() - ref.Index) return S_FALSE;
+    if (ref.Dir->_subItems[ref.Index].IsDir()) return S_OK;
+    UInt64 total = 0;
+    for (UInt32 i = 0; i < ref.NumExtents; ++i)
+    {
+      const CDir &item = ref.Dir->_subItems[ref.Index + i];
+      if (total > ref.TotalSize || item.Size > ref.TotalSize - total) return S_FALSE;
+      total += item.Size;
+      RINOK(sink->AddReadRange((UInt64)item.ExtentLocation * kBlockSize, item.Size))
+    }
+    return total == ref.TotalSize ? S_OK : S_FALSE;
+  }
+  const unsigned boot = index - _archive.Refs.Size();
+  if (boot >= _archive.BootEntries.Size()) return E_INVALIDARG;
+  return sink->AddReadRange((UInt64)_archive.BootEntries[boot].LoadRBA * kBlockSize,
+      _archive.GetBootItemSize(boot));
+}
+
 static const Byte kProps[] =
 {
   kpidPath,

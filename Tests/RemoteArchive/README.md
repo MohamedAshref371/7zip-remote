@@ -52,6 +52,9 @@ archive size, average network speed, and request count for the current operation
 See [network progress](../../Notes/14-network-progress.md) for semantics and checks.
 Selected ZIP/7z extraction and testing also show a conservative approximate
 download total alongside downloaded bytes. See [download estimates](../../Notes/15-download-estimates.md).
+RAR/RAR5 and ISO now provide estimates too; the Agent suite generates stored RAR
+and ISO/Joliet fixtures, including solid dependencies and separated ISO extents.
+Optional compressed-fixture checks are documented in [RAR/ISO estimates](../../Notes/16-rar-iso-estimates.md).
 
 For a manual desktop test after building, start a loopback-only fixture server:
 

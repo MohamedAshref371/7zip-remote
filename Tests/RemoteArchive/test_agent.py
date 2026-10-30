@@ -12,6 +12,7 @@ import tarfile
 import zipfile
 
 from test_remote import FixtureServer, ROOT
+from estimate_fixtures import write_iso, write_rar4, write_rar5
 
 
 def main():
@@ -27,6 +28,12 @@ def main():
     target = b'File Manager Agent remote extraction\n' * 100
     (inputs / 'docs/target.txt').write_bytes(target)
     (inputs / '000-data.bin').write_bytes(random.Random(12).randbytes(4 << 20))
+    for name, writer in [('rar4', write_rar4), ('rar5', write_rar5)]:
+        entries = [('000-data.bin', (inputs / '000-data.bin').read_bytes()), ('docs/target.txt', target)]
+        writer(work / (name + '.rar'), entries)
+        writer(work / (name + '-solid.rar'), entries, solid=True)
+    write_iso(work / 'sample.iso', target)
+    write_iso(work / 'multi-extent.iso', target, multi_extent=True)
     with zipfile.ZipFile(work / 'sample.zip', 'w', zipfile.ZIP_DEFLATED) as z:
         z.write(inputs / '000-data.bin', '000-data.bin')
         z.writestr('docs/target.txt', target)
@@ -40,7 +47,7 @@ def main():
                         ('secret.7z', ['-mhe=on', '-pfixture-password', '-ms=off'])]:
         subprocess.run([str(exe.with_name('7z.exe')), 'a', str(work / name), '-t7z', *flags, '.'],
                        cwd=inputs, check=True, capture_output=True)
-    files = {p.name: p.read_bytes() for p in work.iterdir() if p.suffix in ('.zip', '.7z', '.tar')}
+    files = {p.name: p.read_bytes() for p in work.iterdir() if p.suffix in ('.zip', '.7z', '.tar', '.rar', '.iso')}
     server = FixtureServer(files)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f'http://127.0.0.1:{server.server_port}'
@@ -72,7 +79,7 @@ def main():
                 assert [s[0] for s in estimates] == ['open', 'extract', 'test'], text
                 name = source.split('?')[0].rsplit('/', 1)[1]
                 assert estimates[0][1] == '0'  # no selected files while opening
-                supported = name.endswith(('.zip', '.7z'))
+                supported = name.endswith(('.zip', '.7z', '.rar', '.iso'))
                 assert all((s[1] == '1') == supported for s in estimates[1:]), estimates
                 if supported:
                     assert all(int(s[2]) <= len(files[name]) for s in estimates[1:]), estimates
@@ -84,6 +91,14 @@ def main():
                     if name == 'middle.zip':
                         assert int(estimates[1][2]) >= int(stats[1][1]) > 0, (stats, estimates)
                         assert int(estimates[1][2]) <= int(stats[1][1]) + 524288, (stats, estimates)
+                    if name.endswith('.iso'):
+                        assert int(estimates[1][2]) == int(stats[1][1]), (stats, estimates)
+                    if name.endswith('-solid.rar') or name == 'multi-extent.iso':
+                        assert int(estimates[1][2]) == int(stats[1][1]) > 0, (stats, estimates)
+                    if name == 'multi-extent.iso':
+                        # Auto detection may have cached the first extent. The
+                        # large unused gap between extents must never be counted.
+                        assert int(estimates[1][2]) <= 524288, estimates
             else:
                 assert 'NETWORK ' not in text, text
         print('PASS ' + label, flush=True)
