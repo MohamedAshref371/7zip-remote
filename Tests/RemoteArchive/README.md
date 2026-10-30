@@ -1,5 +1,24 @@
 # Remote archive prototype (Windows x64)
 
+## Selection preview in File Manager
+
+Select files or folders in a remote archive to see **Unpacked** and **Download**
+in the status bar before extraction. Download is approximate, excludes cached
+blocks, and may be unavailable for unsupported layouts or large selections.
+`[Solid]` identifies an archive that may require other files in the same block.
+Tooltips show exact byte counts; the panel returns to its usual status layout
+for local folders. Preview queries do not read the archive or issue HTTP requests.
+
+```powershell
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/selection-preview
+python Tests/RemoteArchive/test_agent.py --exe .build/msvc/selection-preview/agentcheck.exe
+```
+
+The Agent suite exercises repeated previews, directories, duplicates, flat mode,
+empty/invalid/oversized selections, all supported estimate formats, unavailable
+TAR/WIM download estimates, WIM alternate-stream sizes and cache state after extraction.
+See [selection preview validation](../../Notes/20-selection-preview.md).
+
 ## Bounded HTTP retries
 
 The shared transport retries temporary network failures and HTTP

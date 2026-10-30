@@ -31,6 +31,8 @@ These are engineering choices for the study, not settings currently available in
 
 ## Study Files
 
+Latest follow-up: [Selection download preview](20-selection-preview.md).
+
 Latest follow-up: [Bounded HTTP retries](19-http-retries.md).
 
 Latest follow-up: [HTTP redirects and stability checks](18-http-redirects.md).

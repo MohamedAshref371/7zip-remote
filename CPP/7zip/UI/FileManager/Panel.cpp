@@ -575,7 +575,7 @@ bool CPanel::OnCreate(CREATESTRUCT * /* createStruct */)
     // _headerReBar.MaximizeBand(1, false);
   }
 
-  _statusBar.Create(WS_CHILD | WS_VISIBLE, L"Status", (*this), _statusBarID);
+  _statusBar.Create(WS_CHILD | WS_VISIBLE | SBT_TOOLTIPS, L"Status", (*this), _statusBarID);
   // _statusBar2.Create(WS_CHILD | WS_VISIBLE, L"Status", (*this), _statusBarID + 1);
 
   const int sizes[] = {220, 320, 420, -1};
@@ -648,6 +648,7 @@ bool CPanel::OnSize(WPARAM /* wParam */, int xSize, int ySize)
   if (_headerReBar)
     _headerReBar.Move(0, 0, xSize, 0);
   ChangeWindowSize(xSize, ySize);
+  Post_Refresh_StatusBar();
   return true;
 }
 

@@ -107,6 +107,39 @@ public:
   }
 };
 
+inline bool EstimateRemoteDownload(CRemoteArchiveSource &source, IInArchive *archive,
+    const UInt32 *indices, UInt32 count, UInt64 &bytes)
+{
+  bytes = 0;
+  if (!source.Spec || !archive) return false;
+  try
+  {
+    CMyComPtr<IArchiveReadRange> plan;
+    CMyComPtr<IArchiveReadRanges> multiPlan;
+    archive->QueryInterface(IID_IArchiveReadRange, (void **)&plan);
+    archive->QueryInterface(IID_IArchiveReadRanges, (void **)&multiPlan);
+    if (!plan && !multiPlan) return false;
+    CRemoteReadRangeSink *sink = new CRemoteReadRangeSink;
+    CMyComPtr<IArchiveReadRangeSink> sinkRef = sink;
+    sink->Ranges.reserve(count);
+    for (UInt32 i = 0; i < count; ++i)
+    {
+      if (multiPlan)
+      {
+        if (multiPlan->GetItemReadRanges(indices[i], sinkRef) != S_OK) return false;
+      }
+      else
+      {
+        CHttpReadRange range;
+        if (plan->GetItemReadRange(indices[i], &range.Start, &range.Size) != S_OK) return false;
+        if (sink->AddReadRange(range.Start, range.Size) != S_OK) return false;
+      }
+    }
+    return source.Spec->EstimateMissingBytes(sink->Ranges, bytes);
+  }
+  catch (...) { return false; }
+}
+
 class CRemoteProgressScope
 {
   CRemoteArchiveSource &_source;
@@ -145,33 +178,8 @@ public:
   {
     if (!_source.Spec || !_callback || !archive) return;
     // Failure to estimate must never prevent extraction or trigger network I/O.
-    try
-    {
-      CMyComPtr<IArchiveReadRange> plan;
-      CMyComPtr<IArchiveReadRanges> multiPlan;
-      archive->QueryInterface(IID_IArchiveReadRange, (void **)&plan);
-      archive->QueryInterface(IID_IArchiveReadRanges, (void **)&multiPlan);
-      if (!plan && !multiPlan) return;
-      CRemoteReadRangeSink *sink = new CRemoteReadRangeSink;
-      CMyComPtr<IArchiveReadRangeSink> sinkRef = sink;
-      sink->Ranges.reserve(count);
-      for (UInt32 i = 0; i < count; ++i)
-      {
-        if (multiPlan)
-        {
-          if (multiPlan->GetItemReadRanges(indices[i], sinkRef) != S_OK) return;
-        }
-        else
-        {
-          CHttpReadRange range;
-          if (plan->GetItemReadRange(indices[i], &range.Start, &range.Size) != S_OK) return;
-          if (sink->AddReadRange(range.Start, range.Size) != S_OK) return;
-        }
-      }
-      _estimateDefined = _source.Spec->EstimateMissingBytes(sink->Ranges, _estimate);
-      _callback->SetNetworkEstimate(_estimate, _estimateDefined);
-    }
-    catch (...) { /* Optional estimate unavailable; normal extraction continues. */ }
+    _estimateDefined = EstimateRemoteDownload(_source, archive, indices, count, _estimate);
+    _callback->SetNetworkEstimate(_estimate, _estimateDefined);
   }
   ~CRemoteProgressScope()
   {

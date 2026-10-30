@@ -93,6 +93,76 @@ Z7_COM7F_IMF(CTestCallback::CryptoGetTextPassword(BSTR *password))
   fprintf(stderr, "line %u: HRESULT %08lx\n", __LINE__, (unsigned long)hr_); return 1; } } while (0)
 #define CHECK(value) do { if (!(value)) { fprintf(stderr, "line %u: check failed\n", __LINE__); return 1; } } while (0)
 
+static int CheckSelectionPreview(IFolderFolder *folder, const UInt32 *indices,
+    UInt32 count, const char *phase, CRemoteSelectionEstimate &estimate)
+{
+  CMyComPtr<IRemoteSelection> preview;
+  CHECK_HR(folder->QueryInterface(IID_IRemoteSelection, (void **)&preview));
+  CAgentFolder *spec = static_cast<CAgentFolder *>(folder);
+  CHttpInStream *source = spec->_agentSpec->RemoteSource.Spec;
+  const UInt64 requests = source ? source->Source.Requests : 0;
+  const UInt64 downloaded = source ? source->Source.Downloaded : 0;
+  const UInt64 hits = source ? source->CacheHits : 0;
+  const HRESULT result = preview->GetSelectionEstimate(indices, count, &estimate);
+  CHECK(result == (source ? S_OK : S_FALSE));
+  if (!source) { CHECK(estimate.Flags == 0); return 0; }
+  for (unsigned i = 0; i < 20; ++i)
+  {
+    CRemoteSelectionEstimate repeated;
+    CHECK_HR(preview->GetSelectionEstimate(indices, count, &repeated));
+    CHECK(repeated.Flags == estimate.Flags && repeated.Unpacked == estimate.Unpacked
+        && repeated.Download == estimate.Download);
+  }
+  CHECK(source->Source.Requests == requests && source->Source.Downloaded == downloaded && source->CacheHits == hits);
+  printf("PREVIEW %s %u %llu %llu\n", phase, estimate.Flags,
+      (unsigned long long)estimate.Unpacked, (unsigned long long)estimate.Download);
+  UString files, download;
+  RemoteSelectionText(estimate, files, download);
+  printf("PREVIEW_TEXT %s | %s\n", UnicodeStringToMultiByte(files, CP_UTF8).Ptr(),
+      UnicodeStringToMultiByte(download, CP_UTF8).Ptr());
+  return 0;
+}
+
+static int CheckSelectionModes(IFolderFolder *root, UInt32 selectedDir)
+{
+  CRemoteSelectionEstimate directory, flat, empty, limited;
+  CHECK(CheckSelectionPreview(root, &selectedDir, 1, "directory", directory) == 0);
+  CMyComPtr<IRemoteSelection> preview;
+  CHECK_HR(root->QueryInterface(IID_IRemoteSelection, (void **)&preview));
+  if (!(directory.Flags & kRemoteSelection)) return 0;
+  UInt32 count = 0;
+  CHECK_HR(root->GetNumberOfItems(&count));
+  CHECK(preview->GetSelectionEstimate(&count, 1, &empty) == E_INVALIDARG);
+  CHECK(preview->GetSelectionEstimate(NULL, 1, &empty) == E_INVALIDARG);
+  CHECK(preview->GetSelectionEstimate(NULL, 0, NULL) == E_POINTER);
+  CHECK(CheckSelectionPreview(root, NULL, 0, "empty", empty) == 0);
+  CHECK(empty.Unpacked == 0 && empty.Download == 0);
+  CUIntVector large;
+  for (unsigned i = 0; i < 4097; ++i) large.Add(selectedDir);
+  CHECK(CheckSelectionPreview(root, large.ConstData(), large.Size(), "limited", limited) == 0);
+  CHECK(limited.Flags == kRemoteSelection);
+
+  CMyComPtr<IFolderSetFlatMode> mode;
+  CHECK_HR(root->QueryInterface(IID_IFolderSetFlatMode, (void **)&mode));
+  CHECK_HR(mode->SetFlatMode(1));
+  CHECK_HR(root->LoadItems());
+  CHECK_HR(root->GetNumberOfItems(&count));
+  CUIntVector selected;
+  for (UInt32 i = 0; i < count; ++i)
+  {
+    NWindows::NCOM::CPropVariant name;
+    CHECK_HR(root->GetProperty(i, kpidName, &name));
+    if (name.vt == VT_BSTR && (wcscmp(name.bstrVal, L"docs") == 0 || wcscmp(name.bstrVal, L"target.txt") == 0))
+      selected.Add(i);
+  }
+  CHECK(!selected.IsEmpty());
+  CHECK(CheckSelectionPreview(root, selected.ConstData(), selected.Size(), "flat", flat) == 0);
+  CHECK(flat.Unpacked == directory.Unpacked && flat.Download == directory.Download);
+  CHECK_HR(mode->SetFlatMode(0));
+  CHECK_HR(root->LoadItems());
+  return 0;
+}
+
 struct CCancelClock
 {
   DWORD Started, Owner;
@@ -178,6 +248,9 @@ static int CheckTransportRetry(int argc, wchar_t **argv)
 
 static int CheckNetworkSync()
 {
+  CHECK(RemoteSelectionSize(0) == L"0 B");
+  CHECK(RemoteSelectionSize(1024) == L"1.0 KiB");
+  CHECK(RemoteSelectionSize((UInt64)1 << 60) == L"1.0 EiB");
   CHttpInStream stream;
   stream.Source.Size = ((UInt64)1 << 40) + 123;
   UInt64 estimate;
@@ -234,6 +307,8 @@ int __cdecl wmain(int argc, wchar_t **argv)
   const wchar_t *arcFormat = L"";
   bool rarFamilyCheck = false;
   bool estimateArchiveCheck = false;
+  bool selectionCheck = false;
+  bool selectionAds = false;
   const wchar_t *skipItem = NULL;
   unsigned cancelOpenMs = 0, cancelExtractMs = 0, transportRepeats = 0;
   bool cancelEventMode = false;
@@ -258,6 +333,8 @@ int __cdecl wmain(int argc, wchar_t **argv)
     if (wcsncmp(argv[i], L"--format=", 9) == 0) arcFormat = argv[i] + 9;
     if (wcscmp(argv[i], L"--rar-family-check") == 0) rarFamilyCheck = true;
     if (wcscmp(argv[i], L"--estimate-archive-check") == 0) estimateArchiveCheck = true;
+    if (wcscmp(argv[i], L"--selection-check") == 0) selectionCheck = true;
+    if (wcscmp(argv[i], L"--selection-ads-check") == 0) selectionAds = true;
     if (wcsncmp(argv[i], L"--password=", 11) == 0) g_TestPassword = argv[i] + 11;
     if (wcsncmp(argv[i], L"--skip-item=", 12) == 0) skipItem = argv[i] + 12;
     if (wcsncmp(argv[i], L"--cancel-open-ms=", 17) == 0) cancelOpenMs = (unsigned)_wtoi(argv[i] + 17);
@@ -358,6 +435,24 @@ int __cdecl wmain(int argc, wchar_t **argv)
   }
 
   CMyComPtr<IFolderFolder> docs;
+  if (selectionCheck)
+  {
+    UInt32 rootCount = 0;
+    CHECK_HR(folder->GetNumberOfItems(&rootCount));
+    bool found = false;
+    for (UInt32 i = 0; i < rootCount; ++i)
+    {
+      NWindows::NCOM::CPropVariant name;
+      CHECK_HR(folder->GetProperty(i, kpidName, &name));
+      if (name.vt == VT_BSTR && wcscmp(name.bstrVal, L"docs") == 0)
+      {
+        CHECK(CheckSelectionModes(folder, i) == 0);
+        found = true;
+        break;
+      }
+    }
+    CHECK(found);
+  }
   CHECK_HR(folder->BindToFolder(L"docs", &docs));
   CHECK(docs);
   CHECK_HR(docs->LoadItems());
@@ -372,6 +467,15 @@ int __cdecl wmain(int argc, wchar_t **argv)
     if (name.vt == VT_BSTR && wcscmp(name.bstrVal, L"target.txt") == 0) selected = i;
   }
   CHECK(selected < count);
+  CRemoteSelectionEstimate beforePreview;
+  CHECK(CheckSelectionPreview(docs, &selected, 1, "before", beforePreview) == 0);
+  if (selectionCheck)
+  {
+    const UInt32 duplicates[] = {selected, selected};
+    CRemoteSelectionEstimate duplicate;
+    CHECK(CheckSelectionPreview(docs, duplicates, 2, "duplicate", duplicate) == 0);
+    CHECK(duplicate.Unpacked == beforePreview.Unpacked && duplicate.Download == beforePreview.Download);
+  }
   CMyComPtr<IFolderOperations> operations;
   CHECK_HR(docs.QueryInterface(IID_IFolderOperations, &operations));
   if (remote)
@@ -395,7 +499,7 @@ int __cdecl wmain(int argc, wchar_t **argv)
     CHECK(getchar() == 'g');
     extract->CancelAfter(cancelExtractMs);
   }
-  const HRESULT extraction = archive->Extract(&selected, 1, 0, 0, NExtract::NPathMode::kNoPaths,
+  const HRESULT extraction = archive->Extract(&selected, 1, selectionAds ? 1 : 0, 0, NExtract::NPathMode::kNoPaths,
       NExtract::NOverwriteMode::kOverwrite, argv[2], 0, callback);
   if (cancelExtractMs)
   {
@@ -407,8 +511,11 @@ int __cdecl wmain(int argc, wchar_t **argv)
   CHECK(!extract->Failed);
   CHECK(extract->NetworkMonotonic && extract->NetworkDefined == remote);
   extract->PrintNetwork("extract");
+  CRemoteSelectionEstimate afterPreview;
+  CHECK(CheckSelectionPreview(docs, &selected, 1, "after", afterPreview) == 0);
+  CHECK(afterPreview.Unpacked == beforePreview.Unpacked);
   extract->ResetNetwork();
-  CHECK_HR(archive->Extract(&selected, 1, 0, 0, NExtract::NPathMode::kNoPaths,
+  CHECK_HR(archive->Extract(&selected, 1, selectionAds ? 1 : 0, 0, NExtract::NPathMode::kNoPaths,
       NExtract::NOverwriteMode::kOverwrite, argv[2], 1, callback));
   CHECK(!extract->Failed);
   CHECK(extract->NetworkMonotonic && extract->NetworkDefined == remote);

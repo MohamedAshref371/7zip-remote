@@ -47,7 +47,11 @@ def main():
                         ('secret.7z', ['-mhe=on', '-pfixture-password', '-ms=off'])]:
         subprocess.run([str(exe.with_name('7z.exe')), 'a', str(work / name), '-t7z', *flags, '.'],
                        cwd=inputs, check=True, capture_output=True)
-    files = {p.name: p.read_bytes() for p in work.iterdir() if p.suffix in ('.zip', '.7z', '.tar', '.rar', '.iso')}
+    ads = b'preview alternate stream\n' * 100
+    Path(str(inputs / 'docs/target.txt') + ':preview-meta').write_bytes(ads)
+    subprocess.run([str(exe.with_name('7z.exe')), 'a', str(work / 'ads.wim'), '-twim', '-sns', '.'],
+                   cwd=inputs, check=True, capture_output=True)
+    files = {p.name: p.read_bytes() for p in work.iterdir() if p.suffix in ('.zip', '.7z', '.tar', '.rar', '.iso', '.wim')}
     server = FixtureServer(files)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f'http://127.0.0.1:{server.server_port}'
@@ -56,7 +60,9 @@ def main():
     def run(label, source, expected=0, extra=()):
         output_dir = work / label
         first_request = len(server.records)
-        result = subprocess.run([str(exe), str(source), str(output_dir), *extra], capture_output=True, timeout=60)
+        ads_case = label.startswith('ads.wim-')
+        options = ['--selection-ads-check'] if ads_case else []
+        result = subprocess.run([str(exe), str(source), str(output_dir), *extra, '--selection-check', *options], capture_output=True, timeout=60)
         text = (result.stdout + result.stderr).decode('utf-8', errors='replace')
         (work / (label + '.log')).write_text(text, encoding='utf-8')
         assert result.returncode == expected, (label, result.returncode, text)
@@ -66,6 +72,8 @@ def main():
                           requested_bytes=sum(r['end'] - r['start'] + 1 for r in ranges)))
         if expected == 0:
             assert (output_dir / 'target.txt').read_bytes() == target
+            if ads_case:
+                assert Path(str(output_dir / 'target.txt') + ':preview-meta').read_bytes() == ads
             if str(source).startswith('http'):
                 assert b'ZoneId=3' in Path(str(output_dir / 'target.txt') + ':Zone.Identifier').read_bytes()
                 stats = re.findall(r'NETWORK (open|extract|test) (\d+) (\d+) (\d+)', text)
@@ -80,6 +88,18 @@ def main():
                 name = source.split('?')[0].rsplit('/', 1)[1]
                 assert estimates[0][1] == '0'  # no selected files while opening
                 supported = name.endswith(('.zip', '.7z', '.rar', '.iso'))
+                previews = re.findall(r'PREVIEW (before|after) (\d+) (\d+) (\d+)', text)
+                assert [p[0] for p in previews] == ['before', 'after'], text
+                assert all((int(p[1]) & 3) == 3 and int(p[2]) == len(target) + (len(ads) if ads_case else 0)
+                           for p in previews), previews
+                assert all(bool(int(p[1]) & 4) == supported for p in previews), previews
+                if supported:
+                    assert int(previews[0][3]) >= int(stats[1][1]), (previews, stats)
+                    assert int(previews[1][3]) == 0, previews
+                if name == 'solid.7z' or name.endswith('-solid.rar'):
+                    assert int(previews[0][1]) & 8, previews
+                if not supported:
+                    assert 'Download: unavailable' in text, text
                 assert all((s[1] == '1') == supported for s in estimates[1:]), estimates
                 if supported:
                     assert all(int(s[2]) <= len(files[name]) for s in estimates[1:]), estimates

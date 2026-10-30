@@ -15,6 +15,14 @@
 #include "resource.h"
 
 
+class CPanelCopyStatusRefresh
+{
+  CPanel &_panel;
+public:
+  CPanelCopyStatusRefresh(CPanel &panel): _panel(panel) {}
+  ~CPanelCopyStatusRefresh() { _panel.PostMsg(kRefresh_StatusBar); }
+};
+
 class CPanelCopyThread: public CProgressThreadVirt
 {
   bool ResultsWereShown;
@@ -185,6 +193,10 @@ HRESULT CPanel::CopyTo(CCopyToOptions &options,
     bool &usePassword, UString &password,
     const UStringVector *filePaths)
 {
+  // The worker owns the archive/cache during extraction, testing and hashing.
+  // Restore notifications before posting a cache-aware selection refresh.
+  CPanelCopyStatusRefresh refreshStatus(*this);
+  CDisableNotify disableNotify(*this);
   if (options.NeedRegistryZone && !options.testMode)
   {
     CContextMenuInfo ci;

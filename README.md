@@ -35,6 +35,11 @@ design, evidence, and remaining work.
   Estimates account for cached blocks; solid 7z uses the full compressed block
   conservatively; RAR follows solid predecessors and ISO uses individual extents.
   Other formats, unsupported layouts, and archive opening show an unavailable estimate.
+- **Selection preview:** the remote panel status bar shows **Unpacked** size and
+  approximate additional **Download** before extraction, accounting for cached
+  data. Solid archives are marked; hover for exact byte counts and an explanation.
+  Unsupported layouts and very large selections show **unavailable**. Selecting
+  files does not initiate HTTP requests. See [selection preview notes](Notes/20-selection-preview.md).
 - **ETag policy:** the Open URL dialog defaults to **Skip ETag verification**
   checked. Uncheck it to require a strong ETag. The console verifies ETags by
   default and exposes `-shttp-no-etag` to opt out.
@@ -56,7 +61,7 @@ Requirements:
 From the repository root:
 
 ```powershell
-python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/retries
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/selection-preview
 ```
 
 The script discovers Visual Studio, loads its x64 environment, and builds the
@@ -93,7 +98,7 @@ sanitized archive name.
 ### Console
 
 ```powershell
-$sevenzip = '.\.build\msvc\retries\7z.exe'
+$sevenzip = '.\.build\msvc\selection-preview\7z.exe'
 
 & $sevenzip l 'https://example.com/archive.zip'
 & $sevenzip x 'https://example.com/archive.zip' 'docs/readme.txt' -oOut
@@ -132,10 +137,10 @@ their existing behavior.
 ## Tests and Validation
 
 ```powershell
-python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/retries/7z.exe"
-python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/retries/agentcheck.exe"
-python Tests/RemoteArchive/test_redirect.py --exe "$PWD/.build/msvc/retries/7z.exe" --agent "$PWD/.build/msvc/retries/agentcheck.exe"
-python Tests/RemoteArchive/test_retry.py --exe "$PWD/.build/msvc/retries/7z.exe" --agent "$PWD/.build/msvc/retries/agentcheck.exe"
+python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/selection-preview/7z.exe"
+python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/selection-preview/agentcheck.exe"
+python Tests/RemoteArchive/test_redirect.py --exe "$PWD/.build/msvc/selection-preview/7z.exe" --agent "$PWD/.build/msvc/selection-preview/agentcheck.exe"
+python Tests/RemoteArchive/test_retry.py --exe "$PWD/.build/msvc/selection-preview/7z.exe" --agent "$PWD/.build/msvc/selection-preview/agentcheck.exe"
 
 # Supply your own local RAR-generation fixtures:
 python Tests/RemoteArchive/test_rar_family.py --rar4 'path/to/legacy.rar' --rar5 'path/to/modern.rar'

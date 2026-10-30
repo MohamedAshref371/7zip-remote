@@ -11,6 +11,9 @@
 #include "../../../Windows/PropVariantConv.h"
 
 #include "../Common/PropIDUtils.h"
+#ifdef Z7_HTTP
+#include "../Common/RemoteSelection.h"
+#endif
 #include "../../PropID.h"
 
 #include "App.h"
@@ -780,6 +783,56 @@ void CPanel::Refresh_StatusBar()
     _statusBar.SetText(0, MyFormatNew(g_App.LangString_N_SELECTED_ITEMS, s));
     // _statusBar.SetText(0, MyFormatNew(IDS_N_SELECTED_ITEMS, NumberToString(indices.Size())));
   }
+
+  #ifdef Z7_HTTP
+  CMyComPtr<IRemoteSelection> remoteSelection;
+  CRemoteSelectionEstimate estimate;
+  if (_folder && _folder.QueryInterface(IID_IRemoteSelection, &remoteSelection) == S_OK
+      && remoteSelection->GetSelectionEstimate(indices.ConstData(), indices.Size(), &estimate) == S_OK
+      && (estimate.Flags & kRemoteSelection))
+  {
+    RECT rect;
+    _statusBar.GetClientRect(&rect);
+    const int width = RECT_SIZE_X(rect);
+    const int edges[] = {width / 5, width / 2, -1};
+    _statusBar.SetParts(3, edges);
+    UString files, download, tip;
+    if (!indices.IsEmpty())
+    {
+      RemoteSelectionText(estimate, files, download);
+      tip = files;
+      if (estimate.Flags & kRemoteSelectionUnpacked)
+      {
+        tip += " (";
+        tip.Add_UInt64(estimate.Unpacked);
+        tip += " bytes after extraction)";
+      }
+    }
+    _statusBar.SetText(1, files);
+    _statusBar.SetText(2, download);
+    _statusBar.SendMsg(SB_SETTIPTEXTW, 1, (LPARAM)tip.Ptr());
+    tip = download;
+    if (!indices.IsEmpty())
+    {
+      if (estimate.Flags & kRemoteSelectionDownload)
+      {
+        tip += " (";
+        tip.Add_UInt64(estimate.Download);
+        tip += " bytes)";
+        tip += L". Approximate additional download after cached data. Actual download may be larger.";
+      }
+      else tip += L". Estimate unavailable for this format, archive layout or selection size.";
+      if (estimate.Flags & kRemoteSelectionSolid)
+        tip += L" Solid archives may need other files in the same block.";
+    }
+    _statusBar.SendMsg(SB_SETTIPTEXTW, 2, (LPARAM)tip.Ptr());
+    return;
+  }
+  #endif
+  const int edges[] = {220, 320, 420, -1};
+  _statusBar.SetParts(4, edges);
+  _statusBar.SendMsg(SB_SETTIPTEXTW, 1, (LPARAM)L"");
+  _statusBar.SendMsg(SB_SETTIPTEXTW, 2, (LPARAM)L"");
 
   {
     wchar_t selectSizeString[32];

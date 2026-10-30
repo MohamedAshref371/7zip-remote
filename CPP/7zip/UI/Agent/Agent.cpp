@@ -1471,6 +1471,61 @@ void CAgentFolder::GetRealIndices(
   HeapSort(realIndices.NonConstData(), realIndices.Size());
 }
 
+#ifdef Z7_HTTP
+Z7_COM7F_IMF(CAgentFolder::GetSelectionEstimate(const UInt32 *indices,
+    UInt32 count, CRemoteSelectionEstimate *estimate))
+{
+  if (!estimate) return E_POINTER;
+  *estimate = CRemoteSelectionEstimate();
+  if (!_agentSpec->IsRemote()) return S_FALSE;
+  estimate->Flags = kRemoteSelection;
+  if (count && !indices) return E_INVALIDARG;
+  COM_TRY_BEGIN
+  UInt32 items = 0;
+  RINOK(GetNumberOfItems(&items))
+  for (UInt32 i = 0; i < count; ++i)
+    if (indices[i] >= items) return E_INVALIDARG;
+  // Keep automatic status updates bounded for very large selections.
+  if (count > 4096) return S_OK;
+  CUIntVector real;
+  GetRealIndices(indices, count, !(_loadAltStreams && _flatMode), false, real);
+  // Match File Manager's default inclusion of alternate streams on extraction.
+  if (real.Size() > 4096) return S_OK;
+  IInArchive *archive = _agentSpec->GetArchive();
+  if (!archive) return S_OK;
+  NCOM::CPropVariant prop;
+  if (archive->GetArchiveProperty(kpidSolid, &prop) == S_OK && prop.vt == VT_BOOL && prop.boolVal)
+    estimate->Flags |= kRemoteSelectionSolid;
+  bool sizeDefined = true;
+  for (unsigned i = 0; i < real.Size(); ++i)
+  {
+    if (i && real[i] == real[i - 1]) continue;
+    prop.Clear();
+    if (archive->GetProperty(real[i], kpidSolid, &prop) == S_OK && prop.vt == VT_BOOL && prop.boolVal)
+      estimate->Flags |= kRemoteSelectionSolid;
+    prop.Clear();
+    if (archive->GetProperty(real[i], kpidIsDir, &prop) == S_OK && prop.vt == VT_BOOL && prop.boolVal)
+      continue;
+    prop.Clear();
+    if (archive->GetProperty(real[i], kpidSize, &prop) != S_OK || prop.vt != VT_UI8
+        || prop.uhVal.QuadPart > (UInt64)(Int64)-1 - estimate->Unpacked)
+      sizeDefined = false;
+    else
+      estimate->Unpacked += prop.uhVal.QuadPart;
+  }
+  if (sizeDefined) estimate->Flags |= kRemoteSelectionUnpacked;
+  else estimate->Unpacked = 0;
+  UInt32 archiveItems = 0;
+  const bool previewWorkBounded = archive->GetNumberOfItems(&archiveItems) == S_OK
+      && (UInt64)archiveItems * real.Size() <= 2000000;
+  if (previewWorkBounded && _agentSpec->_archiveLink.Arcs.Size() == 1 && _agentSpec->GetArc().ArcStreamOffset == 0
+      && EstimateRemoteDownload(_agentSpec->RemoteSource, archive, real.ConstData(), real.Size(), estimate->Download))
+    estimate->Flags |= kRemoteSelectionDownload;
+  return S_OK;
+  COM_TRY_END
+}
+#endif
+
 Z7_COM7F_IMF(CAgentFolder::Extract(const UInt32 *indices,
     UInt32 numItems,
     Int32 includeAltStreams,

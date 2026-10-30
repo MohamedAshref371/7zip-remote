@@ -10,6 +10,9 @@
 #include "../Common/LoadCodecs.h"
 #include "../Common/OpenArchive.h"
 #include "../Common/RemoteArchiveSource.h"
+#ifdef Z7_HTTP
+#include "../Common/RemoteSelection.h"
+#endif
 #include "../Common/UpdateAction.h"
 
 #include "../FileManager/IFolder.h"
@@ -64,6 +67,9 @@ class CAgentFolder Z7_final:
   public IFolderSetZoneIdFile,
   public IFolderOperations,
   public IFolderSetFlatMode,
+  #ifdef Z7_HTTP
+  public IRemoteSelection,
+  #endif
   public CMyUnknownImp
 {
   Z7_COM_QI_BEGIN2(IFolderFolder)
@@ -80,6 +86,9 @@ class CAgentFolder Z7_final:
     Z7_COM_QI_ENTRY(IFolderSetZoneIdFile)
     Z7_COM_QI_ENTRY(IFolderOperations)
     Z7_COM_QI_ENTRY(IFolderSetFlatMode)
+    #ifdef Z7_HTTP
+    Z7_COM_QI_ENTRY(IRemoteSelection)
+    #endif
   Z7_COM_QI_END
   Z7_COM_ADDREF_RELEASE
 
@@ -97,6 +106,9 @@ class CAgentFolder Z7_final:
   Z7_IFACE_COM7_IMP(IFolderSetZoneIdFile)
   Z7_IFACE_COM7_IMP(IFolderOperations)
   Z7_IFACE_COM7_IMP(IFolderSetFlatMode)
+  #ifdef Z7_HTTP
+  Z7_IFACE_COM7_IMP(IRemoteSelection)
+  #endif
 
    void LoadFolder(unsigned proxyDirIndex);
 public:
