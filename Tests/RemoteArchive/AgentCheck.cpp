@@ -103,6 +103,7 @@ static int CheckSelectionPreview(IFolderFolder *folder, const UInt32 *indices,
   const UInt64 requests = source ? source->Source.Requests : 0;
   const UInt64 downloaded = source ? source->Source.Downloaded : 0;
   const UInt64 hits = source ? source->CacheHits : 0;
+  const UInt64 diskHits = source ? source->DiskCacheHits : 0;
   const HRESULT result = preview->GetSelectionEstimate(indices, count, &estimate);
   CHECK(result == (source ? S_OK : S_FALSE));
   if (!source) { CHECK(estimate.Flags == 0); return 0; }
@@ -113,7 +114,8 @@ static int CheckSelectionPreview(IFolderFolder *folder, const UInt32 *indices,
     CHECK(repeated.Flags == estimate.Flags && repeated.Unpacked == estimate.Unpacked
         && repeated.Download == estimate.Download);
   }
-  CHECK(source->Source.Requests == requests && source->Source.Downloaded == downloaded && source->CacheHits == hits);
+  CHECK(source->Source.Requests == requests && source->Source.Downloaded == downloaded && source->CacheHits == hits
+      && source->DiskCacheHits == diskHits);
   printf("PREVIEW %s %u %llu %llu\n", phase, estimate.Flags,
       (unsigned long long)estimate.Unpacked, (unsigned long long)estimate.Download);
   UString files, download;
@@ -309,11 +311,16 @@ int __cdecl wmain(int argc, wchar_t **argv)
   bool estimateArchiveCheck = false;
   bool selectionCheck = false;
   bool selectionAds = false;
+  NWindows::CHttpDiskCacheOptions cacheOptions;
   const wchar_t *skipItem = NULL;
   unsigned cancelOpenMs = 0, cancelExtractMs = 0, transportRepeats = 0;
   bool cancelEventMode = false;
   for (int i = 3; i < argc; ++i)
   {
+    if (wcsncmp(argv[i], L"--cache-dir=", 12) == 0) { cacheOptions.Enabled = true; cacheOptions.Directory = argv[i] + 12; }
+    if (wcsncmp(argv[i], L"--cache-limit=", 14) == 0) cacheOptions.MaxBytes = _wcstoui64(argv[i] + 14, NULL, 10);
+    if (wcsncmp(argv[i], L"--cache-reuse=", 14) == 0) cacheOptions.ReuseId = argv[i] + 14;
+    if (wcscmp(argv[i], L"--cache-trust") == 0) cacheOptions.AllowUnverified = true;
     if (wcscmp(argv[i], L"--transport-retry-check") == 0)
       return CheckTransportRetry(argc, argv);
     if (wcscmp(argv[i], L"--transport-deadline-check") == 0)
@@ -343,6 +350,7 @@ int __cdecl wmain(int argc, wchar_t **argv)
     if (wcscmp(argv[i], L"--cancel-event") == 0) cancelEventMode = true;
   }
   if (transportRepeats) return CheckTransportCancel(argv[1], cancelEventMode, transportRepeats);
+  manager->SetHttpCacheOptions(cacheOptions);
   CMyComPtr<IFolderFolder> folder;
   {
     CTestCallback *callback = new CTestCallback;
@@ -520,6 +528,12 @@ int __cdecl wmain(int argc, wchar_t **argv)
   CHECK(!extract->Failed);
   CHECK(extract->NetworkMonotonic && extract->NetworkDefined == remote);
   extract->PrintNetwork("test");
+  if (cacheOptions.Enabled && remote)
+  {
+    CAgentFolder *spec = static_cast<CAgentFolder *>((IFolderFolder *)folder);
+    printf("ARCHIVE_CACHE %llu %s\n", spec->_agentSpec->RemoteSource.Spec->DiskCacheHits,
+        UnicodeStringToMultiByte(spec->_agentSpec->RemoteSource.Spec->DiskCache.Status.c_str(), CP_UTF8).Ptr());
+  }
   printf("Agent open/browse/extract/test/read-only checks passed.\n");
   return 0;
 }

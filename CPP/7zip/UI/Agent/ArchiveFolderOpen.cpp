@@ -102,6 +102,7 @@ Z7_COM7F_IMF(CArchiveFolderManager::OpenFolderFile(IInStream *inStream,
   CAgent *agent = new CAgent();
   #ifdef Z7_HTTP
   agent->SkipHttpETag = SkipHttpETag;
+  agent->HttpCacheOptions = HttpCacheOptions;
   #endif
   CMyComPtr<IInFolderArchive> archive = agent;
   

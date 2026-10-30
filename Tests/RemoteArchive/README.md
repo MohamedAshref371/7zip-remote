@@ -1,5 +1,29 @@
 # Remote archive prototype (Windows x64)
 
+## Optional persistent disk cache
+
+File Manager's **Open URL → Cache settings...** enables disk caching, chooses a
+folder and optional MiB limit, reports usage and clears inactive data. The cache
+is off by default; the initial limit is 1 GiB. Automatic reuse needs an exact
+resource match with a strong verified ETag. ETag bypass alone never authorizes
+old-cache reuse. A different URL or unverified source needs separate per-open
+consent and fresh metadata/sample checks, which cannot prove full content equality.
+
+```powershell
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/disk-cache
+python Tests/RemoteArchive/build.py --cache-check
+python Tests/RemoteArchive/test_disk_cache.py
+python Tests/RemoteArchive/test_disk_cache_agent.py --exe .build/msvc/disk-cache/agentcheck.exe
+python Tests/RemoteArchive/test_cache_layout.py --exe .build/msvc/disk-cache/7zFM.exe
+```
+
+The 51-scenario transport suite covers identity, consent, corruption, scope
+changes, generation binding, write/clear failures, limits, process locks, crash
+recovery, junctions and cancellation. Ten real-Agent cache scenarios cover ZIP/7z
+selected extraction and GNU/MSVC cache-format interoperability. These are
+controlled fixture results; see [persistent cache details](../../Notes/21-persistent-cache.md)
+for lifecycle, active-entry exceptions and remaining desktop acceptance work.
+
 ## Selection preview in File Manager
 
 Select files or folders in a remote archive to see **Unpacked** and **Download**

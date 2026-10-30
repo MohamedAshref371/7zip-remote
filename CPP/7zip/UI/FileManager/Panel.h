@@ -17,6 +17,9 @@
 #include "../../../Common/MyCom.h"
 
 #include "../../../Windows/DLL.h"
+#ifdef Z7_HTTP
+#include "../../../Windows/HttpDiskCache.h"
+#endif
 #include "../../../Windows/FileDir.h"
 #include "../../../Windows/FileFind.h"
 #include "../../../Windows/FileName.h"
@@ -187,6 +190,7 @@ struct CFolderLink: public CTempFileInfo
   UString RemoteUrl; // session-only; never included in display/history paths
   UString RemoteArcFormat;
   bool SkipHttpETag = false;
+  NWindows::CHttpDiskCacheOptions HttpCacheOptions;
   #endif
   CByteBuffer ZoneBuf; // ZoneBuf for virtaul stream (IsVirtual)
 
@@ -571,7 +575,7 @@ public:
   HRESULT BindToPathAndRefresh(const UString &path);
   #ifdef Z7_HTTP
   HRESULT OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes,
-      bool skipHttpETag = false);
+      bool skipHttpETag = false, const NWindows::CHttpDiskCacheOptions *cacheOptions = NULL);
   void OpenRemoteArchiveDialog();
   #endif
   void OpenDrivesFolder();

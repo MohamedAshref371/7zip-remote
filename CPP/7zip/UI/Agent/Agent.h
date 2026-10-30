@@ -69,6 +69,7 @@ class CAgentFolder Z7_final:
   public IFolderSetFlatMode,
   #ifdef Z7_HTTP
   public IRemoteSelection,
+  public IRemoteCacheStatus,
   #endif
   public CMyUnknownImp
 {
@@ -88,6 +89,7 @@ class CAgentFolder Z7_final:
     Z7_COM_QI_ENTRY(IFolderSetFlatMode)
     #ifdef Z7_HTTP
     Z7_COM_QI_ENTRY(IRemoteSelection)
+    Z7_COM_QI_ENTRY(IRemoteCacheStatus)
     #endif
   Z7_COM_QI_END
   Z7_COM_ADDREF_RELEASE
@@ -108,6 +110,7 @@ class CAgentFolder Z7_final:
   Z7_IFACE_COM7_IMP(IFolderSetFlatMode)
   #ifdef Z7_HTTP
   Z7_IFACE_COM7_IMP(IRemoteSelection)
+  Z7_IFACE_COM7_IMP(IRemoteCacheStatus)
   #endif
 
    void LoadFolder(unsigned proxyDirIndex);
@@ -247,6 +250,7 @@ public:
   #ifdef Z7_HTTP
   CRemoteArchiveSource RemoteSource;
   bool SkipHttpETag = false;
+  NWindows::CHttpDiskCacheOptions HttpCacheOptions;
   bool IsRemote() const { return RemoteSource.Spec != NULL; }
   #endif
   
@@ -372,6 +376,7 @@ Z7_CLASS_IMP_COM_1(
   #ifdef Z7_HTTP
   UString RemoteError;
   bool SkipHttpETag = false;
+  NWindows::CHttpDiskCacheOptions HttpCacheOptions;
   #endif
 
   void LoadFormats();
@@ -383,6 +388,7 @@ public:
   #ifdef Z7_HTTP
   const UString &GetRemoteError() const { return RemoteError; }
   void SetSkipHttpETag(bool skip) { SkipHttpETag = skip; }
+  void SetHttpCacheOptions(const NWindows::CHttpDiskCacheOptions &options) { HttpCacheOptions = options; }
   #endif
 };
 

@@ -29,6 +29,9 @@
 #include "LangUtils.h"
 #include "PropertyNameRes.h"
 #include "RegistryUtils.h"
+#ifdef Z7_HTTP
+#include "RemoteCacheDialog.h"
+#endif
 #include "UpdateCallback100.h"
 
 #include "../GUI/ExtractRes.h"
@@ -456,7 +459,7 @@ void GetFolderError(CMyComPtr<IFolderFolder> &folder, UString &s);
 
 #ifdef Z7_HTTP
 HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes,
-    bool skipHttpETag)
+    bool skipHttpETag, const NWindows::CHttpDiskCacheOptions *cacheOptions)
 {
   CDisableTimerProcessing disableTimerProcessing(*this);
   CDisableNotify disableNotify(*this);
@@ -464,6 +467,7 @@ HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, 
   openRes.Encrypted = false;
   CFfpOpen ffp;
   ffp.SkipHttpETag = skipHttpETag;
+  if (cacheOptions) ffp.HttpCacheOptions = *cacheOptions;
   const HRESULT res = ffp.OpenFileFolderPlugin(NULL, us2fs(url), arcFormat, GetParent());
   openRes.Encrypted = ffp.Encrypted;
   openRes.ErrorMessage = ffp.ErrorMessage;
@@ -480,6 +484,15 @@ HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, 
   link.RemoteUrl = url;
   link.RemoteArcFormat = arcFormat;
   link.SkipHttpETag = skipHttpETag;
+  link.HttpCacheOptions = ffp.HttpCacheOptions;
+  if (link.HttpCacheOptions.AllowUnverified)
+  {
+    CMyComPtr<IRemoteCacheStatus> cacheStatus;
+    CMyComBSTR status, id;
+    if (ffp.Folder.QueryInterface(IID_IRemoteCacheStatus, &cacheStatus) == S_OK
+        && cacheStatus->GetCacheStatus(&status, &id) == S_OK && id && *id)
+      link.HttpCacheOptions.ReuseId = (const wchar_t *)id;
+  }
   link.RelPath = skipHttpETag ? "[HTTP; ETag off] " : "[HTTP] ";
   link.RelPath += CRemoteArchiveSource::DisplayNameFromUrl(url);
   link.VirtualPath = link.RelPath;
@@ -504,10 +517,51 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
 {
   NWindows::NControl::CComboBox _url;
   NWindows::NControl::CComboBox _format;
+  NWindows::NControl::CComboBox _reuse;
+  std::vector<NWindows::NHttpCache::CEntry> _entries;
+  void CacheEntries()
+  {
+    _reuse.ResetContent();
+    _reuse.SendMsg(CB_SETDROPPEDWIDTH, 720, 0);
+    _reuse.AddString(L"Automatic / new cache");
+    try
+    {
+    _entries = NWindows::CHttpDiskCache::Catalog(CacheOptions.Directory);
+    _entries.erase(std::remove_if(_entries.begin(), _entries.end(),
+        [](const NWindows::NHttpCache::CEntry &entry) { return !entry.Valid; }), _entries.end());
+    for (const auto &entry : _entries)
+    {
+      UString text(entry.Info.Name);
+      text += L" | archive "; text += RemoteSelectionSize(entry.Info.Size);
+      text += L" | cached "; text += RemoteSelectionSize(entry.Used);
+      FILETIME utc; utc.dwHighDateTime = (DWORD)(entry.LastUse >> 32); utc.dwLowDateTime = (DWORD)entry.LastUse;
+      FILETIME local; SYSTEMTIME time;
+      wchar_t date[64] = {};
+      if (FileTimeToLocalFileTime(&utc, &local) && FileTimeToSystemTime(&local, &time)
+          && GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time, NULL, date, 64))
+      {
+        text += L" | used "; text += date;
+        if (GetTimeFormatW(LOCALE_USER_DEFAULT, TIME_NOSECONDS, &time, NULL, date, 64))
+        { text += L' '; text += date; }
+      }
+      _reuse.AddString(text);
+    }
+    }
+    catch (...)
+    {
+      _entries.clear(); _reuse.ResetContent(); _reuse.AddString(L"Automatic / new cache");
+    }
+    _reuse.SetCurSel(0);
+    EnableItem(IDC_REMOTE_CACHE_REUSE, CacheOptions.Enabled);
+    EnableItem(IDC_REMOTE_CACHE_TRUST, CacheOptions.Enabled);
+  }
   virtual bool OnInit() Z7_override
   {
     _url.Attach(GetItem(IDC_COMBO));
     _format.Attach(GetItem(IDC_REMOTE_FORMAT));
+    _reuse.Attach(GetItem(IDC_REMOTE_CACHE_REUSE));
+    LoadRemoteCacheSettings(CacheOptions);
+    CacheEntries();
     _format.AddString(L"Auto");
     _format.AddString(L"ZIP");
     _format.AddString(L"7z");
@@ -522,6 +576,15 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
   {
     _url.GetText(Value);
     SkipHttpETag = IsButtonCheckedBool(IDC_REMOTE_SKIP_ETAG);
+    CacheOptions.AllowUnverified = CacheOptions.Enabled && IsButtonCheckedBool(IDC_REMOTE_CACHE_TRUST);
+    CacheOptions.ReuseId.clear();
+    const int saved = _reuse.GetCurSel();
+    if (CacheOptions.Enabled && saved > 0 && (size_t)saved <= _entries.size()) CacheOptions.ReuseId = _entries[(size_t)saved - 1].Id;
+    if (!CacheOptions.ReuseId.empty() && !CacheOptions.AllowUnverified)
+    { MessageBoxW(*this, L"Linking a saved cache requires separate consent to partial version verification.", L"Remote cache", MB_OK | MB_ICONWARNING); return; }
+    if (CacheOptions.AllowUnverified && MessageBoxW(*this,
+        L"Matching metadata and samples cannot prove that the entire archive is unchanged. Reusing old data may cause incorrect output. Continue with partial verification?",
+        L"Reuse saved archive cache", MB_YESNO | MB_ICONWARNING) != IDYES) return;
     switch (_format.GetCurSel())
     {
       case 1: ArcFormat = "zip"; break;
@@ -532,10 +595,24 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
     }
     CModalDialog::OnOK();
   }
+  bool OnButtonClicked(unsigned id, HWND hwnd) Z7_override
+  {
+    if (id == IDC_REMOTE_CACHE_SETTINGS)
+    {
+      CRemoteCacheDialog dialog;
+      dialog.Options = CacheOptions;
+      if (dialog.Create(*this) == IDOK) CacheOptions = dialog.Options;
+      // Clear is immediate even if the settings dialog is subsequently cancelled.
+      CacheEntries(); CheckButton(IDC_REMOTE_CACHE_TRUST, false);
+      return true;
+    }
+    return CModalDialog::OnButtonClicked(id, hwnd);
+  }
 public:
   UString Value;
   UString ArcFormat;
   bool SkipHttpETag = true;
+  NWindows::CHttpDiskCacheOptions CacheOptions;
   INT_PTR Create(HWND parent) { return CModalDialog::Create(IDD_REMOTE_OPEN, parent); }
 };
 
@@ -549,7 +626,7 @@ void CPanel::OpenRemoteArchiveDialog()
     return;
   }
   COpenResult openRes;
-  if (OpenRemoteArchive(dialog.Value, dialog.ArcFormat, openRes, dialog.SkipHttpETag) == S_OK)
+  if (OpenRemoteArchive(dialog.Value, dialog.ArcFormat, openRes, dialog.SkipHttpETag, &dialog.CacheOptions) == S_OK)
     RefreshListCtrl();
   SetFocusToList();
 }

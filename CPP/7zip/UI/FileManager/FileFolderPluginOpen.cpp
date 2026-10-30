@@ -310,6 +310,7 @@ HRESULT CFfpOpen::OpenFileFolderPlugin(IInStream *inStream,
       #ifdef Z7_HTTP
       t.ManagerSpec = manager;
       manager->SetSkipHttpETag(SkipHttpETag);
+      manager->SetHttpCacheOptions(HttpCacheOptions);
       #endif
     }
     /*

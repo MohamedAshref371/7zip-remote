@@ -4,6 +4,9 @@
 #define ZIP7_INC_FILE_FOLDER_PLUGIN_OPEN_H
 
 #include "../../../Windows/DLL.h"
+#ifdef Z7_HTTP
+#include "../../../Windows/HttpDiskCache.h"
+#endif
 
 struct CFfpOpen
 {
@@ -13,6 +16,7 @@ public:
   bool Encrypted;
   #ifdef Z7_HTTP
   bool SkipHttpETag = false;
+  NWindows::CHttpDiskCacheOptions HttpCacheOptions;
   #endif
   UString Password;
 

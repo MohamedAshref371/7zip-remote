@@ -37,8 +37,11 @@ bool CHttpInStream::EstimateMissingBytes(std::vector<CHttpReadRange> ranges, UIn
   for (const auto &range : merged)
   {
     bytes += range.Size;
+    const auto &disk = DiskCache.Blocks();
+    for (auto block = disk.lower_bound(range.Start); block != disk.end() && block->first < range.Start + range.Size; ++block)
+      bytes -= block->second;
     for (const auto &block : _cache)
-      if (block.Start >= range.Start && block.Start < range.Start + range.Size)
+      if (block.Start >= range.Start && block.Start < range.Start + range.Size && !disk.count(block.Start))
         bytes -= block.Data.size();
   }
   return true;
@@ -46,7 +49,15 @@ bool CHttpInStream::EstimateMissingBytes(std::vector<CHttpReadRange> ranges, UIn
 
 HRESULT CHttpInStream::Open(const wchar_t *url, const NWindows::CHttpRangeOptions &options)
 {
-  try { _failure = Source.Open(url, options); }
+  try
+  {
+    _failure = Source.Open(url, options);
+    if (_failure == S_OK)
+    {
+      try { _failure = DiskCache.Open(options.DiskCache, url, Source); }
+      catch (...) { DiskCache.Close(); DiskCache.Status = L"Cache unavailable (memory only)"; }
+    }
+  }
   catch (const std::bad_alloc &) { _failure = E_OUTOFMEMORY; }
   catch (...) { _failure = E_FAIL; }
   return _failure;
@@ -108,7 +119,29 @@ Z7_COM7F_IMF(CHttpInStream::Read(void *data, UInt32 size, UInt32 *processed))
       fetched.Start = start;
       const unsigned length = static_cast<unsigned>((std::min)(
           Source.Size - start, static_cast<UInt64>(kBlockSize)));
-      _failure = Source.Fetch(start, length, fetched.Data);
+      bool diskHit = false;
+      try { diskHit = DiskCache.Read(start, length, fetched.Data); }
+      catch (...) { DiskCache.Close(); DiskCache.Status = L"Cache read failed (memory only)"; }
+      if (diskHit) ++DiskCacheHits;
+      else
+      {
+        _failure = Source.Fetch(start, length, fetched.Data);
+        if (_failure == S_OK && !DiskCache.MatchesEndpoint(Source.FinalUrl()))
+        {
+          const bool oldBytesRead = DiskCacheHits != 0 || !_cache.empty();
+          DiskCache.Quarantine();
+          DiskCache.Close();
+          DiskCache.Status = L"Cache source location changed; reopen the archive";
+          if (oldBytesRead)
+          {
+            Source.Error = "Archive location changed while cached data was in use. Reopen the archive or use a fresh final direct URL.";
+            _failure = E_FAIL; _cache.clear(); return _failure;
+          }
+        }
+        if (_failure == S_OK)
+          try { DiskCache.Write(start, fetched.Data); }
+          catch (...) { DiskCache.Status = L"Cache write failed; new data kept in memory"; }
+      }
       if (_failure != S_OK) { _cache.clear(); return _failure; }
       if (_cache.size() == kCacheBlocks) _cache.pop_back();
       _cache.push_front(std::move(fetched));

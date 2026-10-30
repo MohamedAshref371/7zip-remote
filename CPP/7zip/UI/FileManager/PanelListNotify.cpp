@@ -808,6 +808,14 @@ void CPanel::Refresh_StatusBar()
         tip += " bytes after extraction)";
       }
     }
+    CMyComPtr<IRemoteCacheStatus> cacheStatus;
+    CMyComBSTR cacheText, cacheId;
+    if (_folder.QueryInterface(IID_IRemoteCacheStatus, &cacheStatus) == S_OK
+        && cacheStatus->GetCacheStatus(&cacheText, &cacheId) == S_OK && cacheText && *cacheText)
+    {
+      if (!download.IsEmpty()) download += L" | ";
+      download += (const wchar_t *)cacheText;
+    }
     _statusBar.SetText(1, files);
     _statusBar.SetText(2, download);
     _statusBar.SendMsg(SB_SETTIPTEXTW, 1, (LPARAM)tip.Ptr());

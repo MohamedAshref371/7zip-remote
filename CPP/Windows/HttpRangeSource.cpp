@@ -497,6 +497,8 @@ HRESULT CHttpRangeSource::RequestOnce(ULONGLONG start, unsigned length, bool pro
   }
 
   std::wstring range, tag, encoding, contentLength, contentType;
+  if (_options.SkipETagVerification &&
+      (Header(request.Value, WINHTTP_QUERY_ETAG, tag) != S_OK || !StrongETag(tag))) tag.clear();
   ULONGLONG first = 0, last = 0, total = 0;
   if (Header(request.Value, WINHTTP_QUERY_CONTENT_RANGE, range) != S_OK ||
       !ParseRange(range, first, last, total) || first != start || last - first + 1 != length)

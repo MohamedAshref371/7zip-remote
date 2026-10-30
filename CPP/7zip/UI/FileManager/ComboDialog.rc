@@ -17,7 +17,7 @@ CAPTION "Combo"
 
 #ifdef Z7_HTTP
 #define xc 300
-#define yc 136
+#define yc 228
 
 IDD_REMOTE_OPEN DIALOG 0, 0, xs, ys MY_MODAL_DIALOG_STYLE MY_FONT
 CAPTION "Open URL"
@@ -28,9 +28,34 @@ CAPTION "Open URL"
   COMBOBOX IDC_REMOTE_FORMAT, 75, 39, 140, 80, MY_COMBO
   CONTROL "Skip ETag verification", IDC_REMOTE_SKIP_ETAG, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 65, xc, 12
   LTEXT "Enable only if you trust that the archive will not change. Changes during download may cause incorrect data or extraction errors.", -1, m, 82, xc, 25
+  PUSHBUTTON "Cache settings...", IDC_REMOTE_CACHE_SETTINGS, m, 112, 100, 16
+  LTEXT "Saved archive cache (optional link to a different URL):", -1, m, 137, xc, 8
+  COMBOBOX IDC_REMOTE_CACHE_REUSE, m, 149, xc, 100, MY_COMBO
+  CONTROL "Reuse old cache without full version verification", IDC_REMOTE_CACHE_TRUST, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 173, xc, 12
+  LTEXT "Separate consent is required when skipping ETag or linking a new URL. Fresh metadata and samples are checked; matching samples do not prove that the entire archive is unchanged.", -1, m, 190, xc, 25
   OK_CANCEL
 }
 
+#undef xc
+#undef yc
+
+#define xc 300
+#define yc 184
+IDD_REMOTE_CACHE DIALOG 0, 0, xs, ys MY_MODAL_DIALOG_STYLE MY_FONT
+CAPTION "Remote archive cache"
+{
+  CONTROL "Keep downloaded archive parts on disk", IDC_CACHE_ENABLED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, m, xc, 12
+  LTEXT "Cache folder:", -1, m, 30, xc, 8
+  EDITTEXT IDC_CACHE_PATH, m, 43, 230, 14, ES_AUTOHSCROLL
+  PUSHBUTTON "Browse...", IDC_CACHE_BROWSE, 246, 42, 62, 16
+  CONTROL "Limit cache size (MiB):", IDC_CACHE_LIMIT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 69, 140, 12
+  EDITTEXT IDC_CACHE_MIB, 155, 68, 80, 14, ES_NUMBER | ES_AUTOHSCROLL
+  LTEXT "Unchecked means unlimited. Changes apply on the next open; active archives are retained.", -1, m, 89, xc, 18
+  LTEXT "", IDC_CACHE_USAGE, m, 113, xc, 20
+  PUSHBUTTON "Clear cache...", IDC_CACHE_CLEAR, m, 140, 95, 16
+  LTEXT "Active archives and unrelated files are retained.", -1, 113, 143, 195, 16
+  OK_CANCEL
+}
 #undef xc
 #undef yc
 #endif

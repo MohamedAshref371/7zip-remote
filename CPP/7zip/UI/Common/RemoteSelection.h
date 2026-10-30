@@ -33,6 +33,17 @@ struct Z7_DECLSPEC_NOVTABLE IRemoteSelection: public IUnknown
 };
 Z7_PURE_INTERFACES_END
 
+static const GUID IID_IRemoteCacheStatus =
+    { 0x6ac90d38, 0x5de2, 0x4c92, { 0x8d, 0xc5, 0x0d, 0xc1, 0x18, 0x98, 0x14, 0x27 } };
+#define Z7_IFACEM_IRemoteCacheStatus(x) \
+  x(GetCacheStatus(BSTR *status, BSTR *entryId))
+Z7_PURE_INTERFACES_BEGIN
+struct Z7_DECLSPEC_NOVTABLE IRemoteCacheStatus: public IUnknown
+{
+  Z7_IFACE_COM7_PURE(IRemoteCacheStatus)
+};
+Z7_PURE_INTERFACES_END
+
 inline UString RemoteSelectionSize(UInt64 bytes)
 {
   static const char * const units[] = {" B", " KiB", " MiB", " GiB", " TiB", " PiB", " EiB"};

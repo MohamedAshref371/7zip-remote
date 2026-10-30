@@ -29,6 +29,7 @@ class FixtureServer(http.server.ThreadingHTTPServer):
         super().__init__(("127.0.0.1", 0), Handler)
         self.files = files
         self.records = []
+        self.etag = '"fixture-v1"'
         self.redirects = {} # mode -> (status, Location values); tests supply destinations
         self.redirect_delays = {}
         self.redirect_after_probe = set()
@@ -148,6 +149,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         if mode == "slow":
             time.sleep(0.8)
+        if mode == 'cache-slow' and not probe:
+            time.sleep(0.8)
         if mode == "stalled":
             # With retries, a finite three-second delay can legitimately recover
             # (WinHTTP timeout scheduling is not exact). Withhold headers instead.
@@ -177,7 +180,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if mode in status_modes:
             self.send_error(status_modes[mode])
             return
-        tag = '"fixture-v1"'
+        tag = self.server.etag
         if mode == "changed" and not probe:
             tag = '"fixture-v2"'
         if mode == "weak":

@@ -31,7 +31,9 @@ public:
   static const unsigned kBlockSize = 256u << 10;
   static const unsigned kCacheBlocks = 32;
   NWindows::CHttpRangeSource Source;
+  NWindows::CHttpDiskCache DiskCache;
   UInt64 CacheHits = 0;
+  UInt64 DiskCacheHits = 0;
   HRESULT Open(const wchar_t *url, const NWindows::CHttpRangeOptions &options);
   bool EstimateMissingBytes(std::vector<CHttpReadRange> ranges, UInt64 &bytes) const;
 };

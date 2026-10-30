@@ -1472,6 +1472,18 @@ void CAgentFolder::GetRealIndices(
 }
 
 #ifdef Z7_HTTP
+Z7_COM7F_IMF(CAgentFolder::GetCacheStatus(BSTR *status, BSTR *entryId))
+{
+  if (!status || !entryId) return E_POINTER;
+  *status = *entryId = NULL;
+  if (!_agentSpec->IsRemote()) return S_FALSE;
+  const auto &cache = _agentSpec->RemoteSource.Spec->DiskCache;
+  *status = SysAllocString(cache.Status.c_str());
+  *entryId = SysAllocString(cache.Id().c_str());
+  if (!*status || !*entryId) { SysFreeString(*status); SysFreeString(*entryId); *status = *entryId = NULL; return E_OUTOFMEMORY; }
+  return S_OK;
+}
+
 Z7_COM7F_IMF(CAgentFolder::GetSelectionEstimate(const UInt32 *indices,
     UInt32 count, CRemoteSelectionEstimate *estimate))
 {
@@ -1739,6 +1751,7 @@ Z7_COM7F_IMF(CAgent::Open(
     remoteOptions.CancelCheck = RemoteOpen_CheckBreak;
     remoteOptions.CancelContext = openArchiveCallback;
     remoteOptions.SkipETagVerification = SkipHttpETag;
+    remoteOptions.DiskCache = HttpCacheOptions;
     RINOK(RemoteSource.Open(_archiveFilePath, remoteOptions))
     inStream = RemoteSource.Stream;
     _archiveFilePath = RemoteSource.DisplayName;

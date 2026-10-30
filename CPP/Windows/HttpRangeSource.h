@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include "HttpDiskCache.h"
 #include "../Common/MyWindows.h"
 
 namespace NWindows {
@@ -16,6 +17,7 @@ struct CHttpRangeOptions
   int TimeoutMs = 3000;
   unsigned RequestDeadlineMs = 30000;
   bool SkipETagVerification = false; // explicit per-session opt-in; range/size checks remain mandatory
+  CHttpDiskCacheOptions DiskCache;
   void (*Progress)(void *, ULONGLONG, ULONGLONG, ULONGLONG) = NULL;
   void *ProgressContext = NULL; // scoped to the current operation
 };
@@ -53,6 +55,9 @@ public:
   HRESULT Open(const wchar_t *url, const CHttpRangeOptions &options);
   HRESULT Fetch(ULONGLONG start, unsigned length, std::vector<unsigned char> &data);
   bool IsCancelled() const;
+  const std::wstring &ETag() const { return _etag; }
+  const std::wstring &FinalUrl() const { return _url; }
+  bool SkipsETag() const { return _options.SkipETagVerification; }
   void SetProgress(void (*progress)(void *, ULONGLONG, ULONGLONG, ULONGLONG), void *context)
   {
     _options.Progress = progress;

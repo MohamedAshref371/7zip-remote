@@ -1456,9 +1456,10 @@ void CPanel::OnReload(bool onTimer)
     const UString url = _parentFolders[0].RemoteUrl;
     const UString arcFormat = _parentFolders[0].RemoteArcFormat;
     const bool skipHttpETag = _parentFolders[0].SkipHttpETag;
+    const NWindows::CHttpDiskCacheOptions cacheOptions = _parentFolders[0].HttpCacheOptions;
     const UString folderPath = _parentFolders.Size() == 1 ? GetFolderPath(_folder) : UString();
     COpenResult openRes;
-    if (OpenRemoteArchive(url, arcFormat, openRes, skipHttpETag) == S_OK && !folderPath.IsEmpty())
+    if (OpenRemoteArchive(url, arcFormat, openRes, skipHttpETag, &cacheOptions) == S_OK && !folderPath.IsEmpty())
     {
       CMyComPtr<IFolderFolder> folder;
       if (_folder->BindToFolder(folderPath, &folder) == S_OK && folder)

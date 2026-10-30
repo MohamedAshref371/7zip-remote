@@ -5,7 +5,7 @@ from pathlib import Path
 import struct
 
 
-def read_dialog(exe):
+def read_dialog(exe, resource_id=97):
     api = ctypes.WinDLL('kernel32', use_last_error=True)
     api.LoadLibraryExW.argtypes = [ctypes.c_wchar_p, ctypes.c_void_p, ctypes.c_uint32]
     api.LoadLibraryExW.restype = ctypes.c_void_p
@@ -22,8 +22,8 @@ def read_dialog(exe):
     if not module:
         raise ctypes.WinError(ctypes.get_last_error())
     try:
-        resource = api.FindResourceW(module, 97, 5)  # IDD_PROGRESS, RT_DIALOG
-        assert resource, 'Missing progress dialog'
+        resource = api.FindResourceW(module, resource_id, 5)  # RT_DIALOG
+        assert resource, f'Missing dialog {resource_id}'
         data = ctypes.string_at(api.LockResource(api.LoadResource(module, resource)),
                                 api.SizeofResource(module, resource))
     finally:

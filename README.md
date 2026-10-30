@@ -40,6 +40,11 @@ design, evidence, and remaining work.
   data. Solid archives are marked; hover for exact byte counts and an explanation.
   Unsupported layouts and very large selections show **unavailable**. Selecting
   files does not initiate HTTP requests. See [selection preview notes](Notes/20-selection-preview.md).
+- **Optional disk cache:** Open URL → **Cache settings...** enables persistent
+  archive parts in a chosen folder, with an optional space limit and safe Clear.
+  Exact resource/strong-ETag matches can reuse parts automatically. Changed URLs
+  and ETag bypass need separate consent to partial verification before reusing
+  old data. See [cache settings and verification](Notes/21-persistent-cache.md).
 - **ETag policy:** the Open URL dialog defaults to **Skip ETag verification**
   checked. Uncheck it to require a strong ETag. The console verifies ETags by
   default and exposes `-shttp-no-etag` to opt out.
@@ -61,7 +66,7 @@ Requirements:
 From the repository root:
 
 ```powershell
-python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/selection-preview
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/disk-cache
 ```
 
 The script discovers Visual Studio, loads its x64 environment, and builds the
@@ -81,7 +86,7 @@ Zig/Clang build instructions are available in the [test and build guide](Tests/R
 ### File Manager
 
 ```powershell
-& .\.build\msvc\iso-options\7zFM.exe
+& .\.build\msvc\disk-cache\7zFM.exe
 ```
 
 1. Choose **File → Open URL...** and paste a direct archive URL.
@@ -95,10 +100,21 @@ archive returns to the outer remote archive. A failed refresh preserves the
 previous view. URLs are kept in the session; displayed/history paths use a
 sanitized archive name.
 
+### Disk cache
+
+Open **Cache settings...** to enable it and choose storage. Leave ETag verification
+on for automatic verified reuse. To link a changed URL, select a saved archive
+and explicitly confirm **Reuse old cache without full version verification**.
+That independent choice is also required for old data when skipping ETag; samples
+can miss changes outside the checked regions. Clear skips active archives, so
+close them and clear again if needed. Busy or failed cache I/O uses memory.
+Cache settings are retained on Refresh and apply to new GUI opens; the console
+continues to use its existing memory cache defaults.
+
 ### Console
 
 ```powershell
-$sevenzip = '.\.build\msvc\selection-preview\7z.exe'
+$sevenzip = '.\.build\msvc\disk-cache\7z.exe'
 
 & $sevenzip l 'https://example.com/archive.zip'
 & $sevenzip x 'https://example.com/archive.zip' 'docs/readme.txt' -oOut
@@ -137,10 +153,13 @@ their existing behavior.
 ## Tests and Validation
 
 ```powershell
-python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/selection-preview/7z.exe"
-python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/selection-preview/agentcheck.exe"
-python Tests/RemoteArchive/test_redirect.py --exe "$PWD/.build/msvc/selection-preview/7z.exe" --agent "$PWD/.build/msvc/selection-preview/agentcheck.exe"
-python Tests/RemoteArchive/test_retry.py --exe "$PWD/.build/msvc/selection-preview/7z.exe" --agent "$PWD/.build/msvc/selection-preview/agentcheck.exe"
+python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/disk-cache/7z.exe"
+python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/disk-cache/agentcheck.exe"
+python Tests/RemoteArchive/test_redirect.py --exe "$PWD/.build/msvc/disk-cache/7z.exe" --agent "$PWD/.build/msvc/disk-cache/agentcheck.exe"
+python Tests/RemoteArchive/test_retry.py --exe "$PWD/.build/msvc/disk-cache/7z.exe" --agent "$PWD/.build/msvc/disk-cache/agentcheck.exe"
+python Tests/RemoteArchive/build.py --cache-check
+python Tests/RemoteArchive/test_disk_cache.py
+python Tests/RemoteArchive/test_disk_cache_agent.py --exe "$PWD/.build/msvc/disk-cache/agentcheck.exe"
 
 # Supply your own local RAR-generation fixtures:
 python Tests/RemoteArchive/test_rar_family.py --rar4 'path/to/legacy.rar' --rar5 'path/to/modern.rar'
@@ -155,7 +174,9 @@ Recorded validation across the development milestones:
 |---|---:|---|
 | Stream/prototype | 72 | Read/Seek, offsets above 4 GiB, HTTP validation, cache, cancellation, and extraction hashes |
 | Console | 99 | Local/remote commands, actionable diagnostics, ETag policies, selected extraction, zones, and failure cases |
-| File Manager Agent | 58 | Browsing, extraction/testing, passwords, read-only enforcement, format selection, network counters, and ZIP/7z/RAR/ISO estimates |
+| File Manager Agent | 60 | Browsing, extraction/testing, passwords, read-only enforcement, format selection, network counters, and ZIP/7z/RAR/ISO estimates |
+| Persistent cache | 51 | Source identity, explicit reuse consent, corruption, quotas, locks, safe clearing, interrupted writes, and validation cancellation |
+| Cache with real archives | 10 | ZIP/7z extraction hashes, saved-part reuse, independent ETag consent, and GNU/MSVC cache compatibility |
 | Compressed RAR estimates | 10 | RAR/RAR5 metadata plans, solid predecessors, encrypted RAR4 headers/data, ETag policies, and extracted hashes |
 | Cancellation | 8 | Stalled headers/body during opening/extraction, repeated callback/event cancellation, closed connections, and partial-range rejection |
 | RAR family | 8 | Both generations, Auto/shared RAR selection, unknown URL extensions, ETag bypass, and output hashes |
