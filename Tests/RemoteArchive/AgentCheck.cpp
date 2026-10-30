@@ -210,6 +210,19 @@ int __cdecl wmain(int argc, wchar_t **argv)
   bool cancelEventMode = false;
   for (int i = 3; i < argc; ++i)
   {
+    if (wcscmp(argv[i], L"--transport-deadline-check") == 0)
+    {
+      NWindows::CHttpRangeSource source;
+      NWindows::CHttpRangeOptions options;
+      options.TimeoutMs = 10000;
+      options.RequestDeadlineMs = 250;
+      const DWORD started = GetTickCount();
+      CHECK(source.Open(argv[1], options) == HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+      CHECK(GetTickCount() - started < 1500);
+      CHECK(source.Requests >= 2 && source.Requests <= 4);
+      printf("REDIRECT_DEADLINE_OK\n");
+      return 0;
+    }
     if (wcscmp(argv[i], L"--skip-http-etag") == 0) manager->SetSkipHttpETag(true);
     if (wcsncmp(argv[i], L"--format=", 9) == 0) arcFormat = argv[i] + 9;
     if (wcscmp(argv[i], L"--rar-family-check") == 0) rarFamilyCheck = true;

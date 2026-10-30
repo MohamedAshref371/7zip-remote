@@ -21,6 +21,8 @@ design, evidence, and remaining work.
 - **Console:** direct URLs for `l`, `x`, `e`, and `t`.
 - **HTTP input stream:** WinHTTP transport, seekable reads, a bounded memory
   cache, and validation of ranges, lengths, and source size.
+- **Redirects:** follow HTTP 301/302/303/307/308, including relative links, with
+  at most five hops per range request. HTTPS-to-HTTP redirects are rejected.
 - **Network diagnostics:** actionable messages for denied or expired links,
   authentication requirements, rate limits, server failures, unsupported partial
   downloads, and connection errors. Messages exclude URLs and access tokens.
@@ -51,7 +53,7 @@ Requirements:
 From the repository root:
 
 ```powershell
-python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/iso-options
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/redirects
 ```
 
 The script discovers Visual Studio, loads its x64 environment, and builds the
@@ -88,7 +90,7 @@ sanitized archive name.
 ### Console
 
 ```powershell
-$sevenzip = '.\.build\msvc\iso-options\7z.exe'
+$sevenzip = '.\.build\msvc\redirects\7z.exe'
 
 & $sevenzip l 'https://example.com/archive.zip'
 & $sevenzip x 'https://example.com/archive.zip' 'docs/readme.txt' -oOut
@@ -108,8 +110,11 @@ their existing behavior.
   responses and a known total size are required. Strict mode additionally needs
   a strong ETag on every response.
 - Remote archives are read-only and currently single-volume.
-- Redirects, automatic retries, browser login/cookies, sharing-page resolution,
+- Automatic retries, browser login/cookies, sharing-page resolution,
   and automatic full-download fallback are not implemented.
+- Redirect destinations must satisfy the same HTTP(S), range and version checks.
+  Cookies and authentication remain disabled. Signed query strings are preserved
+  as supplied by each Location; old query parameters are not appended to new URLs.
 - Solid compression may require reading and decompressing preceding data,
   potentially most or all of the archive. Savings depend on the archive layout.
 - HTTP requests can be cancelled while response headers or body data are pending,
@@ -121,8 +126,9 @@ their existing behavior.
 ## Tests and Validation
 
 ```powershell
-python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/iso-options/7z.exe"
-python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/iso-options/agentcheck.exe"
+python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/redirects/7z.exe"
+python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/redirects/agentcheck.exe"
+python Tests/RemoteArchive/test_redirect.py --exe "$PWD/.build/msvc/redirects/7z.exe" --agent "$PWD/.build/msvc/redirects/agentcheck.exe"
 
 # Supply your own local RAR-generation fixtures:
 python Tests/RemoteArchive/test_rar_family.py --rar4 'path/to/legacy.rar' --rar5 'path/to/modern.rar'

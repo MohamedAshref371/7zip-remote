@@ -125,7 +125,7 @@ def main():
             text = run('error-hint-' + mode, f'{base}/{mode}/sample.zip?sig=fixture-secret', 1)
             assert hint in text, (mode, text)
         for mode in ('ignore', 'missing-etag', 'weak', 'changed', 'changed-size', 'precondition',
-                     'truncated', 'redirect', 'forbidden', 'missing', 'range416'):
+                     'truncated', 'redirect-loop', 'forbidden', 'missing', 'range416'):
             text = run(mode, f'{base}/{mode}/sample.zip?sig=fixture-secret', 1)
             if mode in ('forbidden', 'missing', 'range416'):
                 assert str({'forbidden': 403, 'missing': 404, 'range416': 416}[mode]) in text

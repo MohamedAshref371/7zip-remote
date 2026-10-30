@@ -29,6 +29,9 @@ class FixtureServer(http.server.ThreadingHTTPServer):
         super().__init__(("127.0.0.1", 0), Handler)
         self.files = files
         self.records = []
+        self.redirects = {} # mode -> (status, Location values); tests supply destinations
+        self.redirect_delays = {}
+        self.redirect_after_probe = set()
         self.lock = threading.Lock()
         self.hold_enabled = False
         self.held = threading.Event()
@@ -94,7 +97,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.server.records.append(dict(mode=mode, name=name, start=start, end=end,
                                             if_match=self.headers.get("If-Match"),
                                             encoding=self.headers.get("Accept-Encoding"),
+                                            cookie=self.headers.get("Cookie"),
+                                            authorization=self.headers.get("Authorization"),
+                                            referer=self.headers.get("Referer"),
                                             path=self.path))
+        if (mode in self.server.redirects or mode in ('redirect', 'redirect-loop')) and not (
+                probe and mode in self.server.redirect_after_probe):
+            time.sleep(self.server.redirect_delays.get(mode, 0))
+            status, locations = self.server.redirects.get(mode, (302, [
+                f"/{'redirect-loop' if mode == 'redirect-loop' else 'ok'}/{name}"]))
+            self.send_response(status)
+            for location in locations:
+                self.send_header('Location', location)
+            self.send_header('Set-Cookie', 'redirect-cookie=must-not-be-sent')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
         if start >= total or end >= total or end < start:
             self.send_error(416)
             return
@@ -108,12 +126,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             hold = False
         if hold and mode.endswith('headers'):
             self.hold_until_disconnected()
-            return
-        if mode == "redirect":
-            self.send_response(302)
-            self.send_header("Location", f"/ok/{name}")
-            self.send_header("Content-Length", "0")
-            self.end_headers()
             return
         if mode == "ignore":
             self.send_response(200)
@@ -281,7 +293,7 @@ def main():
         for mode in ("ignore", "weak", "missing-etag", "missing-range", "duplicate-range",
                      "duplicate-etag", "wrong-range", "changed", "changed-size", "precondition",
                      "encoded", "multipart", "wrong-length", "truncated", "extra-body",
-                     "redirect", "forbidden", "missing", "range416"):
+                     "redirect-loop", "forbidden", "missing", "range416"):
             run(mode, "l", "zip", f"{base}/{mode}/sample.zip", expected=False)
         run("no-password", "l", "7z", f"{base}/ok/secret.7z", expected=False)
         run("wrong-header-password", "l", "7z", f"{base}/ok/secret.7z",

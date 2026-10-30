@@ -157,6 +157,53 @@ bool StrongETag(const std::wstring &tag)
       return false;
   return true;
 }
+
+// RFC 3986 relative references. Never decode/re-encode signed paths or queries.
+std::wstring ResolveRedirect(const std::wstring &base, std::wstring target)
+{
+  const size_t fragment = target.find(L'#');
+  if (fragment != std::wstring::npos) target.erase(fragment);
+  const size_t authorityEnd = base.find_first_of(L"/?", base.find(L"://") + 3);
+  const std::wstring origin = base.substr(0, authorityEnd);
+  const size_t schemeEnd = base.find(L':');
+  const size_t colon = target.find(L':');
+  const size_t delimiter = target.find_first_of(L"/?");
+  if (colon != std::wstring::npos && (delimiter == std::wstring::npos || colon < delimiter))
+    return target; // SetUrl validates the absolute scheme and authority.
+  if (target.compare(0, 2, L"//") == 0)
+    return base.substr(0, schemeEnd + 1) + target;
+  const std::wstring basePath = authorityEnd == std::wstring::npos || base[authorityEnd] == L'?'
+      ? L"/" : base.substr(authorityEnd, base.find(L'?', authorityEnd) - authorityEnd);
+  if (target.empty()) return base;
+  if (target[0] == L'?') return origin + basePath + target;
+  std::wstring path = target[0] == L'/' ? target
+      : basePath.substr(0, basePath.rfind(L'/') + 1) + target;
+  const size_t query = path.find(L'?');
+  const std::wstring suffix = query == std::wstring::npos ? L"" : path.substr(query);
+  if (query != std::wstring::npos) path.erase(query);
+  // Remove literal dot segments only; preserve escaped dots and empty segments.
+  std::wstring output;
+  while (!path.empty())
+  {
+    if (path.compare(0, 3, L"../") == 0) path.erase(0, 3);
+    else if (path.compare(0, 2, L"./") == 0) path.erase(0, 2);
+    else if (path.compare(0, 3, L"/./") == 0 || path == L"/.") path.replace(0, 2, L"");
+    else if (path.compare(0, 4, L"/../") == 0 || path == L"/..")
+    {
+      path.replace(0, 3, L"");
+      const size_t slash = output.rfind(L'/');
+      output.erase(slash == std::wstring::npos ? 0 : slash);
+    }
+    else if (path == L"." || path == L"..") path.clear();
+    else
+    {
+      const size_t next = path.find(L'/', path[0] == L'/' ? 1 : 0);
+      output.append(path, 0, next);
+      path.erase(0, next == std::wstring::npos ? path.size() : next);
+    }
+  }
+  return origin + output + suffix;
+}
 }
 
 CHttpRangeSource::~CHttpRangeSource()
@@ -216,35 +263,53 @@ HRESULT CHttpRangeSource::Open(const wchar_t *url, const CHttpRangeOptions &opti
   if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
   if (!url || options.TimeoutMs <= 0 || options.RequestDeadlineMs == 0)
     return Fail("Invalid source options.", E_INVALIDARG);
-  // Require an encoded URI, not a local path. Do not alter signed query strings.
-  for (const wchar_t *p = url; *p; ++p)
-    if (*p <= 0x20 || *p > 0x7e || *p == L'\\' || *p == L'#')
-      return Fail("Use an ASCII percent-encoded HTTP(S) URL without a fragment.", E_INVALIDARG);
-  URL_COMPONENTS parts = {};
-  parts.dwStructSize = sizeof(parts);
-  parts.dwHostNameLength = parts.dwUrlPathLength = parts.dwExtraInfoLength =
-      parts.dwUserNameLength = parts.dwPasswordLength = static_cast<DWORD>(-1);
-  if (!WinHttpCrackUrl(url, 0, 0, &parts) || !parts.dwHostNameLength ||
-      parts.dwUserNameLength || parts.dwPasswordLength ||
-      (parts.nScheme != INTERNET_SCHEME_HTTP && parts.nScheme != INTERNET_SCHEME_HTTPS))
-    return Fail("Expected an HTTP(S) URL without embedded credentials.", E_INVALIDARG);
-  _secure = parts.nScheme == INTERNET_SCHEME_HTTPS;
-  const std::wstring host(parts.lpszHostName, parts.dwHostNameLength);
-  _path.assign(parts.lpszUrlPath, parts.dwUrlPathLength);
-  if (_path.empty()) _path = L"/";
-  if (parts.dwExtraInfoLength) _path.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
   _session = WinHttpOpen(L"7-Zip-Range-Prototype/1", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
       WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC);
   if (!_session) return Fail("Cannot create HTTP session.", LastErrorResult());
   if (!WinHttpSetTimeouts(_session, options.TimeoutMs, options.TimeoutMs,
       options.TimeoutMs, options.TimeoutMs))
     return Fail("Cannot configure HTTP timeouts.", LastErrorResult());
-  _connection = WinHttpConnect(_session, host.c_str(), parts.nPort, 0);
-  if (!_connection) return Fail("Cannot create HTTP connection.", LastErrorResult());
+  HRESULT result = SetUrl(url);
+  if (result != S_OK) return result;
   std::vector<unsigned char> probe;
-  const HRESULT result = Request(0, 1, true, probe);
+  result = Request(0, 1, true, probe);
   _ready = result == S_OK;
   return result;
+}
+
+HRESULT CHttpRangeSource::SetUrl(const std::wstring &url)
+{
+  // Apply the same validation to initial and redirected URLs.
+  if (url.size() > 32768) return Fail("HTTP URL is too long.", E_INVALIDARG);
+  for (const wchar_t c : url)
+    if (c <= 0x20 || c > 0x7e || c == L'\\' || c == L'#')
+      return Fail("Use an ASCII percent-encoded HTTP(S) URL without a fragment.", E_INVALIDARG);
+  URL_COMPONENTS parts = {};
+  parts.dwStructSize = sizeof(parts);
+  parts.dwHostNameLength = parts.dwUrlPathLength = parts.dwExtraInfoLength =
+      parts.dwUserNameLength = parts.dwPasswordLength = static_cast<DWORD>(-1);
+  const size_t authorityStart = url.find(L"://");
+  const size_t authorityEnd = authorityStart == std::wstring::npos ? 0
+      : url.find_first_of(L"/?", authorityStart + 3);
+  const size_t userinfo = url.find(L'@', authorityStart == std::wstring::npos ? 0 : authorityStart + 3);
+  if (userinfo != std::wstring::npos && (authorityEnd == std::wstring::npos || userinfo < authorityEnd))
+    return Fail("Expected an HTTP(S) URL without embedded credentials.", E_INVALIDARG);
+  if (!WinHttpCrackUrl(url.c_str(), 0, 0, &parts) || !parts.dwHostNameLength ||
+      parts.dwUserNameLength || parts.dwPasswordLength ||
+      (parts.nScheme != INTERNET_SCHEME_HTTP && parts.nScheme != INTERNET_SCHEME_HTTPS))
+    return Fail("Expected an HTTP(S) URL without embedded credentials.", E_INVALIDARG);
+  const bool secure = parts.nScheme == INTERNET_SCHEME_HTTPS;
+  if (_secure && !secure) return Fail("Redirect from HTTPS to HTTP is not allowed.");
+  const std::wstring host(parts.lpszHostName, parts.dwHostNameLength);
+  _path.assign(parts.lpszUrlPath, parts.dwUrlPathLength);
+  if (_path.empty()) _path = L"/";
+  if (parts.dwExtraInfoLength) _path.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
+  if (_connection) { WinHttpCloseHandle(_connection); _connection = NULL; }
+  _connection = WinHttpConnect(_session, host.c_str(), parts.nPort, 0);
+  if (!_connection) return Fail("Cannot create HTTP connection.", LastErrorResult());
+  _url = url;
+  _secure = secure;
+  return S_OK;
 }
 
 HRESULT CHttpRangeSource::Fetch(ULONGLONG start, unsigned length,
@@ -259,9 +324,26 @@ HRESULT CHttpRangeSource::Fetch(ULONGLONG start, unsigned length,
 HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
     std::vector<unsigned char> &data)
 {
+  const DWORD begun = GetTickCount();
+  for (unsigned hops = 0; ; ++hops)
+  {
+    std::wstring redirect;
+    const HRESULT result = RequestOnce(start, length, probe, data, begun, redirect);
+    if (result != S_FALSE) return result;
+    if (hops == 5) return Fail("Too many HTTP redirects (maximum 5). Obtain a fresh direct download URL.");
+    if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
+    const HRESULT changed = SetUrl(ResolveRedirect(_url, redirect));
+    if (changed != S_OK) return changed;
+  }
+}
+
+HRESULT CHttpRangeSource::RequestOnce(ULONGLONG start, unsigned length, bool probe,
+    std::vector<unsigned char> &data, DWORD begun, std::wstring &redirect)
+{
   data.clear();
   if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
-  const DWORD begun = GetTickCount();
+  if (static_cast<DWORD>(GetTickCount() - begun) >= _options.RequestDeadlineMs)
+    return Fail("HTTP request deadline exceeded. Check your connection and reopen the archive.", HRESULT_FROM_WIN32(ERROR_TIMEOUT));
   // Declare I/O buffers before the request so its destructor cancels/drains
   // callbacks before cancellation can release any buffer still used by WinHTTP.
   std::vector<unsigned char> body;
@@ -294,7 +376,8 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
       !WinHttpSetOption(request.Value, WINHTTP_OPTION_RECEIVE_RESPONSE_TIMEOUT,
           &responseTimeout, sizeof(responseTimeout)))
     return Fail("Cannot configure request timeouts.", LastErrorResult());
-  // This prototype never follows redirects, sends browser cookies, or negotiates credentials.
+  // Handle redirects on the caller thread, with a shared deadline and hop limit.
+  // No cookies or automatic server/proxy authentication, including on new hosts.
   DWORD disabled = WINHTTP_DISABLE_REDIRECTS | WINHTTP_DISABLE_COOKIES | WINHTTP_DISABLE_AUTHENTICATION;
   if (!WinHttpSetOption(request.Value, WINHTTP_OPTION_DISABLE_FEATURE, &disabled, sizeof(disabled)))
     return Fail("Cannot configure HTTP request policy.", LastErrorResult());
@@ -314,6 +397,12 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
       WINHTTP_HEADER_NAME_BY_INDEX, &status, &statusSize, WINHTTP_NO_HEADER_INDEX))
     return Fail("Cannot read HTTP status.", LastErrorResult());
   Status = status;
+  if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308)
+  {
+    if (Header(request.Value, WINHTTP_QUERY_LOCATION, redirect) != S_OK || redirect.empty())
+      return Fail("Missing, duplicate or invalid HTTP redirect Location.");
+    return S_FALSE; // Request closes/drains before changing the connection.
+  }
   if (status == 200) return Fail("The server does not support partial downloads for this URL. Download the archive locally to open it.");
   if (status == 401) return Fail("The server requires authentication. Browser login sessions are not supported; use a direct download URL that grants access.");
   if (status == 403) return Fail("The server denied access. The download link may have expired; obtain a fresh direct download URL and check access permissions.");
@@ -323,7 +412,7 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
   if (status == 416) return Fail("The server rejected the requested byte range. Reopen the archive; if the problem persists, download it locally.");
   if (status == 429) return Fail("The server is limiting download requests. Wait before reopening the archive.");
   if (status >= 500 && status < 600) return Fail("The server reported a temporary failure. Try reopening the archive later.");
-  if (status >= 300 && status < 400) return Fail("Redirect unsupported; supply the final direct URL.");
+  if (status >= 300 && status < 400) return Fail("Unsupported HTTP redirect status. Supply a direct download URL.");
   if (status != 206)
   {
     const std::string message = "Unexpected HTTP status " + std::to_string(status)

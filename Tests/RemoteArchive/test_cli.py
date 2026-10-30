@@ -113,7 +113,7 @@ def main():
             "changed-size": "Reopen the archive",
             "precondition": "Reopen the archive",
             "truncated": "reopen the archive",
-            "redirect": "final direct URL",
+            "redirect-loop": "Too many HTTP redirects",
             "unauthorized": "Browser login sessions are not supported",
             "forbidden": "obtain a fresh direct download URL",
             "missing": "Check the URL",
@@ -166,7 +166,7 @@ def main():
             target = output_dir / ("docs/target.txt" if command == "x" else "target.txt")
             assert target.read_bytes() == contents["docs/target.txt"]
         for mode in ("changed-size", "wrong-range", "missing-range", "duplicate-range", "truncated",
-                     "extra-body", "encoded", "multipart", "wrong-length", "ignore", "precondition", "redirect"):
+                     "extra-body", "encoded", "multipart", "wrong-length", "ignore", "precondition", "redirect-loop"):
             run("no-etag-reject-" + mode, ["t", f"{base}/{mode}/sample.zip", opt], False)
         assert all(r["if_match"] is None for r in server.records[unchecked_start:])
         run("no-etag-local-rejected", ["l", archive, opt], False)

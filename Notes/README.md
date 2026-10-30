@@ -31,6 +31,8 @@ These are engineering choices for the study, not settings currently available in
 
 ## Study Files
 
+Latest follow-up: [HTTP redirects and stability checks](18-http-redirects.md).
+
 Latest follow-up: [Responsive cancellation](17-responsive-cancellation.md).
 
 Latest follow-up: [RAR/RAR5 and ISO download estimates](16-rar-iso-estimates.md).
@@ -60,4 +62,4 @@ For a 20 GiB ZIP, downloading its directory and a 5 MiB compressed file's data, 
 
 ## Work Status
 
-The study, standalone prototype, 26.05 engine build, and CLI integration are complete. File Manager supports opening direct URLs and refreshing with a fresh session, with Agent-level coverage for local/remote browsing, extraction, passwords, zones, rejected mutations, and optional ETag bypass. The user confirmed the previous Open URL flow works; the new checkbox and complete desktop acceptance flow still need verification. A real MediaFire HTTPS listing and selected extraction have now succeeded. Broader server/proxy interoperability, redirects, retries, full-download fallback, and remote volume resolution remain future work. This is a development milestone, not a release-ready product.
+The study, standalone prototype, 26.05 engine build, and CLI integration are complete. File Manager supports opening direct URLs and refreshing with a fresh session, with Agent-level coverage for local/remote browsing, extraction, passwords, zones, rejected mutations, and optional ETag bypass. The user confirmed the previous Open URL flow works; the new checkbox and complete desktop acceptance flow still need verification. A real MediaFire HTTPS listing and selected extraction have now succeeded. HTTP redirects now have controlled integration coverage; see the latest follow-up. Broader server/proxy interoperability, retries, full-download fallback, and remote volume resolution remain future work. This is a development milestone, not a release-ready product.

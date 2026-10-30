@@ -59,6 +59,7 @@ def main():
         zip_url=base + '/ok/sample.zip', encrypted_url=base + '/ok/secret.7z',
         slow_url=base + '/slow/sample.zip', rejected_url=base + '/ignore/sample.zip',
         no_etag_url=base + '/missing-etag/sample.zip',
+        redirect_url=base + '/redirect/sample.zip',
         password=password, directory=str(work), requests=str(server.record_path))
     # Stable discovery file for the current manual session. Payloads stay unique.
     (ROOT / '.build/msvc/manual-session.json').write_text(

@@ -25,12 +25,16 @@ class CHttpRangeSource
   void *_session = NULL;
   void *_connection = NULL;
   std::wstring _path;
+  std::wstring _url;
   std::wstring _etag;
   bool _secure = false;
   bool _ready = false;
   CHttpRangeOptions _options;
   HRESULT Request(ULONGLONG start, unsigned length, bool probe,
       std::vector<unsigned char> &data);
+  HRESULT RequestOnce(ULONGLONG start, unsigned length, bool probe,
+      std::vector<unsigned char> &data, DWORD begun, std::wstring &redirect);
+  HRESULT SetUrl(const std::wstring &url);
   HRESULT Fail(const char *message, HRESULT result = E_FAIL);
   HRESULT FailNetwork();
   void ReportProgress() const;

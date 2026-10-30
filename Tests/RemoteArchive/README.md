@@ -1,5 +1,22 @@
 # Remote archive prototype (Windows x64)
 
+## HTTP redirects
+
+The current shared transport follows 301/302/303/307/308 redirects, with a maximum
+of five hops and one deadline for the entire range request. Relative Location
+values are resolved without decoding signed paths/queries. HTTPS downgrades and
+embedded credentials are rejected; cookies and authentication stay disabled.
+The resolved destination is reused for subsequent reads in the session. Refresh
+starts from the original user URL. See [redirect implementation and validation](../../Notes/18-http-redirects.md).
+
+```powershell
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/redirects
+python Tests/RemoteArchive/test_redirect.py --exe .build/msvc/redirects/7z.exe --agent .build/msvc/redirects/agentcheck.exe
+```
+
+The manual fixture server also prints `redirect_url` for Open URL, selected
+extraction, Refresh and cancellation acceptance tests.
+
 ## Optional ETag verification bypass
 
 The transport and console verify ETags by default. At the user's request, the
@@ -231,8 +248,10 @@ The internal `streamcheck raw URL` command expects byte N to equal N modulo
 
 ## Limits
 
-- No main CLI/GUI integration, format autodetection, SFX scanning, multivolume
-  archives, remote writes, browser authentication, redirects, retries or
+- The following limits describe the original standalone milestone. Current
+  CLI/GUI integration and redirect support are described above.
+- No standalone format autodetection, multivolume
+  archives, remote writes, browser authentication, retries or
   automatic full-download fallback.
 - 256 KiB blocks, 8 MiB LRU cache, single consumer per source. The initial
   one-byte probe is counted but not cached. Values are provisional.
