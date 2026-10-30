@@ -181,5 +181,30 @@ private:
   CRemoteProgressScope(const CRemoteProgressScope &);
   CRemoteProgressScope &operator=(const CRemoteProgressScope &);
 };
+
+// Extraction callbacks, like opening callbacks, belong to a single operation.
+class CRemoteExtractCancelScope
+{
+  CRemoteArchiveSource &_source;
+  CMyComPtr<IProgress> _callback;
+  static bool Check(void *context)
+  {
+    CRemoteExtractCancelScope &self = *static_cast<CRemoteExtractCancelScope *>(context);
+    return self._callback && self._callback->SetCompleted(NULL) != S_OK;
+  }
+public:
+  CRemoteExtractCancelScope(CRemoteArchiveSource &source, IProgress *callback):
+      _source(source), _callback(callback)
+  {
+    if (source.Spec) source.Spec->Source.SetCancelCheck(Check, this);
+  }
+  ~CRemoteExtractCancelScope()
+  {
+    if (_source.Spec) _source.Spec->Source.SetCancelCheck(NULL, NULL);
+  }
+private:
+  CRemoteExtractCancelScope(const CRemoteExtractCancelScope &);
+  CRemoteExtractCancelScope &operator=(const CRemoteExtractCancelScope &);
+};
 #endif
 #endif

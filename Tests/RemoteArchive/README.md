@@ -144,7 +144,8 @@ URL query/userinfo is excluded from normal archive display and diagnostics.
 Remote data receives Internet-zone metadata when the selected zone policy
 requires it (`-snz1` explicitly marks all extracted files). Network progress is
 not yet shown separately from the existing archive progress. Cancellation is
-checked through console callbacks but remains subject to synchronous HTTP waits.
+checked through console callbacks during asynchronous WinHTTP waits. Pending
+requests are closed on cancellation; see [responsive cancellation](../../Notes/17-responsive-cancellation.md).
 
 The GCC console makefile accepts `Z7_HTTP=1` on Windows; the MSVC console build
 accepts `Z7_HTTP=1` with a compiler supporting the HTTP code's modern C++ syntax.
@@ -199,8 +200,9 @@ Signed query strings are preserved. Format selection is explicit: `zip` or `7z`.
 It does not provide server authentication. Passwords are not printed, but this
 prototype does not guarantee erasure of every password memory copy.
 `--timeout-ms N` controls WinHTTP timeouts; `--cancel-after-ms N` is a test aid.
-Ctrl+C requests cancellation. Synchronous WinHTTP calls may finish or time out
-before cancellation is observed; cancellation is not an immediate hard deadline.
+Ctrl+C requests cancellation. Pending WinHTTP send/receive/read operations are
+cancelled through the same asynchronous wait path; cancellation is not a hard
+real-time guarantee.
 
 Listing is JSON Lines on stdout. Statistics on stderr distinguish engine reads
 from HTTP body bytes returned by WinHTTP; they exclude HTTP/TLS overhead and

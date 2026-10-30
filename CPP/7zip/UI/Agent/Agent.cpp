@@ -1487,6 +1487,7 @@ Z7_COM7F_IMF(CAgentFolder::Extract(const UInt32 *indices,
     return E_NOTIMPL;
 
   #ifdef Z7_HTTP
+  CRemoteExtractCancelScope networkCancel(_agentSpec->RemoteSource, extractCallback2);
   CRemoteProgressScope networkProgress(_agentSpec->RemoteSource, extractCallback2);
   #endif
 

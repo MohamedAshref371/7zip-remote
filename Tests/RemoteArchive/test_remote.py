@@ -30,6 +30,11 @@ class FixtureServer(http.server.ThreadingHTTPServer):
         self.files = files
         self.records = []
         self.lock = threading.Lock()
+        self.hold_enabled = False
+        self.held = threading.Event()
+        self.disconnected = threading.Event()
+        self.closed_holds = 0
+        self.release_holds = threading.Event()
 
     def handle_error(self, request, client_address):
         # Clients intentionally abort invalid/oversized responses.
@@ -44,6 +49,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_HEAD(self):
         self.send_error(405)
+
+    def hold_until_disconnected(self):
+        self.close_connection = True
+        self.server.held.set()
+        self.connection.settimeout(0.05)
+        deadline = time.monotonic() + 10
+        while not self.server.release_holds.is_set() and time.monotonic() < deadline:
+            try:
+                if not self.connection.recv(4096):
+                    with self.server.lock:
+                        self.server.closed_holds += 1
+                    self.server.disconnected.set()
+                    return
+            except socket.timeout:
+                pass
+            except ConnectionError:
+                with self.server.lock:
+                    self.server.closed_holds += 1
+                self.server.disconnected.set()
+                return
 
     def do_GET(self):
         route = urllib.parse.urlsplit(self.path)
@@ -77,6 +102,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             time.sleep(0.8)
         if mode == "stalled":
             time.sleep(3)
+        hold = (mode in ('hang-headers', 'hang-body') or
+                (mode in ('extract-hang-headers', 'extract-hang-body') and self.server.hold_enabled))
+        if mode.endswith('body') and probe:
+            hold = False
+        if hold and mode.endswith('headers'):
+            self.hold_until_disconnected()
+            return
         if mode == "redirect":
             self.send_response(302)
             self.send_header("Location", f"/ok/{name}")
@@ -130,6 +162,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(length + 1 if mode == "wrong-length" else length))
         self.end_headers()
         body = bytes(i % 251 for i in range(start, end + 1)) if virtual else blob[start:end + 1]
+        if hold and mode.endswith('body'):
+            self.wfile.write(body[:8192])
+            self.wfile.flush()
+            self.hold_until_disconnected()
+            return
         if mode == "truncated" and not probe:
             self.wfile.write(body[:len(body) // 2])
             self.wfile.flush()

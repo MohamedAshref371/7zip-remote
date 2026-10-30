@@ -1,6 +1,7 @@
 // Headless integration check using the exact Agent/File Manager objects.
 #include "../../CPP/7zip/UI/FileManager/StdAfx.h"
 #include <stdio.h>
+#include <thread>
 #include "../../CPP/7zip/UI/Agent/Agent.h"
 #include "../../CPP/Common/StringConvert.h"
 #include "../../C/DllSecur.h"
@@ -24,6 +25,10 @@ class CTestCallback Z7_final:
 public:
   bool Cancel = false;
   bool Failed = false;
+  DWORD CancelStarted = 0;
+  unsigned CancelDelay = 0;
+  void CancelAfter(unsigned delay) { CancelStarted = GetTickCount(); CancelDelay = delay; }
+  bool IsCancelled() const { return Cancel || (CancelDelay && GetTickCount() - CancelStarted >= CancelDelay); }
   bool NetworkDefined = false;
   bool NetworkMonotonic = true;
   UInt64 NetworkBytes = 0, NetworkSize = 0, NetworkRequests = 0;
@@ -70,10 +75,10 @@ Z7_COM7F_IMF(CTestCallback::SetNetworkProgress(UInt64 bytes, UInt64 size, UInt64
   return S_OK;
 }
 
-Z7_COM7F_IMF(CTestCallback::SetTotal(UInt64)) { return Cancel ? E_ABORT : S_OK; }
-Z7_COM7F_IMF(CTestCallback::SetCompleted(const UInt64 *)) { return Cancel ? E_ABORT : S_OK; }
-Z7_COM7F_IMF(CTestCallback::SetTotal(const UInt64 *, const UInt64 *)) { return Cancel ? E_ABORT : S_OK; }
-Z7_COM7F_IMF(CTestCallback::SetCompleted(const UInt64 *, const UInt64 *)) { return Cancel ? E_ABORT : S_OK; }
+Z7_COM7F_IMF(CTestCallback::SetTotal(UInt64)) { return IsCancelled() ? E_ABORT : S_OK; }
+Z7_COM7F_IMF(CTestCallback::SetCompleted(const UInt64 *)) { return IsCancelled() ? E_ABORT : S_OK; }
+Z7_COM7F_IMF(CTestCallback::SetTotal(const UInt64 *, const UInt64 *)) { return IsCancelled() ? E_ABORT : S_OK; }
+Z7_COM7F_IMF(CTestCallback::SetCompleted(const UInt64 *, const UInt64 *)) { return IsCancelled() ? E_ABORT : S_OK; }
 Z7_COM7F_IMF(CTestCallback::AskOverwrite(const wchar_t *, const FILETIME *, const UInt64 *,
     const wchar_t *, const FILETIME *, const UInt64 *, Int32 *answer))
 { *answer = NOverwriteAnswer::kYes; return S_OK; }
@@ -87,6 +92,60 @@ Z7_COM7F_IMF(CTestCallback::CryptoGetTextPassword(BSTR *password))
 #define CHECK_HR(call) do { const HRESULT hr_ = (call); if (hr_ != S_OK) { \
   fprintf(stderr, "line %u: HRESULT %08lx\n", __LINE__, (unsigned long)hr_); return 1; } } while (0)
 #define CHECK(value) do { if (!(value)) { fprintf(stderr, "line %u: check failed\n", __LINE__); return 1; } } while (0)
+
+struct CCancelClock
+{
+  DWORD Started, Owner;
+  bool WrongThread;
+  CCancelClock(): Started(GetTickCount()), Owner(GetCurrentThreadId()), WrongThread(false) {}
+  static bool Check(void *context)
+  {
+    CCancelClock &self = *static_cast<CCancelClock *>(context);
+    if (GetCurrentThreadId() != self.Owner) self.WrongThread = true;
+    return GetTickCount() - self.Started >= 200;
+  }
+};
+
+static int CheckTransportCancel(const wchar_t *url, bool eventMode, unsigned repeats)
+{
+  DWORD baseline = 0, after = 0;
+  CHECK(GetProcessHandleCount(GetCurrentProcess(), &baseline));
+  for (unsigned i = 0; i <= repeats; ++i)
+  {
+    CCancelClock clock;
+    HANDLE event = CreateEventW(NULL, TRUE, FALSE, NULL);
+    CHECK(event);
+    std::thread timer;
+    if (eventMode) timer = std::thread([event]() { Sleep(200); SetEvent(event); });
+    HRESULT result;
+    bool cancelledMessage = false, emptyRange = false;
+    {
+      NWindows::CHttpRangeSource source;
+      NWindows::CHttpRangeOptions options;
+      options.TimeoutMs = 10000;
+      options.RequestDeadlineMs = 10000;
+      if (eventMode) options.CancelEvent = event;
+      else { options.CancelCheck = CCancelClock::Check; options.CancelContext = &clock; }
+      result = source.Open(url, options);
+      std::vector<unsigned char> data;
+      if (result == S_OK) result = source.Fetch(0, (unsigned)(source.Size < 262144 ? source.Size : 262144), data);
+      cancelledMessage = source.Error == "Cancelled.";
+      emptyRange = data.empty();
+    }
+    if (timer.joinable()) timer.join();
+    CloseHandle(event);
+    CHECK(result == E_ABORT && cancelledMessage && emptyRange);
+    CHECK(!clock.WrongThread);
+    CHECK(GetTickCount() - clock.Started < 1500);
+  }
+  // Diagnostic only: process-wide counts include WinHTTP-retained internal
+  // events, also observed in a minimal WinHTTP-only client. The Python fixture
+  // asserts that every blocked socket is closed; each request drains its final
+  // HANDLE_CLOSING callback before releasing the context and read buffers.
+  CHECK(GetProcessHandleCount(GetCurrentProcess(), &after));
+  printf("CANCEL_CHECK %u %lu %lu\n", repeats + 1, (unsigned long)baseline, (unsigned long)after);
+  return 0;
+}
 
 static int CheckNetworkSync()
 {
@@ -147,6 +206,8 @@ int __cdecl wmain(int argc, wchar_t **argv)
   bool rarFamilyCheck = false;
   bool estimateArchiveCheck = false;
   const wchar_t *skipItem = NULL;
+  unsigned cancelOpenMs = 0, cancelExtractMs = 0, transportRepeats = 0;
+  bool cancelEventMode = false;
   for (int i = 3; i < argc; ++i)
   {
     if (wcscmp(argv[i], L"--skip-http-etag") == 0) manager->SetSkipHttpETag(true);
@@ -155,12 +216,18 @@ int __cdecl wmain(int argc, wchar_t **argv)
     if (wcscmp(argv[i], L"--estimate-archive-check") == 0) estimateArchiveCheck = true;
     if (wcsncmp(argv[i], L"--password=", 11) == 0) g_TestPassword = argv[i] + 11;
     if (wcsncmp(argv[i], L"--skip-item=", 12) == 0) skipItem = argv[i] + 12;
+    if (wcsncmp(argv[i], L"--cancel-open-ms=", 17) == 0) cancelOpenMs = (unsigned)_wtoi(argv[i] + 17);
+    if (wcsncmp(argv[i], L"--cancel-extract-ms=", 20) == 0) cancelExtractMs = (unsigned)_wtoi(argv[i] + 20);
+    if (wcsncmp(argv[i], L"--transport-repeats=", 20) == 0) transportRepeats = (unsigned)_wtoi(argv[i] + 20);
+    if (wcscmp(argv[i], L"--cancel-event") == 0) cancelEventMode = true;
   }
+  if (transportRepeats) return CheckTransportCancel(argv[1], cancelEventMode, transportRepeats);
   CMyComPtr<IFolderFolder> folder;
   {
     CTestCallback *callback = new CTestCallback;
     CMyComPtr<IProgress> progress = callback;
     if (argc > 3 && wcscmp(argv[3], L"cancel") == 0) callback->Cancel = true;
+    if (cancelOpenMs) callback->CancelAfter(cancelOpenMs);
     const HRESULT result = managerRef->OpenFolderFile(NULL, argv[1], arcFormat, &folder, progress);
     if (result != S_OK)
     {
@@ -277,8 +344,22 @@ int __cdecl wmain(int argc, wchar_t **argv)
   CHECK_HR(docs.QueryInterface(IID_IArchiveFolder, &archive));
   CTestCallback *extract = new CTestCallback;
   CMyComPtr<IFolderArchiveExtractCallback> callback = extract;
-  CHECK_HR(archive->Extract(&selected, 1, 0, 0, NExtract::NPathMode::kNoPaths,
-      NExtract::NOverwriteMode::kOverwrite, argv[2], 0, callback));
+  if (cancelExtractMs)
+  {
+    printf("EXTRACT_READY\n");
+    fflush(stdout);
+    CHECK(getchar() == 'g');
+    extract->CancelAfter(cancelExtractMs);
+  }
+  const HRESULT extraction = archive->Extract(&selected, 1, 0, 0, NExtract::NPathMode::kNoPaths,
+      NExtract::NOverwriteMode::kOverwrite, argv[2], 0, callback);
+  if (cancelExtractMs)
+  {
+    CHECK(extraction == E_ABORT);
+    printf("Cancelled.\n");
+    return 3;
+  }
+  CHECK_HR(extraction);
   CHECK(!extract->Failed);
   CHECK(extract->NetworkMonotonic && extract->NetworkDefined == remote);
   extract->PrintNetwork("extract");

@@ -112,8 +112,8 @@ their existing behavior.
   and automatic full-download fallback are not implemented.
 - Solid compression may require reading and decompressing preceding data,
   potentially most or all of the archive. Savings depend on the archive layout.
-- HTTP operations are synchronous; cancellation can wait for a request to return
-  or time out. Separate network statistics are shown in File Manager progress
+- HTTP requests can be cancelled while response headers or body data are pending,
+  with cancellation checks during asynchronous waits. Separate network statistics are shown in File Manager progress
   dialogs; the console does not yet display these statistics.
 - Remote compatibility has coverage for ZIP, 7z, and single-volume RAR/RAR5
   samples. Other handlers and advanced format features need separate validation.
@@ -139,6 +139,7 @@ Recorded validation across the development milestones:
 | Console | 99 | Local/remote commands, actionable diagnostics, ETag policies, selected extraction, zones, and failure cases |
 | File Manager Agent | 58 | Browsing, extraction/testing, passwords, read-only enforcement, format selection, network counters, and ZIP/7z/RAR/ISO estimates |
 | Compressed RAR estimates | 10 | RAR/RAR5 metadata plans, solid predecessors, encrypted RAR4 headers/data, ETag policies, and extracted hashes |
+| Cancellation | 8 | Stalled headers/body during opening/extraction, repeated callback/event cancellation, closed connections, and partial-range rejection |
 | RAR family | 8 | Both generations, Auto/shared RAR selection, unknown URL extensions, ETag bypass, and output hashes |
 
 A real MediaFire HTTPS link was also tested with ETag bypass: listing and selected

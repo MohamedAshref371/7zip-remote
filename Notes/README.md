@@ -31,6 +31,8 @@ These are engineering choices for the study, not settings currently available in
 
 ## Study Files
 
+Latest follow-up: [Responsive cancellation](17-responsive-cancellation.md).
+
 Latest follow-up: [RAR/RAR5 and ISO download estimates](16-rar-iso-estimates.md).
 
 Latest follow-up: [Selected-download estimates](15-download-estimates.md).

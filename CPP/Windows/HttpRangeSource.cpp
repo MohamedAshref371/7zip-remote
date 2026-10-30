@@ -10,8 +10,84 @@ namespace {
 struct CRequestHandle
 {
   HINTERNET Value;
-  explicit CRequestHandle(HINTERNET value): Value(value) {}
-  ~CRequestHandle() { if (Value) WinHttpCloseHandle(Value); }
+  HANDLE Completed;
+  HANDLE Closed;
+  DWORD Error;
+  DWORD ReadSize;
+  bool Watching;
+  explicit CRequestHandle(HINTERNET value): Value(value),
+      Completed(value ? CreateEventW(NULL, TRUE, FALSE, NULL) : NULL), Closed(NULL),
+      Error(0), ReadSize(0), Watching(false)
+  {
+    if (Completed) Closed = CreateEventW(NULL, TRUE, FALSE, NULL);
+    if (!Completed || !Closed) Error = GetLastError();
+  }
+  static void CALLBACK Callback(HINTERNET, DWORD_PTR context, DWORD status, void *info, DWORD length)
+  {
+    if (!context) return;
+    CRequestHandle &self = *reinterpret_cast<CRequestHandle *>(context);
+    switch (status)
+    {
+      case WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING:
+        SetEvent(self.Closed); // Last notification; do not touch self afterwards.
+        return;
+      case WINHTTP_CALLBACK_STATUS_REQUEST_ERROR:
+        self.Error = length >= sizeof(WINHTTP_ASYNC_RESULT)
+            ? static_cast<WINHTTP_ASYNC_RESULT *>(info)->dwError : ERROR_GEN_FAILURE;
+        break;
+      case WINHTTP_CALLBACK_STATUS_READ_COMPLETE:
+        self.ReadSize = length;
+        break;
+      case WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE:
+      case WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE:
+        break;
+      default:
+        return;
+    }
+    SetEvent(self.Completed);
+  }
+  bool Initialize()
+  {
+    if (!Completed || !Closed) { SetLastError(Error); return false; }
+    DWORD_PTR context = reinterpret_cast<DWORD_PTR>(this);
+    if (!WinHttpSetOption(Value, WINHTTP_OPTION_CONTEXT_VALUE, &context, sizeof(context))) return false;
+    if (WinHttpSetStatusCallback(Value, Callback, WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS
+        | WINHTTP_CALLBACK_FLAG_HANDLES, 0) == WINHTTP_INVALID_STATUS_CALLBACK) return false;
+    Watching = true;
+    return true;
+  }
+  void Prepare()
+  {
+    ResetEvent(Completed);
+    Error = ReadSize = 0;
+  }
+  DWORD Wait(const CHttpRangeSource &source, DWORD begun, unsigned deadline)
+  {
+    for (;;)
+    {
+      // Only the operation's original thread invokes application callbacks.
+      if (source.IsCancelled()) return ERROR_CANCELLED;
+      const DWORD elapsed = GetTickCount() - begun;
+      if (elapsed >= deadline) return ERROR_TIMEOUT;
+      const DWORD result = WaitForSingleObject(Completed, (std::min<DWORD>)(50, deadline - elapsed));
+      if (result == WAIT_OBJECT_0) return source.IsCancelled() ? ERROR_CANCELLED : Error;
+      if (result == WAIT_FAILED) return GetLastError();
+    }
+  }
+  ~CRequestHandle()
+  {
+    if (Value)
+    {
+      WinHttpCloseHandle(Value); // Abort outstanding asynchronous I/O.
+      // The request context and read buffers must survive all late callbacks.
+      if (Watching) WaitForSingleObject(Closed, INFINITE);
+    }
+    if (Completed) CloseHandle(Completed);
+    if (Closed) CloseHandle(Closed);
+  }
+private:
+  CRequestHandle(const CRequestHandle &) = delete;
+  CRequestHandle &operator=(const CRequestHandle &) = delete;
 };
 
 HRESULT LastErrorResult()
@@ -116,6 +192,7 @@ HRESULT CHttpRangeSource::FailNetwork()
   switch (error)
   {
     case ERROR_WINHTTP_TIMEOUT:
+    case ERROR_TIMEOUT:
       message = "The server took too long to respond. Check your connection and reopen the archive.";
       break;
     case ERROR_WINHTTP_NAME_NOT_RESOLVED:
@@ -157,7 +234,7 @@ HRESULT CHttpRangeSource::Open(const wchar_t *url, const CHttpRangeOptions &opti
   if (_path.empty()) _path = L"/";
   if (parts.dwExtraInfoLength) _path.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
   _session = WinHttpOpen(L"7-Zip-Range-Prototype/1", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-      WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+      WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC);
   if (!_session) return Fail("Cannot create HTTP session.", LastErrorResult());
   if (!WinHttpSetTimeouts(_session, options.TimeoutMs, options.TimeoutMs,
       options.TimeoutMs, options.TimeoutMs))
@@ -185,11 +262,31 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
   data.clear();
   if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
   const DWORD begun = GetTickCount();
+  // Declare I/O buffers before the request so its destructor cancels/drains
+  // callbacks before cancellation can release any buffer still used by WinHTTP.
+  std::vector<unsigned char> body;
+  unsigned char extra;
+  const std::wstring headers = L"Accept-Encoding: identity\r\nRange: bytes=" +
+      std::to_wstring(start) + L"-" + std::to_wstring(start + length - 1) + L"\r\n" +
+      (probe || _options.SkipETagVerification ? L"" : L"If-Match: " + _etag + L"\r\n");
   CRequestHandle request(WinHttpOpenRequest(_connection, L"GET", _path.c_str(), NULL,
       WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
       (_secure ? WINHTTP_FLAG_SECURE : 0) | WINHTTP_FLAG_ESCAPE_DISABLE));
   if (!request.Value) return Fail("Cannot create HTTP request.", LastErrorResult());
-  // Bound the complete header phase too, not just individual socket reads.
+  if (!request.Initialize()) return Fail("Cannot configure asynchronous HTTP request.", LastErrorResult());
+  const auto wait = [&](BOOL started) -> HRESULT
+  {
+    if (!started) return FailNetwork();
+    const DWORD error = request.Wait(*this, begun, _options.RequestDeadlineMs);
+    if (error == ERROR_CANCELLED) return Fail("Cancelled.", E_ABORT);
+    if (error)
+    {
+      SetLastError(error);
+      return FailNetwork();
+    }
+    return S_OK;
+  };
+  // Preserve the response timeout as well as the complete-request deadline.
   DWORD responseTimeout = (std::min)(static_cast<unsigned>(_options.TimeoutMs),
       _options.RequestDeadlineMs);
   if (!WinHttpSetTimeouts(request.Value, _options.TimeoutMs, _options.TimeoutMs,
@@ -201,15 +298,16 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
   DWORD disabled = WINHTTP_DISABLE_REDIRECTS | WINHTTP_DISABLE_COOKIES | WINHTTP_DISABLE_AUTHENTICATION;
   if (!WinHttpSetOption(request.Value, WINHTTP_OPTION_DISABLE_FEATURE, &disabled, sizeof(disabled)))
     return Fail("Cannot configure HTTP request policy.", LastErrorResult());
-  const std::wstring headers = L"Accept-Encoding: identity\r\nRange: bytes=" +
-      std::to_wstring(start) + L"-" + std::to_wstring(start + length - 1) + L"\r\n" +
-      (probe || _options.SkipETagVerification ? L"" : L"If-Match: " + _etag + L"\r\n");
   ++Requests;
   ReportProgress();
   Status = 0; // A failed request must not report the previous response's status.
-  if (!WinHttpSendRequest(request.Value, headers.c_str(), static_cast<DWORD>(headers.size()),
-      WINHTTP_NO_REQUEST_DATA, 0, 0, 0) || !WinHttpReceiveResponse(request.Value, NULL))
-    return FailNetwork();
+  request.Prepare();
+  HRESULT pending = wait(WinHttpSendRequest(request.Value, headers.c_str(), static_cast<DWORD>(headers.size()),
+      WINHTTP_NO_REQUEST_DATA, 0, 0, reinterpret_cast<DWORD_PTR>(&request)));
+  if (pending != S_OK) return pending;
+  request.Prepare();
+  pending = wait(WinHttpReceiveResponse(request.Value, NULL));
+  if (pending != S_OK) return pending;
   if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
   DWORD status = 0, statusSize = sizeof(status);
   if (!WinHttpQueryHeaders(request.Value, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
@@ -258,7 +356,7 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
     if (!Number(p, count) || *p || count != length)
       return Fail("Content-Length does not match the requested range.");
   }
-  std::vector<unsigned char> body(length);
+  body.resize(length);
   unsigned done = 0;
   for (;;)
   {
@@ -266,11 +364,11 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
     // Unsigned subtraction also handles the 32-bit tick counter wrapping.
     if (static_cast<DWORD>(GetTickCount() - begun) >= _options.RequestDeadlineMs)
       return Fail("HTTP request deadline exceeded. Check your connection and reopen the archive.", HRESULT_FROM_WIN32(ERROR_TIMEOUT));
-    unsigned char extra;
-    DWORD got = 0;
     const DWORD want = done < length ? (std::min)(length - done, 65536u) : 1;
-    if (!WinHttpReadData(request.Value, done < length ? body.data() + done : &extra, want, &got))
-      return FailNetwork();
+    request.Prepare();
+    pending = wait(WinHttpReadData(request.Value, done < length ? body.data() + done : &extra, want, NULL));
+    if (pending != S_OK) return pending;
+    const DWORD got = request.ReadSize;
     Downloaded += got;
     ReportProgress();
     if (!got) break;
