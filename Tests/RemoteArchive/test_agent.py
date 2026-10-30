@@ -64,6 +64,18 @@ def main():
         before = len(server.records)
         run('cancel-before', f'{base}/ok/sample.zip', 3, ['cancel'])
         assert len(server.records) == before
+        # These probe failures use the same error path displayed by File Manager.
+        for mode, hint in {
+            'unauthorized': 'Browser login sessions are not supported',
+            'forbidden': 'obtain a fresh direct download URL',
+            'gone': 'Check the URL',
+            'proxy-auth': 'proxy authentication is not supported',
+            'rate-limit': 'Wait before reopening',
+            'server-error': 'Try reopening the archive later',
+            'unexpected-status': 'Unexpected HTTP status 418',
+        }.items():
+            text = run('error-hint-' + mode, f'{base}/{mode}/sample.zip?sig=fixture-secret', 1)
+            assert hint in text, (mode, text)
         for mode in ('ignore', 'missing-etag', 'weak', 'changed', 'changed-size', 'precondition',
                      'truncated', 'redirect', 'forbidden', 'missing', 'range416'):
             text = run(mode, f'{base}/{mode}/sample.zip?sig=fixture-secret', 1)

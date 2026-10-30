@@ -31,6 +31,9 @@ These are engineering choices for the study, not settings currently available in
 
 ## Study Files
 
+Latest follow-up: [Actionable network diagnostics](13-network-diagnostics.md),
+with 99 passing CLI scenarios and 42 passing File Manager Agent scenarios.
+
 1. [Project map and integration points](01-source-map.md): opening/extraction paths and source references.
 2. [Partial-reading feasibility by format](02-format-feasibility.md): ZIP, 7z, RAR, TAR, and practical limits.
 3. [Network source design](03-http-stream-design.md): protocol, cache, errors, and data consistency.

@@ -21,6 +21,9 @@ design, evidence, and remaining work.
 - **Console:** direct URLs for `l`, `x`, `e`, and `t`.
 - **HTTP input stream:** WinHTTP transport, seekable reads, a bounded memory
   cache, and validation of ranges, lengths, and source size.
+- **Network diagnostics:** actionable messages for denied or expired links,
+  authentication requirements, rate limits, server failures, unsupported partial
+  downloads, and connection errors. Messages exclude URLs and access tokens.
 - **ETag policy:** the Open URL dialog defaults to **Skip ETag verification**
   checked. Uncheck it to require a strong ETag. The console verifies ETags by
   default and exposes `-shttp-no-etag` to opt out.

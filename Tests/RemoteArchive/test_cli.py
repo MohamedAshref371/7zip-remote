@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import random
+import socket
 import subprocess
 import tempfile
 import threading
@@ -104,13 +105,45 @@ def main():
             before = len(server.records)
             run("reject-" + command, [command, f"{base}/ok/sample.zip?sig=private-token", "docs/target.txt"], False)
             assert len(server.records) == before
-        for mode in ("ignore", "weak", "missing-etag", "changed", "changed-size", "precondition",
-                     "truncated", "redirect", "forbidden", "missing", "range416", "wrong-range"):
+        error_hints = {
+            "ignore": "Download the archive locally",
+            "weak": "skip ETag verification only if",
+            "missing-etag": "-shttp-no-etag",
+            "changed": "Reopen the archive",
+            "changed-size": "Reopen the archive",
+            "precondition": "Reopen the archive",
+            "truncated": "reopen the archive",
+            "redirect": "final direct URL",
+            "unauthorized": "Browser login sessions are not supported",
+            "forbidden": "obtain a fresh direct download URL",
+            "missing": "Check the URL",
+            "proxy-auth": "proxy authentication is not supported",
+            "gone": "Check the URL",
+            "range416": "Reopen the archive",
+            "rate-limit": "Wait before reopening",
+            "server-error": "Try reopening the archive later",
+            "unexpected-status": "Unexpected HTTP status 418",
+            "wrong-range": "Content-Range",
+        }
+        status_codes = {"unauthorized": 401, "forbidden": 403, "missing": 404,
+                        "proxy-auth": 407, "gone": 410, "range416": 416,
+                        "rate-limit": 429, "server-error": 503, "unexpected-status": 418}
+        for mode, hint in error_hints.items():
             for command in ("l", "t"):
                 output = run(mode + "-" + command,
                              [command, f"{base}/{mode}/sample.zip?sig=private-token"], False)
-                if mode in ("forbidden", "missing", "range416"):
-                    assert str({"forbidden": 403, "missing": 404, "range416": 416}[mode]) in output
+                assert hint in output, (mode, command, output)
+                if mode in status_codes:
+                    assert str(status_codes[mode]) in output
+        # Reserve an unused loopback port without listening: connection refusal
+        # must provide a useful message without leaking the signed URL.
+        with socket.socket() as unavailable:
+            unavailable.bind(("127.0.0.1", 0))
+            port = unavailable.getsockname()[1]
+            for command in ("l", "t"):
+                output = run("connection-refused-" + command,
+                             [command, f"http://127.0.0.1:{port}/sample.zip?sig=private-token"], False)
+                assert "Cannot connect to the server" in output
         run("wrong-password", ["t", f"{base}/ok/secret.7z", "-pincorrect"], False)
         run("chunked", ["t", f"{base}/chunked/sample.zip"])
         assert any(r["path"].endswith("?sig=private-token%2Ftest&x=1&x=2") for r in server.records)

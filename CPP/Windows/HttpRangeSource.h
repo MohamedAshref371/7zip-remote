@@ -30,6 +30,7 @@ class CHttpRangeSource
   HRESULT Request(ULONGLONG start, unsigned length, bool probe,
       std::vector<unsigned char> &data);
   HRESULT Fail(const char *message, HRESULT result = E_FAIL);
+  HRESULT FailNetwork();
   CHttpRangeSource(const CHttpRangeSource &) = delete;
   CHttpRangeSource &operator=(const CHttpRangeSource &) = delete;
 public:

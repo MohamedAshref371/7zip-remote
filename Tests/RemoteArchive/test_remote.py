@@ -94,8 +94,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if mode in ("forbidden", "missing", "range416"):
-            self.send_error({"forbidden": 403, "missing": 404, "range416": 416}[mode])
+        status_modes = {"unauthorized": 401, "forbidden": 403, "missing": 404,
+                        "proxy-auth": 407, "gone": 410, "range416": 416,
+                        "rate-limit": 429, "server-error": 503, "unexpected-status": 418}
+        if mode in status_modes:
+            self.send_error(status_modes[mode])
             return
         tag = '"fixture-v1"'
         if mode == "changed" and not probe:

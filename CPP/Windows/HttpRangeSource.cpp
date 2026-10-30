@@ -102,6 +102,30 @@ HRESULT CHttpRangeSource::Fail(const char *message, HRESULT result)
   return result;
 }
 
+HRESULT CHttpRangeSource::FailNetwork()
+{
+  const DWORD error = GetLastError();
+  if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
+  const char *message = "Network request failed. Check your connection and reopen the archive.";
+  switch (error)
+  {
+    case ERROR_WINHTTP_TIMEOUT:
+      message = "The server took too long to respond. Check your connection and reopen the archive.";
+      break;
+    case ERROR_WINHTTP_NAME_NOT_RESOLVED:
+      message = "Cannot resolve the server name. Check the URL and your network connection.";
+      break;
+    case ERROR_WINHTTP_CANNOT_CONNECT:
+    case ERROR_WINHTTP_CONNECTION_ERROR:
+      message = "Cannot connect to the server or the connection was interrupted. Check your connection and reopen the archive.";
+      break;
+    case ERROR_WINHTTP_SECURE_FAILURE:
+      message = "HTTPS certificate verification failed. Check the server certificate and your system date.";
+      break;
+  }
+  return Fail(message, HRESULT_FROM_WIN32(error ? error : ERROR_GEN_FAILURE));
+}
+
 HRESULT CHttpRangeSource::Open(const wchar_t *url, const CHttpRangeOptions &options)
 {
   if (_session) return Fail("Create a new source to reopen an archive.", E_UNEXPECTED);
@@ -175,23 +199,32 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
       std::to_wstring(start) + L"-" + std::to_wstring(start + length - 1) + L"\r\n" +
       (probe || _options.SkipETagVerification ? L"" : L"If-Match: " + _etag + L"\r\n");
   ++Requests;
+  Status = 0; // A failed request must not report the previous response's status.
   if (!WinHttpSendRequest(request.Value, headers.c_str(), static_cast<DWORD>(headers.size()),
       WINHTTP_NO_REQUEST_DATA, 0, 0, 0) || !WinHttpReceiveResponse(request.Value, NULL))
-  {
-    const HRESULT failure = LastErrorResult();
-    return Fail(IsCancelled() ? "Cancelled." : "HTTP request failed or timed out.",
-        IsCancelled() ? E_ABORT : failure);
-  }
+    return FailNetwork();
   if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
   DWORD status = 0, statusSize = sizeof(status);
   if (!WinHttpQueryHeaders(request.Value, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
       WINHTTP_HEADER_NAME_BY_INDEX, &status, &statusSize, WINHTTP_NO_HEADER_INDEX))
     return Fail("Cannot read HTTP status.", LastErrorResult());
   Status = status;
-  if (status == 200) return Fail("Server ignored Range; full download is not enabled.");
-  if (status == 412) return Fail("Archive changed on the server (HTTP 412).");
+  if (status == 200) return Fail("The server does not support partial downloads for this URL. Download the archive locally to open it.");
+  if (status == 401) return Fail("The server requires authentication. Browser login sessions are not supported; use a direct download URL that grants access.");
+  if (status == 403) return Fail("The server denied access. The download link may have expired; obtain a fresh direct download URL and check access permissions.");
+  if (status == 404 || status == 410) return Fail("The archive was not found or is no longer available. Check the URL or obtain a fresh download link.");
+  if (status == 407) return Fail("The proxy requires authentication. Check your network proxy settings; proxy authentication is not supported.");
+  if (status == 412) return Fail("Archive changed on the server. Reopen the archive to read the current version.");
+  if (status == 416) return Fail("The server rejected the requested byte range. Reopen the archive; if the problem persists, download it locally.");
+  if (status == 429) return Fail("The server is limiting download requests. Wait before reopening the archive.");
+  if (status >= 500 && status < 600) return Fail("The server reported a temporary failure. Try reopening the archive later.");
   if (status >= 300 && status < 400) return Fail("Redirect unsupported; supply the final direct URL.");
-  if (status != 206) return Fail("Expected HTTP 206; see status in statistics.");
+  if (status != 206)
+  {
+    const std::string message = "Unexpected HTTP status " + std::to_string(status)
+        + ". Use a direct archive download URL that supports partial downloads.";
+    return Fail(message.c_str());
+  }
 
   std::wstring range, tag, encoding, contentLength, contentType;
   ULONGLONG first = 0, last = 0, total = 0;
@@ -200,9 +233,9 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
     return Fail("Invalid or mismatched Content-Range.");
   if (!_options.SkipETagVerification &&
       (Header(request.Value, WINHTTP_QUERY_ETAG, tag) != S_OK || !StrongETag(tag)))
-    return Fail("A strong ETag is required for partial downloads.");
+    return Fail("The server did not provide a valid strong ETag to verify the archive version. Download it locally, or skip ETag verification only if you trust the file to remain unchanged (Open URL: Skip ETag verification; console: -shttp-no-etag).");
   if (!probe && (total != Size || (!_options.SkipETagVerification && tag != _etag)))
-    return Fail("Archive identity or size changed during the session.");
+    return Fail("Archive identity or size changed during the session. Reopen the archive to read the current version.");
   HRESULT h = Header(request.Value, WINHTTP_QUERY_CONTENT_ENCODING, encoding);
   if (FAILED(h) || (h == S_OK && _wcsicmp(encoding.c_str(), L"identity") != 0))
     return Fail("Encoded HTTP representations are not supported for byte ranges.");
@@ -225,18 +258,18 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
     if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
     // Unsigned subtraction also handles the 32-bit tick counter wrapping.
     if (static_cast<DWORD>(GetTickCount() - begun) >= _options.RequestDeadlineMs)
-      return Fail("HTTP request deadline exceeded.", HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+      return Fail("HTTP request deadline exceeded. Check your connection and reopen the archive.", HRESULT_FROM_WIN32(ERROR_TIMEOUT));
     unsigned char extra;
     DWORD got = 0;
     const DWORD want = done < length ? (std::min)(length - done, 65536u) : 1;
     if (!WinHttpReadData(request.Value, done < length ? body.data() + done : &extra, want, &got))
-      return Fail("Range body was interrupted or timed out.", LastErrorResult());
+      return FailNetwork();
     Downloaded += got;
     if (!got) break;
     if (done == length) return Fail("Range body exceeds its declared length.");
     done += got;
   }
-  if (done != length) return Fail("Truncated range body.");
+  if (done != length) return Fail("The server sent an incomplete byte range. Check your connection and reopen the archive.");
   if (probe) { Size = total; _etag = tag; }
   data.swap(body); // Publish only a complete, validated range.
   return S_OK;
