@@ -7,6 +7,43 @@
 #include <new>
 #include <cstring>
 
+bool CHttpInStream::EstimateMissingBytes(std::vector<CHttpReadRange> ranges, UInt64 &bytes) const
+{
+  bytes = 0;
+  for (auto &range : ranges)
+  {
+    if (range.Start > Source.Size || range.Size > Source.Size - range.Start) return false;
+    if (!range.Size) continue;
+    const UInt64 end = range.Start + range.Size;
+    const UInt64 roundedEnd = (std::min)(Source.Size,
+        ((end - 1) / kBlockSize + 1) * kBlockSize);
+    range.Start = range.Start / kBlockSize * kBlockSize;
+    range.Size = roundedEnd - range.Start;
+  }
+  std::sort(ranges.begin(), ranges.end(), [](const CHttpReadRange &a, const CHttpReadRange &b)
+      { return a.Start < b.Start; });
+  // Merge intervals rather than enumerating blocks, even for huge archives.
+  std::vector<CHttpReadRange> merged;
+  for (const auto &range : ranges)
+  {
+    if (!range.Size) continue;
+    if (!merged.empty() && range.Start <= merged.back().Start + merged.back().Size)
+    {
+      const UInt64 end = (std::max)(merged.back().Start + merged.back().Size, range.Start + range.Size);
+      merged.back().Size = end - merged.back().Start;
+    }
+    else merged.push_back(range);
+  }
+  for (const auto &range : merged)
+  {
+    bytes += range.Size;
+    for (const auto &block : _cache)
+      if (block.Start >= range.Start && block.Start < range.Start + range.Size)
+        bytes -= block.Data.size();
+  }
+  return true;
+}
+
 HRESULT CHttpInStream::Open(const wchar_t *url, const NWindows::CHttpRangeOptions &options)
 {
   try { _failure = Source.Open(url, options); }

@@ -26,19 +26,38 @@ public:
   bool NetworkDefined = false;
   bool NetworkMonotonic = true;
   UInt64 NetworkBytes = 0, NetworkSize = 0, NetworkRequests = 0;
+  bool EstimateDefined = false;
+  bool EstimateCaptured = false;
+  UInt64 InitialEstimate = 0;
   void PrintNetwork(const char *phase)
   {
     if (NetworkDefined)
       printf("NETWORK %s %llu %llu %llu\n", phase,
           (unsigned long long)NetworkBytes, (unsigned long long)NetworkSize,
           (unsigned long long)NetworkRequests);
+    if (NetworkDefined)
+      printf("ESTIMATE %s %u %llu\n", phase, EstimateDefined ? 1u : 0u,
+          (unsigned long long)InitialEstimate);
   }
   void ResetNetwork()
   {
     NetworkDefined = false;
     NetworkBytes = NetworkSize = NetworkRequests = 0;
+    EstimateDefined = EstimateCaptured = false;
+    InitialEstimate = 0;
   }
 };
+
+Z7_COM7F_IMF(CTestCallback::SetNetworkEstimate(UInt64 bytes, Int32 defined))
+{
+  EstimateDefined = defined != 0;
+  if (EstimateDefined && !EstimateCaptured)
+  {
+    InitialEstimate = bytes;
+    EstimateCaptured = true;
+  }
+  return S_OK;
+}
 
 Z7_COM7F_IMF(CTestCallback::SetNetworkProgress(UInt64 bytes, UInt64 size, UInt64 requests))
 {
@@ -70,6 +89,19 @@ Z7_COM7F_IMF(CTestCallback::CryptoGetTextPassword(BSTR *password))
 
 static int CheckNetworkSync()
 {
+  CHttpInStream stream;
+  stream.Source.Size = ((UInt64)1 << 40) + 123;
+  UInt64 estimate;
+  std::vector<CHttpReadRange> ranges = {{1, 2}, {1, 2}, {262140, 8}};
+  CHECK(stream.EstimateMissingBytes(ranges, estimate) && estimate == 524288);
+  ranges = {{stream.Source.Size - 1, 1}};
+  CHECK(stream.EstimateMissingBytes(ranges, estimate) && estimate == 123);
+  ranges = {{stream.Source.Size, 1}};
+  CHECK(!stream.EstimateMissingBytes(ranges, estimate));
+  ranges = {{(UInt64)0 - 1, 2}};
+  CHECK(!stream.EstimateMissingBytes(ranges, estimate));
+  ranges.clear();
+  CHECK(stream.EstimateMissingBytes(ranges, estimate) && estimate == 0);
   COpenArchiveCallback open;
   COpenCallbackImp *bridge = new COpenCallbackImp;
   CMyComPtr<IArchiveOpenCallback> bridgeRef = bridge;
@@ -82,6 +114,8 @@ static int CheckNetworkSync()
   CHECK(open.ProgressDialog.Sync._networkSize == 456);
   CHECK(open.ProgressDialog.Sync._networkRequests == 2);
   CHECK(open.ProgressDialog.Sync._completedBytes == 0);
+  CHECK_HR(progress->SetNetworkEstimate(200, 1));
+  CHECK(open.ProgressDialog.Sync._networkEstimateDefined && open.ProgressDialog.Sync._networkEstimate == 200);
   bridge->Callback = NULL;
 
   CExtractCallbackImp *extract = new CExtractCallbackImp;
@@ -92,6 +126,10 @@ static int CheckNetworkSync()
   CHECK_HR(progress->SetNetworkProgress(789, 1024, 3));
   CHECK(dialog.Sync._networkBytes == 789 && dialog.Sync._networkRequests == 3);
   CHECK(dialog.Sync._networkSize == 1024 && dialog.Sync._completedBytes == 0);
+  CHECK_HR(progress->SetNetworkEstimate(1000, 1));
+  CHECK(dialog.Sync._networkEstimateDefined && dialog.Sync._networkEstimate == 1000);
+  CHECK_HR(progress->SetNetworkEstimate(0, 0));
+  CHECK(!dialog.Sync._networkEstimateDefined);
   return 0;
 }
 

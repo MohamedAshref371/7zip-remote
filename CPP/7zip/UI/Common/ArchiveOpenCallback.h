@@ -45,6 +45,7 @@ DECLARE_INTERFACE(IOpenCallbackUI)
   Z7_IFACE_PURE(IOpenCallbackUI)
  #ifdef Z7_HTTP
   virtual HRESULT Open_NetworkProgress(UInt64, UInt64, UInt64) { return S_OK; }
+  virtual HRESULT Open_NetworkEstimate(UInt64, Int32) { return S_OK; }
  #endif
 };
 

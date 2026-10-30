@@ -6,6 +6,11 @@
 #include "../../Windows/HttpRangeSource.h"
 #include "../IStream.h"
 
+struct CHttpReadRange
+{
+  UInt64 Start, Size;
+};
+
 class CHttpInStream Z7_final:
   public IInStream, public IStreamGetSize, public CMyUnknownImp
 {
@@ -28,5 +33,6 @@ public:
   NWindows::CHttpRangeSource Source;
   UInt64 CacheHits = 0;
   HRESULT Open(const wchar_t *url, const NWindows::CHttpRangeOptions &options);
+  bool EstimateMissingBytes(std::vector<CHttpReadRange> ranges, UInt64 &bytes) const;
 };
 #endif

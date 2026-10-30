@@ -6,6 +6,7 @@
 #include "../../../Common/DynamicBuffer.h"
 #include "../../ICoder.h"
 #include "../IArchive.h"
+#include "../IArchiveReadRange.h"
 
 #include "../../Common/CreateCoder.h"
 
@@ -25,6 +26,7 @@ extern const char * const kMethodNames2[kNumMethodNames2];
 
 class CHandler Z7_final:
   public IInArchive,
+  public IArchiveReadRange,
   // public IArchiveGetRawProps,
   public IOutArchive,
   public ISetProperties,
@@ -32,6 +34,7 @@ class CHandler Z7_final:
   public CMyUnknownImp
 {
   Z7_COM_QI_BEGIN2(IInArchive)
+  Z7_COM_QI_ENTRY(IArchiveReadRange)
   // Z7_COM_QI_ENTRY(IArchiveGetRawProps)
   Z7_COM_QI_ENTRY(IOutArchive)
   Z7_COM_QI_ENTRY(ISetProperties)
@@ -40,6 +43,7 @@ class CHandler Z7_final:
   Z7_COM_ADDREF_RELEASE
 
   Z7_IFACE_COM7_IMP(IInArchive)
+  Z7_IFACE_COM7_IMP(IArchiveReadRange)
   // Z7_IFACE_COM7_IMP(IArchiveGetRawProps)
   Z7_IFACE_COM7_IMP(IOutArchive)
   Z7_IFACE_COM7_IMP(ISetProperties)

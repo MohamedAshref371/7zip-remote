@@ -44,9 +44,12 @@ public:
   UInt64 _outSize;
  #ifdef Z7_HTTP
   bool _networkDefined;
+  bool _networkEstimateDefined;
+  UInt64 _networkEstimate;
   UInt64 _networkBytes, _networkSize, _networkRequests;
   ULONGLONG _networkStarted;
   void Set_NetworkProgress(UInt64 downloaded, UInt64 size, UInt64 requests);
+  void Set_NetworkEstimate(UInt64 bytes, bool defined);
  #endif
   
   UString _titleFileName;

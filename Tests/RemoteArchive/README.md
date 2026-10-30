@@ -50,6 +50,8 @@ work. See [ETag option results](../../Notes/09-etag-option.md).
 The HTTP-enabled File Manager progress dialog now shows downloaded body bytes,
 archive size, average network speed, and request count for the current operation.
 See [network progress](../../Notes/14-network-progress.md) for semantics and checks.
+Selected ZIP/7z extraction and testing also show a conservative approximate
+download total alongside downloaded bytes. See [download estimates](../../Notes/15-download-estimates.md).
 
 For a manual desktop test after building, start a loopback-only fixture server:
 

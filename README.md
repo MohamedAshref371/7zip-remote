@@ -24,9 +24,11 @@ design, evidence, and remaining work.
 - **Network diagnostics:** actionable messages for denied or expired links,
   authentication requirements, rate limits, server failures, unsupported partial
   downloads, and connection errors. Messages exclude URLs and access tokens.
-- **File Manager network progress:** downloaded body bytes compared with archive
-  size, average transfer speed, and HTTP request count for the current opening,
-  extraction, or test operation, separate from archive progress.
+- **File Manager network progress:** downloaded body bytes, an approximate total
+  download for selected ZIP/7z extraction/testing, average transfer speed, and
+  HTTP request count. Archive size is shown separately as a reference.
+  Estimates account for cached blocks; solid 7z uses the full compressed block
+  conservatively. Other formats and archive opening show an unavailable estimate.
 - **ETag policy:** the Open URL dialog defaults to **Skip ETag verification**
   checked. Uncheck it to require a strong ETag. The console verifies ETags by
   default and exposes `-shttp-no-etag` to opt out.
@@ -133,8 +135,8 @@ Recorded validation across the development milestones:
 | Suite | Passing scenarios | Coverage |
 |---|---:|---|
 | Stream/prototype | 72 | Read/Seek, offsets above 4 GiB, HTTP validation, cache, cancellation, and extraction hashes |
-| Console | 85 | Local/remote commands, ETag policies, selected extraction, zones, and failure cases |
-| File Manager Agent | 35 | Browsing, extraction/testing, passwords, read-only enforcement, and format selection |
+| Console | 99 | Local/remote commands, actionable diagnostics, ETag policies, selected extraction, zones, and failure cases |
+| File Manager Agent | 46 | Browsing, extraction/testing, passwords, read-only enforcement, format selection, network counters, and download estimates |
 | RAR family | 8 | Both generations, Auto/shared RAR selection, unknown URL extensions, ETag bypass, and output hashes |
 
 A real MediaFire HTTPS link was also tested with ETag bypass: listing and selected

@@ -28,6 +28,19 @@ using namespace NCOM;
 namespace NArchive {
 namespace N7z {
 
+Z7_COM7F_IMF(CHandler::GetItemReadRange(UInt32 index, UInt64 *start, UInt64 *length))
+{
+  if (!start || !length) return E_POINTER;
+  *start = *length = 0;
+  if (index >= _db.Files.Size()) return E_INVALIDARG;
+  const CNum folder = _db.FileIndexToFolderIndexMap[index];
+  if (folder == kNumNoIndex) return S_OK;
+  // A conservative full packed folder, including all preceding solid data.
+  *start = _db.GetFolderStreamPos(folder, 0);
+  *length = _db.GetFolderFullPackSize(folder);
+  return S_OK;
+}
+
 CHandler::CHandler()
 {
   #ifndef Z7_NO_CRYPTO

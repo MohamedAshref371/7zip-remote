@@ -8,6 +8,7 @@ import re
 import subprocess
 import tempfile
 import threading
+import tarfile
 import zipfile
 
 from test_remote import FixtureServer, ROOT
@@ -29,11 +30,17 @@ def main():
     with zipfile.ZipFile(work / 'sample.zip', 'w', zipfile.ZIP_DEFLATED) as z:
         z.write(inputs / '000-data.bin', '000-data.bin')
         z.writestr('docs/target.txt', target)
+    with tarfile.open(work / 'sample.tar', 'w') as tar:
+        tar.add(inputs / 'docs/target.txt', arcname='docs/target.txt')
+    with zipfile.ZipFile(work / 'middle.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+        z.write(inputs / '000-data.bin', '000-first.bin')
+        z.writestr('docs/target.txt', target)
+        z.write(inputs / '000-data.bin', '999-last.bin')
     for name, flags in [('nonsolid.7z', ['-ms=off']), ('solid.7z', ['-ms=on']),
                         ('secret.7z', ['-mhe=on', '-pfixture-password', '-ms=off'])]:
         subprocess.run([str(exe.with_name('7z.exe')), 'a', str(work / name), '-t7z', *flags, '.'],
                        cwd=inputs, check=True, capture_output=True)
-    files = {p.name: p.read_bytes() for p in work.iterdir() if p.suffix in ('.zip', '.7z')}
+    files = {p.name: p.read_bytes() for p in work.iterdir() if p.suffix in ('.zip', '.7z', '.tar')}
     server = FixtureServer(files)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f'http://127.0.0.1:{server.server_port}'
@@ -61,6 +68,22 @@ def main():
                 assert sum(int(s[1]) for s in stats) == sum(
                     r['end'] - r['start'] + 1 for r in ranges), (stats, ranges)
                 assert sum(int(s[3]) for s in stats) == len(ranges), (stats, ranges)
+                estimates = re.findall(r'ESTIMATE (open|extract|test) (\d+) (\d+)', text)
+                assert [s[0] for s in estimates] == ['open', 'extract', 'test'], text
+                name = source.split('?')[0].rsplit('/', 1)[1]
+                assert estimates[0][1] == '0'  # no selected files while opening
+                supported = name.endswith(('.zip', '.7z'))
+                assert all((s[1] == '1') == supported for s in estimates[1:]), estimates
+                if supported:
+                    assert all(int(s[2]) <= len(files[name]) for s in estimates[1:]), estimates
+                    if name.endswith('.7z'):
+                        # These fixtures fit in cache; a second test needs no download.
+                        assert estimates[2][2] == '0', estimates
+                    if name == 'solid.7z':
+                        assert int(estimates[1][2]) >= int(stats[1][1]) > 0, (stats, estimates)
+                    if name == 'middle.zip':
+                        assert int(estimates[1][2]) >= int(stats[1][1]) > 0, (stats, estimates)
+                        assert int(estimates[1][2]) <= int(stats[1][1]) + 524288, (stats, estimates)
             else:
                 assert 'NETWORK ' not in text, text
         print('PASS ' + label, flush=True)

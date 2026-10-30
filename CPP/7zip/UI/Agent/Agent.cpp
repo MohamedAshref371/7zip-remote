@@ -1575,6 +1575,11 @@ Z7_COM7F_IMF(CAgentFolder::Extract(const UInt32 *indices,
       false, // includeFolderSubItemsInFlatMode
       realIndices); //
 
+  #ifdef Z7_HTTP
+  if (_agentSpec->_archiveLink.Arcs.Size() == 1 && _agentSpec->GetArc().ArcStreamOffset == 0)
+    networkProgress.Estimate(_agentSpec->GetArchive(), realIndices.ConstData(), realIndices.Size());
+  #endif
+
   #ifdef SUPPORT_LINKS
 
   if (!testMode)

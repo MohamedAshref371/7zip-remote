@@ -21,6 +21,7 @@
 #include "ProgressDialog2Res.h"
 #ifdef Z7_HTTP
 #include <chrono>
+#include <algorithm>
 static UInt64 NetworkTimeMs()
 {
   return static_cast<UInt64>(std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -95,12 +96,20 @@ CProgressSync::CProgressSync():
     _inSize(UNDEFINED_VAL),
     _outSize(UNDEFINED_VAL)
    #ifdef Z7_HTTP
-    , _networkDefined(false), _networkBytes(0), _networkSize(0),
+    , _networkDefined(false), _networkEstimateDefined(false), _networkEstimate(0),
+    _networkBytes(0), _networkSize(0),
     _networkRequests(0), _networkStarted(0)
    #endif
     {}
 
 #ifdef Z7_HTTP
+void CProgressSync::Set_NetworkEstimate(UInt64 bytes, bool defined)
+{
+  NSynchronization::CCriticalSectionLock lock(_cs);
+  _networkEstimateDefined = defined;
+  _networkEstimate = bytes;
+}
+
 void CProgressSync::Set_NetworkProgress(UInt64 downloaded, UInt64 size, UInt64 requests)
 {
   NSynchronization::CCriticalSectionLock lock(_cs);
@@ -726,6 +735,8 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
 {
  #ifdef Z7_HTTP
   bool networkDefined;
+  bool estimateDefined;
+  UInt64 estimate;
   UInt64 networkBytes, networkSize, networkRequests, networkStarted;
  #endif
   UInt64 total, completed, totalFiles, completedFiles, inSize, outSize;
@@ -746,6 +757,8 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
     filesProgressMode = Sync._filesProgressMode;
    #ifdef Z7_HTTP
     networkDefined = Sync._networkDefined;
+    estimateDefined = Sync._networkEstimateDefined;
+    estimate = (std::max)(Sync._networkEstimate, Sync._networkBytes);
     networkBytes = Sync._networkBytes;
     networkSize = Sync._networkSize;
     networkRequests = Sync._networkRequests;
@@ -774,14 +787,15 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
     ConvertSizeToString(networkBytes, value);
     text += value;
     if (networkBytes < 100000) text += L" B";
-    text += L" / archive: ";
-    if (networkSize)
+    text += L" / estimated total: ";
+    if (estimateDefined)
     {
-      ConvertSizeToString(networkSize, value);
+      text += L"~";
+      ConvertSizeToString(estimate, value);
       text += value;
-      if (networkSize < 100000) text += L" B";
+      if (estimate < 100000) text += L" B";
     }
-    else text += L"?";
+    else text += L"unavailable";
     SetItemText(IDT_PROGRESS_NETWORK, text);
 
     const UInt64 elapsed = NetworkTimeMs() - networkStarted;
@@ -796,6 +810,13 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
     SetItemText(IDT_PROGRESS_NETWORK_SPEED, text);
     text = L"HTTP requests: ";
     text.Add_UInt64(networkRequests);
+    if (networkSize)
+    {
+      text += L" | archive size: ";
+      ConvertSizeToString(networkSize, value);
+      text += value;
+      if (networkSize < 100000) text += L" B";
+    }
     SetItemText(IDT_PROGRESS_NETWORK_REQUESTS, text);
   }
  #endif

@@ -45,6 +45,11 @@ public:
 
   Z7_IFACE_IMP(IOpenCallbackUI)
  #if defined(Z7_HTTP) && !defined(Z7_SFX)
+  HRESULT Open_NetworkEstimate(UInt64 bytes, Int32 defined) Z7_override
+  {
+    ProgressDialog.Sync.Set_NetworkEstimate(bytes, defined != 0);
+    return S_OK;
+  }
   HRESULT Open_NetworkProgress(UInt64 downloaded, UInt64 size, UInt64 requests) Z7_override
   {
     ProgressDialog.Sync.Set_NetworkProgress(downloaded, size, requests);

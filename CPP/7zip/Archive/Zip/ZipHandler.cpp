@@ -43,6 +43,28 @@ using namespace NWindows;
 namespace NArchive {
 namespace NZip {
 
+Z7_COM7F_IMF(CHandler::GetItemReadRange(UInt32 index, UInt64 *start, UInt64 *length))
+{
+  if (!start || !length) return E_POINTER;
+  *start = *length = 0;
+  if (index >= m_Items.Size()) return E_INVALIDARG;
+  if (m_Archive.IsMultiVol || m_Archive.ArcInfo.Base < 0 || m_Archive.HeadersError
+      || m_Archive.UnexpectedEnd || m_Archive.NoCentralDir) return S_FALSE;
+  const CItemEx &item = m_Items[index];
+  if (item.IsDir()) return S_OK;
+  const UInt64 base = (UInt64)m_Archive.ArcInfo.Base;
+  const UInt64 end = m_Archive.ArcInfo.FileEndPos;
+  if (base > end || item.LocalHeaderPos > end - base) return S_FALSE;
+  *start = base + item.LocalHeaderPos;
+  // Local names/extras need not match the central directory. Until the local
+  // header is known, reserve both maximum 16-bit fields, plus a descriptor.
+  const UInt64 overhead = (item.FromLocal ? item.LocalFullHeaderSize : 30u + 65535u + 65535u) + 24u;
+  if (item.PackSize > end - *start) return S_FALSE;
+  const UInt64 available = end - *start;
+  *length = item.PackSize + (overhead < available - item.PackSize ? overhead : available - item.PackSize);
+  return S_OK;
+}
+
 static const char * const kHostOS[] =
 {
     "FAT"

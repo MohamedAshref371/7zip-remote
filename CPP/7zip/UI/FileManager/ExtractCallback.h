@@ -222,6 +222,10 @@ class CExtractCallbackImp Z7_final:
   Z7_IFACE_IMP(IOpenCallbackUI)
  #ifdef Z7_HTTP
   Z7_IFACE_COM7_IMP(IRemoteProgress)
+  HRESULT Open_NetworkEstimate(UInt64 bytes, Int32 defined) Z7_override
+  {
+    return SetNetworkEstimate(bytes, defined);
+  }
   HRESULT Open_NetworkProgress(UInt64 downloaded, UInt64 size, UInt64 requests) Z7_override
   {
     return SetNetworkProgress(downloaded, size, requests);

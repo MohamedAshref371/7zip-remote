@@ -5,6 +5,7 @@
 
 #include "../../ICoder.h"
 #include "../IArchive.h"
+#include "../IArchiveReadRange.h"
 
 #include "../../Common/CreateCoder.h"
 
@@ -83,6 +84,7 @@ public:
 
 class CHandler Z7_final:
   public IInArchive,
+  public IArchiveReadRange,
   public IArchiveGetRawProps,
   
   #ifdef Z7_7Z_SET_PROPERTIES
@@ -104,6 +106,7 @@ class CHandler Z7_final:
   #endif
 {
   Z7_COM_QI_BEGIN2(IInArchive)
+  Z7_COM_QI_ENTRY(IArchiveReadRange)
   Z7_COM_QI_ENTRY(IArchiveGetRawProps)
  #ifdef Z7_7Z_SET_PROPERTIES
   Z7_COM_QI_ENTRY(ISetProperties)
@@ -116,6 +119,7 @@ class CHandler Z7_final:
   Z7_COM_ADDREF_RELEASE
 
   Z7_IFACE_COM7_IMP(IInArchive)
+  Z7_IFACE_COM7_IMP(IArchiveReadRange)
   Z7_IFACE_COM7_IMP(IArchiveGetRawProps)
  #ifdef Z7_7Z_SET_PROPERTIES
   Z7_IFACE_COM7_IMP(ISetProperties)

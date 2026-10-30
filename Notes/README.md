@@ -31,6 +31,8 @@ These are engineering choices for the study, not settings currently available in
 
 ## Study Files
 
+Latest follow-up: [Selected-download estimates](15-download-estimates.md).
+
 Latest follow-up: [File Manager network progress](14-network-progress.md).
 
 Latest follow-up: [Actionable network diagnostics](13-network-diagnostics.md),

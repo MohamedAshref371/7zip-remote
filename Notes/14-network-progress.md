@@ -1,5 +1,10 @@
 # File Manager network progress
 
+The subsequent [download-estimate update](15-download-estimates.md) replaces
+the archive-size reference next to downloaded bytes with an approximate download
+total. Archive size now appears alongside the HTTP request count. The original
+implementation semantics below describe the preceding milestone.
+
 HTTP-enabled progress dialogs show three separate rows while opening, extracting,
 or testing a remote archive:
 

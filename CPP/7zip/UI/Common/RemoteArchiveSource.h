@@ -6,6 +6,7 @@
 #include "../../Common/HttpInStream.h"
 #include "ArchiveOpenCallback.h"
 #include "RemoteProgress.h"
+#include "../../Archive/IArchiveReadRange.h"
 
 inline bool IsHttpArchiveUrl(const UString &path)
 {
@@ -95,15 +96,20 @@ class CRemoteProgressScope
   CMyComPtr<IRemoteProgress> _callback;
   UInt64 _bytesBase;
   UInt64 _requestsBase;
+  bool _estimateDefined;
+  UInt64 _estimate;
   static void Report(void *context, ULONGLONG bytes, ULONGLONG size, ULONGLONG requests)
   {
     CRemoteProgressScope &self = *static_cast<CRemoteProgressScope *>(context);
     if (self._callback)
+    {
       self._callback->SetNetworkProgress(bytes - self._bytesBase, size, requests - self._requestsBase);
+      self._callback->SetNetworkEstimate(self._estimate, self._estimateDefined);
+    }
   }
 public:
   CRemoteProgressScope(CRemoteArchiveSource &source, IUnknown *callback):
-      _source(source), _bytesBase(0), _requestsBase(0)
+      _source(source), _bytesBase(0), _requestsBase(0), _estimateDefined(false), _estimate(0)
   {
     if (callback) callback->QueryInterface(IID_IRemoteProgress, (void **)&_callback);
     if (source.Spec)
@@ -117,6 +123,28 @@ public:
   {
     options.Progress = Report;
     options.ProgressContext = this;
+  }
+  void Estimate(IInArchive *archive, const UInt32 *indices, UInt32 count)
+  {
+    if (!_source.Spec || !_callback || !archive) return;
+    // Failure to estimate must never prevent extraction or trigger network I/O.
+    try
+    {
+      CMyComPtr<IArchiveReadRange> plan;
+      archive->QueryInterface(IID_IArchiveReadRange, (void **)&plan);
+      if (!plan) return;
+      std::vector<CHttpReadRange> ranges;
+      ranges.reserve(count);
+      for (UInt32 i = 0; i < count; ++i)
+      {
+        CHttpReadRange range;
+        if (plan->GetItemReadRange(indices[i], &range.Start, &range.Size) != S_OK) return;
+        ranges.push_back(range);
+      }
+      _estimateDefined = _source.Spec->EstimateMissingBytes(ranges, _estimate);
+      _callback->SetNetworkEstimate(_estimate, _estimateDefined);
+    }
+    catch (...) { /* Optional estimate unavailable; normal extraction continues. */ }
   }
   ~CRemoteProgressScope()
   {
