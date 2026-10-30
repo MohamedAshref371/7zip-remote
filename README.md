@@ -23,6 +23,9 @@ design, evidence, and remaining work.
   cache, and validation of ranges, lengths, and source size.
 - **Redirects:** follow HTTP 301/302/303/307/308, including relative links, with
   at most five hops per range request. HTTPS-to-HTTP redirects are rejected.
+- **Automatic retries:** up to two retries for temporary network failures and
+  HTTP 408/429/500/502/503/504. Waits are cancellable, respect `Retry-After`,
+  and share the original range-request deadline.
 - **Network diagnostics:** actionable messages for denied or expired links,
   authentication requirements, rate limits, server failures, unsupported partial
   downloads, and connection errors. Messages exclude URLs and access tokens.
@@ -53,7 +56,7 @@ Requirements:
 From the repository root:
 
 ```powershell
-python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/redirects
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/retries
 ```
 
 The script discovers Visual Studio, loads its x64 environment, and builds the
@@ -90,7 +93,7 @@ sanitized archive name.
 ### Console
 
 ```powershell
-$sevenzip = '.\.build\msvc\redirects\7z.exe'
+$sevenzip = '.\.build\msvc\retries\7z.exe'
 
 & $sevenzip l 'https://example.com/archive.zip'
 & $sevenzip x 'https://example.com/archive.zip' 'docs/readme.txt' -oOut
@@ -110,8 +113,11 @@ their existing behavior.
   responses and a known total size are required. Strict mode additionally needs
   a strong ETag on every response.
 - Remote archives are read-only and currently single-volume.
-- Automatic retries, browser login/cookies, sharing-page resolution,
+- Browser login/cookies, sharing-page resolution,
   and automatic full-download fallback are not implemented.
+- Failed partial ranges restart from their beginning; retry bytes count toward
+  actual downloads. Source identity, range and size checks remain active.
+  ETag bypass retains its existing same-size-change limitation.
 - Redirect destinations must satisfy the same HTTP(S), range and version checks.
   Cookies and authentication remain disabled. Signed query strings are preserved
   as supplied by each Location; old query parameters are not appended to new URLs.
@@ -126,9 +132,10 @@ their existing behavior.
 ## Tests and Validation
 
 ```powershell
-python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/redirects/7z.exe"
-python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/redirects/agentcheck.exe"
-python Tests/RemoteArchive/test_redirect.py --exe "$PWD/.build/msvc/redirects/7z.exe" --agent "$PWD/.build/msvc/redirects/agentcheck.exe"
+python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/retries/7z.exe"
+python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/retries/agentcheck.exe"
+python Tests/RemoteArchive/test_redirect.py --exe "$PWD/.build/msvc/retries/7z.exe" --agent "$PWD/.build/msvc/retries/agentcheck.exe"
+python Tests/RemoteArchive/test_retry.py --exe "$PWD/.build/msvc/retries/7z.exe" --agent "$PWD/.build/msvc/retries/agentcheck.exe"
 
 # Supply your own local RAR-generation fixtures:
 python Tests/RemoteArchive/test_rar_family.py --rar4 'path/to/legacy.rar' --rar5 'path/to/modern.rar'

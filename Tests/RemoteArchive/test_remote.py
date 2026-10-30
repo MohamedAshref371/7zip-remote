@@ -32,6 +32,8 @@ class FixtureServer(http.server.ThreadingHTTPServer):
         self.redirects = {} # mode -> (status, Location values); tests supply destinations
         self.redirect_delays = {}
         self.redirect_after_probe = set()
+        self.failures = {} # mode -> controlled transient fault options
+        self.failure_counts = {}
         self.lock = threading.Lock()
         self.hold_enabled = False
         self.held = threading.Event()
@@ -100,7 +102,35 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                             cookie=self.headers.get("Cookie"),
                                             authorization=self.headers.get("Authorization"),
                                             referer=self.headers.get("Referer"),
+                                            at=time.monotonic(),
                                             path=self.path))
+        fault = self.server.failures.get(mode)
+        fail_body = False
+        if fault:
+            eligible = fault.get('phase', 'probe') == ('probe' if probe else 'range')
+            with self.server.lock:
+                count = self.server.failure_counts.get(mode, 0)
+                failing = eligible and count < fault.get('times', 1)
+                if failing:
+                    self.server.failure_counts[mode] = count + 1
+            if failing:
+                kind = fault.get('kind', 'status')
+                if kind == 'disconnect':
+                    self.close_connection = True
+                    self.connection.shutdown(socket.SHUT_RDWR)
+                    return
+                if kind == 'status':
+                    self.send_response(fault.get('status', 503))
+                    for value in fault.get('retry_after', []):
+                        self.send_header('Retry-After', value)
+                    self.send_header('Content-Length', '0')
+                    self.end_headers()
+                    return
+                if kind == 'timeout':
+                    self.hold_until_disconnected()
+                    return
+                fail_body = True
+            mode = fault.get('after_mode', 'ok') if not failing else 'ok'
         if (mode in self.server.redirects or mode in ('redirect', 'redirect-loop')) and not (
                 probe and mode in self.server.redirect_after_probe):
             time.sleep(self.server.redirect_delays.get(mode, 0))
@@ -119,7 +149,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if mode == "slow":
             time.sleep(0.8)
         if mode == "stalled":
-            time.sleep(3)
+            # With retries, a finite three-second delay can legitimately recover
+            # (WinHTTP timeout scheduling is not exact). Withhold headers instead.
+            self.hold_until_disconnected()
+            return
         hold = (mode in ('hang-headers', 'hang-body') or
                 (mode in ('extract-hang-headers', 'extract-hang-body') and self.server.hold_enabled))
         if mode.endswith('body') and probe:
@@ -166,7 +199,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "multipart/byteranges; boundary=x" if mode == "multipart"
                          else "application/octet-stream")
         # Deliberately no Accept-Ranges header: successful GET is authoritative.
-        chunked = mode in ("chunked", "extra-body")
+        chunked = mode in ("chunked", "extra-body") or (fail_body and fault.get('kind') == 'short-chunked')
         length = end - start + 1
         if chunked:
             self.send_header("Transfer-Encoding", "chunked")
@@ -174,6 +207,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(length + 1 if mode == "wrong-length" else length))
         self.end_headers()
         body = bytes(i % 251 for i in range(start, end + 1)) if virtual else blob[start:end + 1]
+        if fail_body:
+            piece = body[:max(1, len(body) // 2)]
+            if chunked:
+                self.wfile.write(f'{len(piece):x}\r\n'.encode() + piece + b'\r\n0\r\n\r\n')
+            else:
+                self.wfile.write(piece)
+            self.wfile.flush()
+            self.close_connection = True
+            self.connection.shutdown(socket.SHUT_WR)
+            return
         if hold and mode.endswith('body'):
             self.wfile.write(body[:8192])
             self.wfile.flush()

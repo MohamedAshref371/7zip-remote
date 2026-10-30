@@ -1,5 +1,20 @@
 # Remote archive prototype (Windows x64)
 
+## Bounded HTTP retries
+
+The shared transport retries temporary network failures and HTTP
+408/429/500/502/503/504 up to twice per logical range. Cancellable waits start
+at 250/500 ms and honor longer valid Retry-After values. The same deadline and
+redirect budget apply across all attempts. Incomplete bodies are discarded and
+the full range is requested again, retaining the established ETag/size checks.
+Malformed ranges, source changes, access failures and certificate errors fail
+without automatic retry. See [retry policy and validation](../../Notes/19-http-retries.md).
+
+```powershell
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/retries
+python Tests/RemoteArchive/test_retry.py --exe .build/msvc/retries/7z.exe --agent .build/msvc/retries/agentcheck.exe
+```
+
 ## HTTP redirects
 
 The current shared transport follows 301/302/303/307/308 redirects, with a maximum
@@ -249,13 +264,13 @@ The internal `streamcheck raw URL` command expects byte N to equal N modulo
 ## Limits
 
 - The following limits describe the original standalone milestone. Current
-  CLI/GUI integration and redirect support are described above.
+  CLI/GUI integration, redirects and retry support are described above.
 - No standalone format autodetection, multivolume
-  archives, remote writes, browser authentication, retries or
+  archives, remote writes, browser authentication or
   automatic full-download fallback.
 - 256 KiB blocks, 8 MiB LRU cache, single consumer per source. The initial
   one-byte probe is counted but not cached. Values are provisional.
-- HTTP errors invalidate the stream; retry with a new source. No mixing of
+- Terminal HTTP errors invalidate the stream; reopen with a new source. No mixing of
   versions or reuse of cache across sessions.
 - HTTPS retains Windows certificate validation. Successful HTTPS/proxy
   interoperability has not been integration-tested in this run.

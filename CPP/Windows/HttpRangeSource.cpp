@@ -158,6 +158,41 @@ bool StrongETag(const std::wstring &tag)
   return true;
 }
 
+// Never shorten Retry-After. Unparseable/ambiguous values suppress retry.
+bool RetryDelay(HINTERNET request, unsigned &delay)
+{
+  std::wstring value;
+  const HRESULT result = Header(request, WINHTTP_QUERY_RETRY_AFTER, value);
+  if (result == S_FALSE) return true;
+  if (result != S_OK || value.empty()) return false;
+  ULONGLONG milliseconds = 0, seconds = 0;
+  const wchar_t *p = value.c_str();
+  if (*p >= L'0' && *p <= L'9')
+  {
+    if (!Number(p, seconds) || *p || seconds > MAXDWORD / 1000) return false;
+    milliseconds = seconds * 1000;
+  }
+  else
+  {
+    SYSTEMTIME time = {};
+    FILETIME future, now;
+    wchar_t canonical[WINHTTP_TIME_FORMAT_BUFSIZE];
+    // WinHTTP's date parser is permissive even for malformed numeric strings.
+    // Accept a round-trippable IMF-fixdate; conservatively stop for other forms.
+    if (value.size() != 29 || !WinHttpTimeToSystemTime(value.c_str(), &time)
+        || !WinHttpTimeFromSystemTime(&time, canonical) || _wcsicmp(value.c_str(), canonical) != 0
+        || !SystemTimeToFileTime(&time, &future))
+      return false;
+    GetSystemTimeAsFileTime(&now);
+    const ULONGLONG target = (static_cast<ULONGLONG>(future.dwHighDateTime) << 32) | future.dwLowDateTime;
+    const ULONGLONG current = (static_cast<ULONGLONG>(now.dwHighDateTime) << 32) | now.dwLowDateTime;
+    if (target > current) milliseconds = (target - current + 9999) / 10000;
+  }
+  if (milliseconds > MAXDWORD) return false;
+  delay = static_cast<unsigned>(milliseconds);
+  return true;
+}
+
 // RFC 3986 relative references. Never decode/re-encode signed paths or queries.
 std::wstring ResolveRedirect(const std::wstring &base, std::wstring target)
 {
@@ -235,6 +270,9 @@ HRESULT CHttpRangeSource::FailNetwork()
 {
   const DWORD error = GetLastError();
   if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
+  _retryable = error == ERROR_WINHTTP_TIMEOUT || error == ERROR_WINHTTP_CANNOT_CONNECT
+      || error == ERROR_WINHTTP_CONNECTION_ERROR || error == ERROR_WINHTTP_RESEND_REQUEST
+      || error == ERROR_WINHTTP_INVALID_SERVER_RESPONSE;
   const char *message = "Network request failed. Check your connection and reopen the archive.";
   switch (error)
   {
@@ -325,15 +363,50 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
     std::vector<unsigned char> &data)
 {
   const DWORD begun = GetTickCount();
-  for (unsigned hops = 0; ; ++hops)
+  unsigned hops = 0, retries = 0;
+  for (;;)
   {
     std::wstring redirect;
+    _retryable = false;
+    _retryDelayMs = 0;
     const HRESULT result = RequestOnce(start, length, probe, data, begun, redirect);
-    if (result != S_FALSE) return result;
-    if (hops == 5) return Fail("Too many HTTP redirects (maximum 5). Obtain a fresh direct download URL.");
-    if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
-    const HRESULT changed = SetUrl(ResolveRedirect(_url, redirect));
-    if (changed != S_OK) return changed;
+    if (result == S_OK)
+    {
+      _ready = true;
+      Error.clear();
+      return S_OK;
+    }
+    if (result == S_FALSE)
+    {
+      if (hops++ == 5) return Fail("Too many HTTP redirects (maximum 5). Obtain a fresh direct download URL.");
+      if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
+      const HRESULT changed = SetUrl(ResolveRedirect(_url, redirect));
+      if (changed != S_OK) return changed;
+      continue;
+    }
+    if (result == E_ABORT || !_retryable || retries == 2) return result;
+    const unsigned delay = (std::max)(_retryDelayMs, 250u << retries);
+    const DWORD elapsed = GetTickCount() - begun;
+    // Preserve the original failure if the server's wait will not fit the budget.
+    if (elapsed >= _options.RequestDeadlineMs || delay >= _options.RequestDeadlineMs - elapsed)
+      return result;
+    ++retries;
+    const DWORD waiting = GetTickCount();
+    for (;;)
+    {
+      if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
+      const DWORD waited = GetTickCount() - waiting;
+      if (waited >= delay) break;
+      const DWORD spent = GetTickCount() - begun;
+      if (spent >= _options.RequestDeadlineMs)
+        return Fail("HTTP request deadline exceeded. Check your connection and reopen the archive.", HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+      const DWORD remaining = delay - waited;
+      const DWORD slice = (std::min<DWORD>)(50, (std::min<DWORD>)(remaining, _options.RequestDeadlineMs - spent));
+      if (_options.CancelEvent) WaitForSingleObject(_options.CancelEvent, slice);
+      else Sleep(slice);
+    }
+    // RequestOnce has already closed/drained failed I/O and discarded its body.
+    // Restart the same full range; never combine bytes from incomplete attempts.
   }
 }
 
@@ -397,6 +470,8 @@ HRESULT CHttpRangeSource::RequestOnce(ULONGLONG start, unsigned length, bool pro
       WINHTTP_HEADER_NAME_BY_INDEX, &status, &statusSize, WINHTTP_NO_HEADER_INDEX))
     return Fail("Cannot read HTTP status.", LastErrorResult());
   Status = status;
+  if (status == 408 || status == 429 || status == 500 || status == 502 || status == 503 || status == 504)
+    _retryable = RetryDelay(request.Value, _retryDelayMs);
   if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308)
   {
     if (Header(request.Value, WINHTTP_QUERY_LOCATION, redirect) != S_OK || redirect.empty())
@@ -408,6 +483,7 @@ HRESULT CHttpRangeSource::RequestOnce(ULONGLONG start, unsigned length, bool pro
   if (status == 403) return Fail("The server denied access. The download link may have expired; obtain a fresh direct download URL and check access permissions.");
   if (status == 404 || status == 410) return Fail("The archive was not found or is no longer available. Check the URL or obtain a fresh download link.");
   if (status == 407) return Fail("The proxy requires authentication. Check your network proxy settings; proxy authentication is not supported.");
+  if (status == 408) return Fail("The server timed out processing the request. Try reopening the archive later.");
   if (status == 412) return Fail("Archive changed on the server. Reopen the archive to read the current version.");
   if (status == 416) return Fail("The server rejected the requested byte range. Reopen the archive; if the problem persists, download it locally.");
   if (status == 429) return Fail("The server is limiting download requests. Wait before reopening the archive.");
@@ -464,7 +540,11 @@ HRESULT CHttpRangeSource::RequestOnce(ULONGLONG start, unsigned length, bool pro
     if (done == length) return Fail("Range body exceeds its declared length.");
     done += got;
   }
-  if (done != length) return Fail("The server sent an incomplete byte range. Check your connection and reopen the archive.");
+  if (done != length)
+  {
+    _retryable = true;
+    return Fail("The server sent an incomplete byte range. Check your connection and reopen the archive.");
+  }
   if (probe) { Size = total; _etag = tag; }
   ReportProgress();
   data.swap(body); // Publish only a complete, validated range.

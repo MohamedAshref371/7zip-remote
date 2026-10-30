@@ -29,6 +29,8 @@ class CHttpRangeSource
   std::wstring _etag;
   bool _secure = false;
   bool _ready = false;
+  bool _retryable = false;
+  unsigned _retryDelayMs = 0;
   CHttpRangeOptions _options;
   HRESULT Request(ULONGLONG start, unsigned length, bool probe,
       std::vector<unsigned char> &data);

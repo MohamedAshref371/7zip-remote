@@ -147,6 +147,35 @@ static int CheckTransportCancel(const wchar_t *url, bool eventMode, unsigned rep
   return 0;
 }
 
+static int CheckTransportRetry(int argc, wchar_t **argv)
+{
+  NWindows::CHttpRangeSource source;
+  NWindows::CHttpRangeOptions options;
+  for (int i = 3; i < argc; ++i)
+  {
+    if (wcsncmp(argv[i], L"--retry-timeout-ms=", 19) == 0) options.TimeoutMs = _wtoi(argv[i] + 19);
+    if (wcsncmp(argv[i], L"--retry-deadline-ms=", 20) == 0) options.RequestDeadlineMs = (unsigned)_wtoi(argv[i] + 20);
+    if (wcscmp(argv[i], L"--skip-http-etag") == 0) options.SkipETagVerification = true;
+  }
+  HRESULT result = source.Open(argv[1], options);
+  std::vector<unsigned char> data;
+  if (result == S_OK) result = source.Fetch(0, 262144, data);
+  if (result == S_OK)
+  {
+    CHECK(source.Error.empty() && data.size() == 262144);
+    for (size_t i = 0; i < data.size(); ++i) CHECK(data[i] == i % 251);
+  }
+  else
+  {
+    CHECK(data.empty() && !source.Error.empty());
+    CHECK(source.Fetch(0, 1, data) == E_UNEXPECTED);
+  }
+  printf("RETRY_TRANSPORT %08lx %llu %llu %u\n", (unsigned long)result,
+      source.Requests, source.Downloaded, source.Status);
+  printf("%s\n", source.Error.c_str());
+  return result == S_OK ? 0 : 1;
+}
+
 static int CheckNetworkSync()
 {
   CHttpInStream stream;
@@ -210,6 +239,8 @@ int __cdecl wmain(int argc, wchar_t **argv)
   bool cancelEventMode = false;
   for (int i = 3; i < argc; ++i)
   {
+    if (wcscmp(argv[i], L"--transport-retry-check") == 0)
+      return CheckTransportRetry(argc, argv);
     if (wcscmp(argv[i], L"--transport-deadline-check") == 0)
     {
       NWindows::CHttpRangeSource source;
