@@ -6,6 +6,7 @@
 #include "../../../Common/MyCom.h"
 
 #include "../../IStream.h"
+#include "../IArchiveOpenFileProgress.h"
 
 #include "IsoHeader.h"
 #include "IsoItem.h"
@@ -262,7 +263,7 @@ class CInArchive
   void ReadVolumeDescriptor(CVolumeDescriptor &d);
 
   void SeekToBlock(UInt32 blockIndex);
-  HRESULT ReadDir(CDir &d, unsigned level);
+  HRESULT ReadDir(CDir &d, unsigned level, IArchiveOpenFileProgress *fileProgress, UInt64 &discovered);
   void CreateRefs(CDir &d);
 
   void ReadBootInfo();

@@ -1,6 +1,6 @@
 # File names while scanning archive headers
 
-TAR, RAR and RAR5 handlers now report filenames as headers are parsed. File
+TAR, RAR, RAR5 and ISO handlers now report filenames as headers are parsed. File
 Manager shows **Reading archive headers**, the last discovered path and the
 discovered-item count in its existing progress dialog. This applies to local
 and remote opening, including reads from persistent cache. Updates do not
@@ -19,21 +19,32 @@ bridge and offset callback forward it, including reopen callbacks. File Manager
 updates its synchronized progress state and propagates stop/pause checks. RAR5
 service records are not presented as filenames.
 
+ISO reports each non-system directory entry as soon as it is parsed, instead
+of waiting for the existing 16 MiB metadata-progress threshold. Paths use the
+same Joliet/Rock Ridge decoding and name cleanup as the final file list. Parent
+links are established while scanning so nested paths are available immediately.
+Consecutive extents of a multi-extent file are reported/count once. The optional
+callback is scoped to the open operation and adds no archive reads.
+
 ## Validation
 
-Build: `.build/msvc/open-file-progress/` (keep its matching `7z.dll` beside the
-executable). The local-only File Manager is also built separately.
+Build with ISO progress: `.build/msvc/iso-file-progress/` (keep its matching
+`7z.dll` beside the executable).
 
-The new suite covers TAR/PAX with an Arabic filename, RAR4 and RAR5, local and
+The 63-scenario suite covers TAR/PAX with an Arabic filename, RAR4/RAR5 and ISO
+primary/Joliet/Rock Ridge trees, including Arabic nested names and multi-extent
+files. It tests local and
 remote reads, both fetch modes, cancellation at the fifth header and disk-cache
 reopens. Names/counts are compared in order with the input fixtures. Recorded
 HTTP ranges are identical with name logging enabled/disabled, and strict
 cached reopens need only the one-byte source probe. The callback bridge is also
 checked against the actual dialog state, including Unicode, cancellation and
 detachment. Interactive desktop display has not been verified in this session.
+The existing 62 Agent scenarios also pass on this build, including ISO selected
+extraction and download estimates.
 
 ```powershell
-python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/open-file-progress
-python Tests/RemoteArchive/test_open_file_progress.py --exe .build/msvc/open-file-progress/agentcheck.exe
-python Tests/RemoteArchive/test_agent.py --exe .build/msvc/open-file-progress/agentcheck.exe
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/iso-file-progress
+python Tests/RemoteArchive/test_open_file_progress.py --exe .build/msvc/iso-file-progress/agentcheck.exe
+python Tests/RemoteArchive/test_agent.py --exe .build/msvc/iso-file-progress/agentcheck.exe
 ```

@@ -16,10 +16,12 @@ design, evidence, and remaining work.
 
 - **File Manager:** File → Open URL..., archive browsing, selected extraction,
   password handling, and fresh-session Refresh.
-- **Opening progress for TAR/RAR/RAR5:** the progress dialog shows the last
+- **Opening progress for TAR/RAR/RAR5/ISO:** the progress dialog shows the last
   filename discovered while scanning headers and the number of discovered
   items. Updates reuse the existing scan and cause no extra HTTP requests.
   Names become available after their headers are read (and decrypted, if needed).
+  ISO reports full directory paths with Joliet/Rock Ridge naming and counts
+  consecutive extents of the same file once.
 - **Download only requested data:** optional Open URL checkbox removes the
   256 KiB minimum fetch. Small reads request only the bytes asked for by the
   archive engine; larger reads may be split. Optional disk caching saves these

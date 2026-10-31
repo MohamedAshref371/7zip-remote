@@ -1,4 +1,4 @@
-"""Names reported while TAR/RAR headers are read, without extra HTTP reads."""
+"""Names reported while TAR/RAR/ISO headers are read, without extra HTTP reads."""
 import argparse
 import io
 import json
@@ -10,6 +10,7 @@ import tempfile
 import threading
 
 from estimate_fixtures import write_rar4, write_rar5
+from iso_progress_fixtures import write_iso_tree
 from test_remote import FixtureServer, ROOT
 
 
@@ -19,7 +20,7 @@ def main():
     args = parser.parse_args()
     exe = args.exe.resolve()
     work = Path(tempfile.mkdtemp(prefix='open-file-progress-', dir=ROOT / '.build/msvc/runs'))
-    target = b'selected file\n' * 100
+    target = b'selected file\n' * 200
     entries = [(f'folder/file-{i:03}.bin', bytes([i]) * 300000) for i in range(12)]
     entries.append(('docs/target.txt', target))
     files = {}
@@ -33,6 +34,15 @@ def main():
             item.size = len(data)
             tar.addfile(item, io.BytesIO(data))
     files['sample.tar'] = (work / 'sample.tar').read_bytes()
+    expected_names = {name: [n for n, _ in (tar_entries if name.endswith('.tar') else entries)]
+                      for name in files}
+    for name, options in [
+        ('primary.iso', {}), ('joliet.iso', dict(joliet=True)),
+        ('rock-ridge.iso', dict(rock_ridge=True)),
+        ('multi-extent.iso', dict(joliet=True, multi_extent=True)),
+    ]:
+        expected_names[name] = write_iso_tree(work / name, target, **options)
+        files[name] = (work / name).read_bytes()
     server = FixtureServer(files)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f'http://127.0.0.1:{server.server_port}'
@@ -50,11 +60,11 @@ def main():
         assert result.returncode == (3 if cancel else 0), (label, log)
         events = [(int(count), path.replace('\\', '/')) for count, path in
                   re.findall(r'^OPEN_FILE (\d+) ([^\r\n]*)', log, re.MULTILINE)]
-        expected = tar_entries if name.endswith('.tar') else entries
+        expected = expected_names[name]
         if show:
             if cancel:
                 expected = expected[:5]
-            assert events == [(i + 1, n) for i, (n, _) in enumerate(expected)], (label, events)
+            assert events == [(i + 1, n) for i, n in enumerate(expected)], (label, events)
         else:
             assert not events
         if not cancel:

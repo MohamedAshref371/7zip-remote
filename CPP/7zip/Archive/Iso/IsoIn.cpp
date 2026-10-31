@@ -5,10 +5,12 @@
 #include "../../../../C/CpuArch.h"
 
 #include "../../../Common/MyException.h"
+#include "../../../Common/StringConvert.h"
 
 #include "../../Common/StreamUtils.h"
 
 #include "../HandlerCont.h"
+#include "../Common/ItemNameUtils.h"
 
 #include "IsoIn.h"
 
@@ -349,7 +351,8 @@ void CInArchive::SeekToBlock(UInt32 blockIndex)
 
 static const unsigned kNumLevelsMax = 256;
 
-HRESULT CInArchive::ReadDir(CDir &d, const unsigned level)
+HRESULT CInArchive::ReadDir(CDir &d, const unsigned level,
+    IArchiveOpenFileProgress *fileProgress, UInt64 &discovered)
 {
   if (!d.IsDir())
     return S_OK;
@@ -377,7 +380,7 @@ HRESULT CInArchive::ReadDir(CDir &d, const unsigned level)
     if (_openCallback && _processedBytes - _processedBytes_prev >= (1 << 24))
     {
       _processedBytes_prev = _processedBytes;
-      RINOK(_openCallback->SetCompleted(&_numFiles, &_processedBytes))
+      RINOK(_openCallback->SetCompleted(fileProgress ? &discovered : &_numFiles, &_processedBytes))
     }
     if (_processedBytes > _fileSize + (1 << 24))
     {
@@ -429,14 +432,35 @@ HRESULT CInArchive::ReadDir(CDir &d, const unsigned level)
         TooBigMetadata = true; // Too many files
         return S_FALSE;
       }
+      const bool continuation = !d._subItems.IsEmpty()
+          && d._subItems.Back().IsNonFinalExtent()
+          && d._subItems.Back().AreMultiPartEqualWith(subItem);
+      // Establish the parent while scanning, rather than waiting for CreateRefs.
+      // The directory objects are individually allocated and stay at stable addresses.
+      subItem.Parent = &d;
       d._subItems.Add(subItem);
       _numFiles++;
+      if (!continuation)
+      {
+        ++discovered;
+        if (fileProgress)
+        {
+          UString name;
+          if (IsJoliet()) subItem.GetPathU(name);
+          else name = MultiByteToUnicodeString(subItem.GetPath(IsSusp, SuspSkipSize), CP_OEMCP);
+          if (name.Len() >= 2 && name[name.Len() - 2] == ';' && name.Back() == '1')
+            name.DeleteFrom(name.Len() - 2);
+          if (!name.IsEmpty() && name.Back() == L'.') name.DeleteBack();
+          NItemName::ReplaceToOsSlashes_Remove_TailSlash(name);
+          RINOK(fileProgress->SetCurrentFileName(name, discovered))
+        }
+      }
     }
     firstItem = false;
   }
   FOR_VECTOR (i, d._subItems)
   {
-    RINOK(ReadDir(d._subItems[i], level + 1))
+    RINOK(ReadDir(d._subItems[i], level + 1, fileProgress, discovered))
   }
 
   UniqStartLocations.DeleteBack();
@@ -677,7 +701,10 @@ HRESULT CInArchive::Open2()
   IsArc = true;
 
   (CDirRecord &)_rootDir = vd.RootDirRecord;
-  RINOK(ReadDir(_rootDir, 0))
+  CMyComPtr<IArchiveOpenFileProgress> fileProgress;
+  if (_openCallback) _openCallback->QueryInterface(IID_IArchiveOpenFileProgress, (void **)&fileProgress);
+  UInt64 discovered = 0;
+  RINOK(ReadDir(_rootDir, 0, fileProgress, discovered))
   CreateRefs(_rootDir);
   ReadBootInfo();
 
