@@ -64,11 +64,18 @@ def main():
             second, text = run(name + '-reopen', name)
             assert first['downloaded'] > 700000 and first['hits'] == 0
             assert second['downloaded'] == 1 and second['hits'] > 0 and 'Cache verified' in text
+        for name in files:
+            refreshed, text = run(name + '-refresh', name, options=('--cache-refresh-check',))
+            assert 'CACHE_REFRESH_OK 3 rollback 2' in text
+            assert refreshed['downloaded'] == 1 and refreshed['hits'] > 0
         first, _ = run('weak-first', 'sample.zip', 'missing-etag', ('--skip-http-etag',))
         second, _ = run('weak-without-consent', 'sample.zip', 'missing-etag', ('--skip-http-etag',))
         assert first['hits'] == second['hits'] == 0
         third, text = run('weak-with-consent', 'sample.zip', 'missing-etag', ('--skip-http-etag', '--cache-trust'))
         assert third['hits'] > 0 and 'partial verification' in text
+        _, text = run('weak-refresh', 'sample.zip', 'missing-etag',
+                      ('--skip-http-etag', '--cache-trust', '--cache-refresh-check'))
+        assert 'CACHE_REFRESH_OK 3 rollback 2' in text and 'partial verification' in text
         # The versioned disk format must work across the GNU and MSVC builds.
         native = subprocess.run([str(args.checker.resolve()), base + '/ok/sample.zip?sig=cache-agent-secret',
                                  str(work / 'cache-sample.zip')], capture_output=True, check=True, timeout=20)

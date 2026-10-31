@@ -310,6 +310,7 @@ int __cdecl wmain(int argc, wchar_t **argv)
   bool rarFamilyCheck = false;
   bool estimateArchiveCheck = false;
   bool selectionCheck = false;
+  bool cacheRefreshCheck = false;
   bool selectionAds = false;
   NWindows::CHttpDiskCacheOptions cacheOptions;
   const wchar_t *skipItem = NULL;
@@ -320,6 +321,7 @@ int __cdecl wmain(int argc, wchar_t **argv)
     if (wcsncmp(argv[i], L"--cache-dir=", 12) == 0) { cacheOptions.Enabled = true; cacheOptions.Directory = argv[i] + 12; }
     if (wcsncmp(argv[i], L"--cache-limit=", 14) == 0) cacheOptions.MaxBytes = _wcstoui64(argv[i] + 14, NULL, 10);
     if (wcsncmp(argv[i], L"--cache-reuse=", 14) == 0) cacheOptions.ReuseId = argv[i] + 14;
+    if (wcscmp(argv[i], L"--cache-refresh-check") == 0) cacheRefreshCheck = true;
     if (wcscmp(argv[i], L"--cache-trust") == 0) cacheOptions.AllowUnverified = true;
     if (wcscmp(argv[i], L"--transport-retry-check") == 0)
       return CheckTransportRetry(argc, argv);
@@ -370,6 +372,56 @@ int __cdecl wmain(int argc, wchar_t **argv)
     callback->PrintNetwork("open");
   } // Destroy the open callback before subsequent reads: no retained raw pointer.
   CHECK_HR(folder->LoadItems());
+  if (cacheRefreshCheck)
+  {
+    for (unsigned iteration = 0; iteration < 3; ++iteration)
+    {
+      CMyComPtr<IRemoteCacheStatus> oldCache;
+      CHECK_HR(folder.QueryInterface(IID_IRemoteCacheStatus, &oldCache));
+      CMyComBSTR oldStatus, oldId;
+      CHECK_HR(oldCache->GetCacheStatus(&oldStatus, &oldId));
+      CHECK(oldId && *oldId);
+      CRemoteCacheRefreshScope refresh(folder);
+      CMyComPtr<IFolderFolder> replacement;
+      CTestCallback *callback = new CTestCallback;
+      CMyComPtr<IProgress> progress = callback;
+      CHECK_HR(managerRef->OpenFolderFile(NULL, argv[1], arcFormat, &replacement, progress));
+      const bool verified = wcscmp(oldStatus, L"Cache verified") == 0;
+      CHECK(!verified || callback->NetworkBytes == 1);
+      CMyComPtr<IRemoteCacheStatus> newCache;
+      CHECK_HR(replacement.QueryInterface(IID_IRemoteCacheStatus, &newCache));
+      CMyComBSTR status, id;
+      CHECK_HR(newCache->GetCacheStatus(&status, &id));
+      CHECK(wcscmp(oldId, id) == 0 && wcscmp(status, oldStatus) == 0);
+      folder = replacement;
+      refresh.Commit();
+      CHECK_HR(folder->LoadItems());
+    }
+    for (unsigned failure = 0; failure < 2; ++failure)
+    {
+      CMyComPtr<IRemoteCacheStatus> previous;
+      CHECK_HR(folder.QueryInterface(IID_IRemoteCacheStatus, &previous));
+      CMyComBSTR previousStatus, previousId;
+      CHECK_HR(previous->GetCacheStatus(&previousStatus, &previousId));
+      {
+        CRemoteCacheRefreshScope refresh(folder);
+        CMyComPtr<IFolderFolder> rejected;
+        CTestCallback *callback = new CTestCallback;
+        CMyComPtr<IProgress> progress = callback;
+        callback->Cancel = failure == 0;
+        CHECK(managerRef->OpenFolderFile(NULL, argv[1], failure ? L"iso" : arcFormat,
+            &rejected, progress) != S_OK);
+        rejected.Release();
+      }
+      CMyComPtr<IRemoteCacheStatus> restored;
+      CHECK_HR(folder.QueryInterface(IID_IRemoteCacheStatus, &restored));
+      CMyComBSTR status, id;
+      CHECK_HR(restored->GetCacheStatus(&status, &id));
+      CHECK(wcscmp(status, previousStatus) == 0 && wcscmp(id, previousId) == 0);
+      CHECK_HR(folder->LoadItems());
+    }
+    printf("CACHE_REFRESH_OK 3 rollback 2\n");
+  }
   NWindows::NCOM::CPropVariant readOnly;
   CHECK_HR(folder->GetFolderProperty(kpidReadOnly, &readOnly));
   CHECK(readOnly.vt == VT_BOOL);

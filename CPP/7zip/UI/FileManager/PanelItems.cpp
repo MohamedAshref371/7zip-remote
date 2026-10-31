@@ -12,6 +12,9 @@
 #include "../../PropID.h"
 
 #include "../Common/ExtractingFilePath.h"
+#ifdef Z7_HTTP
+#include "../Common/RemoteSelection.h"
+#endif
 
 #include "resource.h"
 
@@ -1458,12 +1461,19 @@ void CPanel::OnReload(bool onTimer)
     const bool skipHttpETag = _parentFolders[0].SkipHttpETag;
     const NWindows::CHttpDiskCacheOptions cacheOptions = _parentFolders[0].HttpCacheOptions;
     const UString folderPath = _parentFolders.Size() == 1 ? GetFolderPath(_folder) : UString();
+    // Nested archives still borrow the outer remote stream/cache.
+    CRemoteCacheRefreshScope cacheRefresh(_parentFolders.Size() > 1
+        ? (IFolderFolder *)_parentFolders[1].ParentFolder : (IFolderFolder *)_folder);
     COpenResult openRes;
-    if (OpenRemoteArchive(url, arcFormat, openRes, skipHttpETag, &cacheOptions) == S_OK && !folderPath.IsEmpty())
+    if (OpenRemoteArchive(url, arcFormat, openRes, skipHttpETag, &cacheOptions) == S_OK)
     {
-      CMyComPtr<IFolderFolder> folder;
-      if (_folder->BindToFolder(folderPath, &folder) == S_OK && folder)
-        SetNewFolder(folder);
+      cacheRefresh.Commit();
+      if (!folderPath.IsEmpty())
+      {
+        CMyComPtr<IFolderFolder> folder;
+        if (_folder->BindToFolder(folderPath, &folder) == S_OK && folder)
+          SetNewFolder(folder);
+      }
     }
     RefreshListCtrl();
     return;

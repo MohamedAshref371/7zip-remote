@@ -255,6 +255,8 @@ class CHttpDiskCache
   HANDLE _lock = INVALID_HANDLE_VALUE;
   ULONGLONG _maximum = 0;
   ULONGLONG _unprunedBytes = 0;
+  bool _suspended = false;
+  std::wstring _resumeStatus;
   NHttpCache::CInfo _info = {};
   std::map<ULONGLONG, unsigned> _blocks;
   bool BlockIdentity(BYTE *digest) const
@@ -287,6 +289,30 @@ class CHttpDiskCache
   }
 public:
   std::wstring Status;
+  void Suspend()
+  {
+    if (!Enabled() || _suspended) return;
+    _resumeStatus = Status;
+    CloseHandle(_lock);
+    _lock = INVALID_HANDLE_VALUE;
+    _suspended = true;
+  }
+  void Resume()
+  {
+    if (!_suspended) return;
+    _suspended = false;
+    // A failed refresh retains the old archive/stream. Reacquire its cache
+    // only if the on-disk generation is unchanged; never issue network I/O.
+    NHttpCache::CCacheHandle manager(CreateFileW((_root + L"\\manage.lock").c_str(), GENERIC_WRITE, 0,
+        NULL, OPEN_ALWAYS, FILE_FLAG_OPEN_REPARSE_POINT, NULL));
+    NHttpCache::CInfo current;
+    const std::wstring id = _id;
+    if (manager.Valid() && NHttpCache::Info(_folder, current)
+        && !memcmp(&current, &_info, sizeof(current)) && LockEntry(id))
+    { Status = _resumeStatus; return; }
+    Close();
+    Status = L"Cache changed or busy after failed refresh (memory only)";
+  }
   bool Enabled() const { return _lock != INVALID_HANDLE_VALUE; }
   const std::map<ULONGLONG, unsigned> &Blocks() const { return _blocks; }
   const std::wstring &Id() const { return _id; }
@@ -310,6 +336,7 @@ public:
       }
       catch (...) {}
     _unprunedBytes = 0;
+    _suspended = false;
     if (_lock != INVALID_HANDLE_VALUE) CloseHandle(_lock);
     _lock = INVALID_HANDLE_VALUE;
     _folder.clear(); _id.clear(); _blocks.clear(); _liveEndpoint.clear();

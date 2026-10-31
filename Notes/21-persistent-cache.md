@@ -172,3 +172,22 @@ Validation of the review build: 62 cache, 40 redirect, 60 Agent, 10 cache-Agent,
 Open URL/cache resource layout checks. MSVC rebuilt the engine, console, File
 Manager and Agent harness; Zig rebuilt the cache harness. No performance
 benchmark or interactive desktop acceptance is claimed by these checks.
+
+## Refresh cache handoff
+
+The previous folder stays alive while Refresh opens and validates a new source.
+A scoped handoff temporarily releases only its disk-cache lock, allowing the new
+session to reuse the entry on the first refresh. Nested archive refresh releases
+the outer remote folder's cache. Success discards the previous session. Failure
+or cancellation reacquires the old cache only if its saved generation metadata
+still matches, without issuing network requests through the old source. If another
+session acquired or changed the entry, the previous archive remains usable with
+memory/network reads instead. Existing ETag and explicit reuse-consent policies
+still apply; Refresh does not authorize unverified reuse by itself.
+
+The headless Agent check uses the same handoff scope as File Manager and covers
+three consecutive refreshes followed by cancellation and rejected-format rollback,
+then extraction/hash verification, for ZIP, solid/non-solid 7z and consented ETag
+bypass. The build is `.build/msvc/refresh-cache/`. Manual desktop retesting of the
+reported first-refresh issue is still required. The maintainer confirmed that
+cache-path editing and closing the usage dialog worked in the preceding build.

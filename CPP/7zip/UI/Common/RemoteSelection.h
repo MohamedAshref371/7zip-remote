@@ -4,6 +4,7 @@
 
 #include "../../IProgress.h"
 #include "../../../Common/MyString.h"
+#include "../../../Common/MyCom.h"
 
 enum
 {
@@ -34,15 +35,33 @@ struct Z7_DECLSPEC_NOVTABLE IRemoteSelection: public IUnknown
 Z7_PURE_INTERFACES_END
 
 static const GUID IID_IRemoteCacheStatus =
-    { 0x6ac90d38, 0x5de2, 0x4c92, { 0x8d, 0xc5, 0x0d, 0xc1, 0x18, 0x98, 0x14, 0x27 } };
+    { 0x6ac90d38, 0x5de2, 0x4c92, { 0x8d, 0xc5, 0x0d, 0xc1, 0x18, 0x98, 0x14, 0x28 } };
 #define Z7_IFACEM_IRemoteCacheStatus(x) \
-  x(GetCacheStatus(BSTR *status, BSTR *entryId))
+  x(GetCacheStatus(BSTR *status, BSTR *entryId)) \
+  x(SetCacheSuspended(UInt32 suspended))
 Z7_PURE_INTERFACES_BEGIN
 struct Z7_DECLSPEC_NOVTABLE IRemoteCacheStatus: public IUnknown
 {
   Z7_IFACE_COM7_PURE(IRemoteCacheStatus)
 };
 Z7_PURE_INTERFACES_END
+
+// Scope a refresh while keeping the previous folder alive for rollback.
+class CRemoteCacheRefreshScope
+{
+  CMyComPtr<IRemoteCacheStatus> _cache;
+public:
+  explicit CRemoteCacheRefreshScope(IUnknown *folder)
+  {
+    if (folder && folder->QueryInterface(IID_IRemoteCacheStatus, (void **)&_cache) == S_OK)
+      _cache->SetCacheSuspended(1);
+  }
+  ~CRemoteCacheRefreshScope() { if (_cache) _cache->SetCacheSuspended(0); }
+  void Commit() { _cache.Release(); }
+private:
+  CRemoteCacheRefreshScope(const CRemoteCacheRefreshScope &) = delete;
+  CRemoteCacheRefreshScope &operator=(const CRemoteCacheRefreshScope &) = delete;
+};
 
 inline UString RemoteSelectionSize(UInt64 bytes)
 {

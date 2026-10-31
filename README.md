@@ -98,7 +98,8 @@ Zig/Clang build instructions are available in the [test and build guide](Tests/R
 **View → Refresh** opens a fresh source and retains the type and ETag choices.
 The current subfolder is restored when possible; refreshing inside a nested
 archive returns to the outer remote archive. A failed refresh preserves the
-previous view. URLs are kept in the session; displayed/history paths use a
+previous view. Refresh temporarily hands off the disk-cache lock so the new
+session can reuse saved parts immediately, subject to the same verification policy. URLs are kept in the session; displayed/history paths use a
 sanitized archive name.
 
 ### Disk cache
