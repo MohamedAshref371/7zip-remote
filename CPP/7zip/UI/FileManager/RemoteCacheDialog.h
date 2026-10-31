@@ -8,14 +8,14 @@
 #include <memory>
 #include <thread>
 
-inline void LoadRemoteOpenSettings(bool &skipETag, bool &reuseUnverified)
+inline void LoadRemoteOpenSettings(bool &skipETag, bool &reuseUnverified, bool &exactReads)
 {
-  skipETag = reuseUnverified = false;
+  skipETag = reuseUnverified = exactReads = false;
   HKEY key;
   if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\7-Zip\\FM\\RemoteCache", 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return;
-  const wchar_t *names[] = { L"SkipETagVerification", L"ReuseUnverifiedCache" };
-  bool *values[] = { &skipETag, &reuseUnverified };
-  for (unsigned i = 0; i < 2; ++i)
+  const wchar_t *names[] = { L"SkipETagVerification", L"ReuseUnverifiedCache", L"ExactReads" };
+  bool *values[] = { &skipETag, &reuseUnverified, &exactReads };
+  for (unsigned i = 0; i < 3; ++i)
   {
     DWORD value = 0, type = 0, size = sizeof(value);
     if (RegQueryValueExW(key, names[i], NULL, &type, (BYTE *)&value, &size) == ERROR_SUCCESS
@@ -24,14 +24,15 @@ inline void LoadRemoteOpenSettings(bool &skipETag, bool &reuseUnverified)
   RegCloseKey(key);
 }
 
-inline bool SaveRemoteOpenSettings(bool skipETag, bool reuseUnverified)
+inline bool SaveRemoteOpenSettings(bool skipETag, bool reuseUnverified, bool exactReads)
 {
   HKEY key;
   if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\7-Zip\\FM\\RemoteCache", 0, NULL, 0,
       KEY_SET_VALUE, NULL, &key, NULL) != ERROR_SUCCESS) return false;
-  const DWORD skip = skipETag ? 1 : 0, reuse = reuseUnverified ? 1 : 0;
+  const DWORD skip = skipETag ? 1 : 0, reuse = reuseUnverified ? 1 : 0, exact = exactReads ? 1 : 0;
   const bool ok = RegSetValueExW(key, L"SkipETagVerification", 0, REG_DWORD, (const BYTE *)&skip, sizeof(skip)) == ERROR_SUCCESS
-      && RegSetValueExW(key, L"ReuseUnverifiedCache", 0, REG_DWORD, (const BYTE *)&reuse, sizeof(reuse)) == ERROR_SUCCESS;
+      && RegSetValueExW(key, L"ReuseUnverifiedCache", 0, REG_DWORD, (const BYTE *)&reuse, sizeof(reuse)) == ERROR_SUCCESS
+      && RegSetValueExW(key, L"ExactReads", 0, REG_DWORD, (const BYTE *)&exact, sizeof(exact)) == ERROR_SUCCESS;
   RegCloseKey(key);
   return ok;
 }

@@ -182,7 +182,8 @@ inline bool Info(const std::wstring &folder, CInfo &info)
   if (!ReadFileBytes(folder + L"\\info.bin", bytes, sizeof(info)) || bytes.size() != sizeof(info)) return false;
   memcpy(&info, bytes.data(), sizeof(info));
   BYTE digest[32];
-  return memcmp(info.Magic, "7ZHC01I", 8) == 0 && info.Name[160] == 0 && info.Verified <= 1
+  return (!memcmp(info.Magic, "7ZHC01I", 8) || !memcmp(info.Magic, "7ZHC02I", 8))
+      && info.Name[160] == 0 && info.Verified <= 1
       && info.Size > 0 && info.Size <= 0x7fffffffffffffffull
       && Hash(&info, offsetof(CInfo, Digest), digest) && !memcmp(digest, info.Digest, 32);
 }
@@ -256,6 +257,7 @@ class CHttpDiskCache
   ULONGLONG _maximum = 0;
   ULONGLONG _unprunedBytes = 0;
   bool _suspended = false;
+  bool _exactReads = false;
   std::wstring _resumeStatus;
   NHttpCache::CInfo _info = {};
   std::map<ULONGLONG, unsigned> _blocks;
@@ -405,9 +407,11 @@ public:
     return ok;
   }
   template<class TSource>
-  HRESULT Open(const CHttpDiskCacheOptions &options, const std::wstring &url, TSource &source)
+  HRESULT Open(const CHttpDiskCacheOptions &options, const std::wstring &url, TSource &source,
+      bool exactReads = false)
   {
     using namespace NHttpCache;
+    _exactReads = exactReads;
     if (!options.Enabled) return S_OK;
     Status = L"Cache unavailable (memory only)";
     _root = Root(options.Directory, true);
@@ -426,6 +430,8 @@ public:
     for (const auto &entry : CatalogRoot(_root))
     {
       if (!entry.Valid) continue;
+      // Separate generations keep legacy fixed-block readers compatible.
+      if ((!memcmp(entry.Info.Magic, "7ZHC02I", 8)) != _exactReads) continue;
       const bool sameUrl = !memcmp(entry.Info.Url, urlHash, 32) && !memcmp(entry.Info.Endpoint, endpoint, 32);
       if ((!options.ReuseId.empty() && options.ReuseId == entry.Id) || (options.ReuseId.empty() && sameUrl))
       {
@@ -438,13 +444,13 @@ public:
     }
     // The fresh strong-ETag probe validates an exact resource/version match.
     // Other cases need fresh edge metadata and, on reuse, stored-block samples.
-    BYTE edgeHash[32];
+    BYTE edgeHash[32] = {};
     const bool strictCandidate = found && candidate.Info.Verified && !source.SkipsETag()
         && !memcmp(candidate.Info.Url, urlHash, 32) && !memcmp(candidate.Info.Endpoint, endpoint, 32)
         && !memcmp(candidate.Info.Tag, tag, 32);
     HRESULT result = S_OK;
     if (strictCandidate) memcpy(edgeHash, candidate.Info.Fingerprint, 32);
-    else
+    else if (!_exactReads)
     {
       std::vector<unsigned char> first, last, fingerprint;
       const unsigned length = (unsigned)((std::min)(source.Size, (ULONGLONG)65536));
@@ -476,9 +482,21 @@ public:
         if (source.IsCancelled()) { Close(); return E_ABORT; }
         ULONGLONG offset = 0;
         if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || !BlockName(file.cFileName, offset)
-            || offset % 262144 || offset >= source.Size) continue;
-        const unsigned count = (unsigned)((std::min)(source.Size - offset, (ULONGLONG)262144));
+            || (!_exactReads && offset % 262144) || offset >= source.Size) continue;
+        const unsigned maximum = (unsigned)((std::min)(source.Size - offset, (ULONGLONG)262144));
+        if (file.nFileSizeHigh || file.nFileSizeLow <= sizeof(CBlockHeader)) continue;
+        const unsigned count = _exactReads ? file.nFileSizeLow - sizeof(CBlockHeader) : maximum;
+        if (count > maximum) continue;
         if (!file.nFileSizeHigh && file.nFileSizeLow == sizeof(CBlockHeader) + count) _blocks[offset] = count;
+      }
+      // Valid writes do not overlap. Ignore overlapping on-disk entries so
+      // partial coverage and preview subtraction always remain unambiguous.
+      if (_exactReads)
+      {
+        ULONGLONG end = 0;
+        for (auto part = _blocks.begin(); part != _blocks.end(); )
+          if (part->first < end) part = _blocks.erase(part);
+          else { end = part->first + part->second; ++part; }
       }
       // Sample up to three stored blocks, always bypassing the disk/memory caches.
       if (!verified && !_blocks.empty())
@@ -514,7 +532,7 @@ public:
     if (id.empty() || !CreateDirectoryW((_root + L"\\" + id).c_str(), NULL) || !LockEntry(id)) return S_OK;
     if (!AtomicWrite(_folder + L"\\entry.owner", "7ZHC01E", 8)) { Close(); return S_OK; }
     memset(&_info, 0, sizeof(_info));
-    memcpy(_info.Magic, "7ZHC01I", 8);
+    memcpy(_info.Magic, _exactReads ? "7ZHC02I" : "7ZHC01I", 8);
     _info.Size = source.Size;
     _info.Verified = source.SkipsETag() ? 0 : 1;
     memcpy(_info.Url, urlHash, 32); memcpy(_info.Endpoint, endpoint, 32);
@@ -534,7 +552,9 @@ public:
   bool Read(ULONGLONG offset, unsigned length, std::vector<unsigned char> &data)
   {
     using namespace NHttpCache;
-    if (!Enabled() || !_blocks.count(offset)) return false;
+    if (!Enabled()) return false;
+    const auto block = _blocks.find(offset);
+    if (block == _blocks.end() || block->second != length) return false;
     std::vector<BYTE> bytes;
     CBlockHeader header;
     BYTE digest[32], identity[32];
@@ -554,10 +574,35 @@ public:
     Status = L"Damaged cache block ignored; downloading again";
     return false;
   }
+  // Read a cached prefix at any position, validating the complete stored part
+  // before returning a slice. Never download anything to fill a disk-cache gap.
+  bool ReadRange(ULONGLONG offset, unsigned length, std::vector<unsigned char> &data)
+  {
+    if (!Enabled() || !length) return false;
+    auto part = _blocks.upper_bound(offset);
+    if (part == _blocks.begin()) return false;
+    --part;
+    const ULONGLONG start = part->first;
+    const unsigned size = part->second;
+    if (offset - start >= size) return false;
+    std::vector<unsigned char> stored;
+    if (!Read(start, size, stored)) return false;
+    const size_t skip = (size_t)(offset - start);
+    const size_t count = (std::min)((size_t)length, stored.size() - skip);
+    data.assign(stored.begin() + skip, stored.begin() + skip + count);
+    return true;
+  }
+  unsigned MissingPrefix(ULONGLONG offset, unsigned length) const
+  {
+    const auto next = _blocks.upper_bound(offset);
+    return next != _blocks.end() && next->first - offset < length
+        ? (unsigned)(next->first - offset) : length;
+  }
   void Write(ULONGLONG offset, const std::vector<unsigned char> &data)
   {
     using namespace NHttpCache;
-    if (!Enabled()) return;
+    if (!Enabled() || data.empty() || data.size() > 262144 || offset >= _info.Size
+        || data.size() > _info.Size - offset) return;
     CCacheHandle manager(CreateFileW((_root + L"\\manage.lock").c_str(), GENERIC_WRITE, 0,
         NULL, OPEN_ALWAYS, FILE_FLAG_OPEN_REPARSE_POINT, NULL));
     if (!manager.Valid()) { Status = L"Cache busy; new bytes kept in memory"; return; }

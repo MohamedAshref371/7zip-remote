@@ -460,7 +460,7 @@ void GetFolderError(CMyComPtr<IFolderFolder> &folder, UString &s);
 
 #ifdef Z7_HTTP
 HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes,
-    bool skipHttpETag, const NWindows::CHttpDiskCacheOptions *cacheOptions)
+    bool skipHttpETag, const NWindows::CHttpDiskCacheOptions *cacheOptions, bool exactHttpReads)
 {
   CDisableTimerProcessing disableTimerProcessing(*this);
   CDisableNotify disableNotify(*this);
@@ -468,6 +468,7 @@ HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, 
   openRes.Encrypted = false;
   CFfpOpen ffp;
   ffp.SkipHttpETag = skipHttpETag;
+  ffp.ExactHttpReads = exactHttpReads;
   if (cacheOptions) ffp.HttpCacheOptions = *cacheOptions;
   const HRESULT res = ffp.OpenFileFolderPlugin(NULL, us2fs(url), arcFormat, GetParent());
   openRes.Encrypted = ffp.Encrypted;
@@ -485,6 +486,7 @@ HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, 
   link.RemoteUrl = url;
   link.RemoteArcFormat = arcFormat;
   link.SkipHttpETag = skipHttpETag;
+  link.ExactHttpReads = exactHttpReads;
   link.HttpCacheOptions = ffp.HttpCacheOptions;
   if (link.HttpCacheOptions.AllowUnverified)
   {
@@ -520,6 +522,11 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
   NWindows::NControl::CComboBox _format;
   NWindows::NControl::CComboBox _reuse;
   std::vector<NWindows::NHttpCache::CEntry> _entries;
+  void UpdateCacheControls()
+  {
+    EnableItem(IDC_REMOTE_CACHE_REUSE, CacheOptions.Enabled);
+    EnableItem(IDC_REMOTE_CACHE_TRUST, CacheOptions.Enabled);
+  }
   void CacheEntries()
   {
     _reuse.ResetContent();
@@ -553,8 +560,7 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
       _entries.clear(); _reuse.ResetContent(); _reuse.AddString(L"Automatic / new cache");
     }
     _reuse.SetCurSel(0);
-    EnableItem(IDC_REMOTE_CACHE_REUSE, CacheOptions.Enabled);
-    EnableItem(IDC_REMOTE_CACHE_TRUST, CacheOptions.Enabled);
+    UpdateCacheControls();
   }
   virtual bool OnInit() Z7_override
   {
@@ -571,9 +577,11 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
     _format.AddString(L"TAR");
     _format.SetCurSel(0);
     bool reuseUnverified = false;
-    LoadRemoteOpenSettings(SkipHttpETag, reuseUnverified);
+    LoadRemoteOpenSettings(SkipHttpETag, reuseUnverified, ExactHttpReads);
+    CheckButton(IDC_REMOTE_EXACT_READS, ExactHttpReads);
     CheckButton(IDC_REMOTE_SKIP_ETAG, SkipHttpETag);
     CheckButton(IDC_REMOTE_CACHE_TRUST, reuseUnverified);
+    UpdateCacheControls();
     NormalizeSize();
     return CModalDialog::OnInit();
   }
@@ -581,11 +589,13 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
   {
     _url.GetText(Value);
     SkipHttpETag = IsButtonCheckedBool(IDC_REMOTE_SKIP_ETAG);
+    ExactHttpReads = IsButtonCheckedBool(IDC_REMOTE_EXACT_READS);
+    const bool useCache = CacheOptions.Enabled;
     const bool reuseUnverified = IsButtonCheckedBool(IDC_REMOTE_CACHE_TRUST);
-    CacheOptions.AllowUnverified = CacheOptions.Enabled && reuseUnverified;
+    CacheOptions.AllowUnverified = useCache && reuseUnverified;
     CacheOptions.ReuseId.clear();
     const int saved = _reuse.GetCurSel();
-    if (CacheOptions.Enabled && saved > 0 && (size_t)saved <= _entries.size()) CacheOptions.ReuseId = _entries[(size_t)saved - 1].Id;
+    if (useCache && saved > 0 && (size_t)saved <= _entries.size()) CacheOptions.ReuseId = _entries[(size_t)saved - 1].Id;
     if (!CacheOptions.ReuseId.empty() && !CacheOptions.AllowUnverified)
     { MessageBoxW(*this, L"Linking a saved cache requires separate consent to partial version verification.", L"Remote cache", MB_OK | MB_ICONWARNING); return; }
     if (CacheOptions.AllowUnverified && MessageBoxW(*this,
@@ -600,12 +610,17 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
       case 5: ArcFormat = "tar"; break;
       default: ArcFormat.Empty(); break; // Empty uses the engine's format detection.
     }
-    if (!SaveRemoteOpenSettings(SkipHttpETag, reuseUnverified))
+    if (!SaveRemoteOpenSettings(SkipHttpETag, reuseUnverified, ExactHttpReads))
     { MessageBoxW(*this, L"Cannot save Open URL settings.", L"Open URL", MB_OK | MB_ICONWARNING); return; }
     CModalDialog::OnOK();
   }
   bool OnButtonClicked(unsigned id, HWND hwnd) Z7_override
   {
+    if (id == IDC_REMOTE_EXACT_READS)
+    {
+      UpdateCacheControls();
+      return true;
+    }
     if (id == IDC_REMOTE_CACHE_SETTINGS)
     {
       CRemoteCacheDialog dialog;
@@ -621,6 +636,7 @@ public:
   UString Value;
   UString ArcFormat;
   bool SkipHttpETag = false;
+  bool ExactHttpReads = false;
   NWindows::CHttpDiskCacheOptions CacheOptions;
   INT_PTR Create(HWND parent) { return CModalDialog::Create(IDD_REMOTE_OPEN, parent); }
 };
@@ -633,6 +649,7 @@ HRESULT CPanel::ReopenRemoteArchive(const UString &url,
   CDisableNotify disableNotify(*this);
   const UString format = _parentFolders[0].RemoteArcFormat;
   const bool skipETag = _parentFolders[0].SkipHttpETag;
+  const bool exactReads = _parentFolders[0].ExactHttpReads;
   const bool outer = _parentFolders.Size() == 1;
   const bool flat = _flatMode;
   const UString folderPath = outer ? GetFolderPath(_folder) : UString();
@@ -641,7 +658,7 @@ HRESULT CPanel::ReopenRemoteArchive(const UString &url,
   CRemoteCacheRefreshScope handoff(outer ? (IFolderFolder *)_folder
       : (IFolderFolder *)_parentFolders[1].ParentFolder);
   COpenResult openRes;
-  const HRESULT result = OpenRemoteArchive(url, format, openRes, skipETag, &cacheOptions);
+  const HRESULT result = OpenRemoteArchive(url, format, openRes, skipETag, &cacheOptions, exactReads);
   bool restoreSelection = outer;
   if (result == S_OK)
   {
@@ -761,7 +778,7 @@ void CPanel::OpenRemoteArchiveDialog()
     return;
   }
   COpenResult openRes;
-  if (OpenRemoteArchive(dialog.Value, dialog.ArcFormat, openRes, dialog.SkipHttpETag, &dialog.CacheOptions) == S_OK)
+  if (OpenRemoteArchive(dialog.Value, dialog.ArcFormat, openRes, dialog.SkipHttpETag, &dialog.CacheOptions, dialog.ExactHttpReads) == S_OK)
     RefreshListCtrl();
   SetFocusToList();
 }

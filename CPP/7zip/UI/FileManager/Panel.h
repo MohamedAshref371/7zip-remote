@@ -190,6 +190,7 @@ struct CFolderLink: public CTempFileInfo
   UString RemoteUrl; // session-only; never included in display/history paths
   UString RemoteArcFormat;
   bool SkipHttpETag = false;
+  bool ExactHttpReads = false;
   NWindows::CHttpDiskCacheOptions HttpCacheOptions;
   #endif
   CByteBuffer ZoneBuf; // ZoneBuf for virtaul stream (IsVirtual)
@@ -575,7 +576,8 @@ public:
   HRESULT BindToPathAndRefresh(const UString &path);
   #ifdef Z7_HTTP
   HRESULT OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes,
-      bool skipHttpETag = false, const NWindows::CHttpDiskCacheOptions *cacheOptions = NULL);
+      bool skipHttpETag = false, const NWindows::CHttpDiskCacheOptions *cacheOptions = NULL,
+      bool exactHttpReads = false);
   void OpenRemoteArchiveDialog();
   HRESULT ReopenRemoteArchive(const UString &url, const NWindows::CHttpDiskCacheOptions &cacheOptions);
   void RenewRemoteArchiveDialog();

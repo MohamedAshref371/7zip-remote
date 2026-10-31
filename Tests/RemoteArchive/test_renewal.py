@@ -24,6 +24,7 @@ class RenewalHandler(Handler):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--exe', type=Path, required=True)
+    parser.add_argument('--exact-http-reads', action='store_true')
     args = parser.parse_args()
     exe = args.exe.resolve()
     work = Path(tempfile.mkdtemp(prefix='renewal-', dir=ROOT / '.build/msvc/runs'))
@@ -61,6 +62,8 @@ def main():
         new = f'{base}/{destination}/{new_name or name}?sig=new-renew-secret'
         out = work / ('output-' + label)
         command = [str(exe), old, str(out), '--renew-url=' + new, *options]
+        if args.exact_http_reads:
+            command.append('--exact-http-reads')
         if enabled:
             command.append('--cache-dir=' + str(cache))
         if fail:

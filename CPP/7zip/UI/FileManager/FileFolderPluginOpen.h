@@ -16,6 +16,7 @@ public:
   bool Encrypted;
   #ifdef Z7_HTTP
   bool SkipHttpETag = false;
+  bool ExactHttpReads = false;
   NWindows::CHttpDiskCacheOptions HttpCacheOptions;
   #endif
   UString Password;

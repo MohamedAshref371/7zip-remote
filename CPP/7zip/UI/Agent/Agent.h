@@ -250,6 +250,7 @@ public:
   #ifdef Z7_HTTP
   CRemoteArchiveSource RemoteSource;
   bool SkipHttpETag = false;
+  bool ExactHttpReads = false;
   NWindows::CHttpDiskCacheOptions HttpCacheOptions;
   bool IsRemote() const { return RemoteSource.Spec != NULL; }
   #endif
@@ -376,6 +377,7 @@ Z7_CLASS_IMP_COM_1(
   #ifdef Z7_HTTP
   UString RemoteError;
   bool SkipHttpETag = false;
+  bool ExactHttpReads = false;
   NWindows::CHttpDiskCacheOptions HttpCacheOptions;
   #endif
 
@@ -388,6 +390,7 @@ public:
   #ifdef Z7_HTTP
   const UString &GetRemoteError() const { return RemoteError; }
   void SetSkipHttpETag(bool skip) { SkipHttpETag = skip; }
+  void SetExactHttpReads(bool exact) { ExactHttpReads = exact; }
   void SetHttpCacheOptions(const NWindows::CHttpDiskCacheOptions &options) { HttpCacheOptions = options; }
   #endif
 };

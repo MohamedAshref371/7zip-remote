@@ -16,6 +16,7 @@ from test_remote import FixtureServer, ROOT
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--exe', type=Path, required=True)
+    parser.add_argument('--exact-http-reads', action='store_true')
     parser.add_argument('--checker', type=Path, default=ROOT / '.build/remote/cachecheck.exe')
     args = parser.parse_args()
     exe = args.exe.resolve()
@@ -42,6 +43,8 @@ def main():
         cache = work / ('cache-' + name + ('-weak' if mode == 'missing-etag' else ''))
         command = [str(exe), f'{base}/{mode}/{name}?sig=cache-agent-secret', str(out),
                    '--cache-dir=' + str(cache), '--selection-check', *options]
+        if args.exact_http_reads:
+            command.append('--exact-http-reads')
         result = subprocess.run(command, capture_output=True, timeout=30)
         text = (result.stdout + result.stderr).decode('utf-8', errors='replace')
         (work / (label + '.log')).write_text(text, encoding='utf-8')
@@ -62,7 +65,9 @@ def main():
         for name in files:
             first, _ = run(name + '-first', name)
             second, text = run(name + '-reopen', name)
-            assert first['downloaded'] > 700000 and first['hits'] == 0
+            assert first['downloaded'] > 700000
+            if not args.exact_http_reads:
+                assert first['hits'] == 0
             assert second['downloaded'] == 1 and second['hits'] > 0 and 'Cache verified' in text
         for name in files:
             refreshed, text = run(name + '-refresh', name, options=('--cache-refresh-check',))

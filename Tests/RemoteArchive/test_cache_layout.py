@@ -10,7 +10,7 @@ def main():
     parser.add_argument('--local-exe', type=Path)
     args = parser.parse_args()
     for dialog, controls, combos in [
-        (2998, [101, 103, 102, 104, 105, 106, 1, 2], {101, 103, 105}),
+        (2998, [101, 103, 102, 107, 104, 105, 106, 1, 2], {101, 103, 105}),
         (2997, [110, 111, 112, 113, 114, 115, 116, 1, 2], set()),
     ]:
         width, height, items = read_dialog(args.exe, dialog)

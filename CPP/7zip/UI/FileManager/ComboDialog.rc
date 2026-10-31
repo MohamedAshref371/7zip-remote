@@ -17,7 +17,7 @@ CAPTION "Combo"
 
 #ifdef Z7_HTTP
 #define xc 300
-#define yc 228
+#define yc 266
 
 IDD_REMOTE_OPEN DIALOG 0, 0, xs, ys MY_MODAL_DIALOG_STYLE MY_FONT
 CAPTION "Open URL"
@@ -28,11 +28,13 @@ CAPTION "Open URL"
   COMBOBOX IDC_REMOTE_FORMAT, 75, 39, 140, 80, MY_COMBO
   CONTROL "Skip ETag verification", IDC_REMOTE_SKIP_ETAG, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 65, xc, 12
   LTEXT "Enable only if you trust that the archive will not change. Changes during download may cause incorrect data or extraction errors.", -1, m, 82, xc, 25
-  PUSHBUTTON "Cache settings...", IDC_REMOTE_CACHE_SETTINGS, m, 112, 100, 16
-  LTEXT "Saved archive cache (optional link to a different URL):", -1, m, 137, xc, 8
-  COMBOBOX IDC_REMOTE_CACHE_REUSE, m, 149, xc, 100, MY_COMBO
-  CONTROL "Reuse old cache without full version verification", IDC_REMOTE_CACHE_TRUST, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 173, xc, 12
-  LTEXT "Separate consent is required when skipping ETag or linking a new URL. Fresh metadata and samples are checked; matching samples do not prove that the entire archive is unchanged.", -1, m, 190, xc, 25
+  CONTROL "Download only requested data (no read-ahead)", IDC_REMOTE_EXACT_READS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 111, xc, 12
+  LTEXT "May be slower due to more requests. Disk cache saves only downloaded parts. Archive metadata and required solid data are still downloaded.", -1, m, 127, xc, 22
+  PUSHBUTTON "Cache settings...", IDC_REMOTE_CACHE_SETTINGS, m, 153, 100, 16
+  LTEXT "Saved archive cache (optional link to a different URL):", -1, m, 178, xc, 8
+  COMBOBOX IDC_REMOTE_CACHE_REUSE, m, 190, xc, 100, MY_COMBO
+  CONTROL "Reuse old cache without full version verification", IDC_REMOTE_CACHE_TRUST, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 214, xc, 12
+  LTEXT "Separate consent is required when skipping ETag or linking a new URL. Fresh metadata and samples are checked; matching samples do not prove that the entire archive is unchanged.", -1, m, 231, xc, 25
   OK_CANCEL
 }
 

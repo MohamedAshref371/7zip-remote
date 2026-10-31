@@ -298,12 +298,74 @@ static int CheckNetworkSync()
   return 0;
 }
 
+static int CheckExactStream(const wchar_t *url, const wchar_t *cachePath, bool disk, bool slice = false)
+{
+  CHttpInStream stream;
+  NWindows::CHttpRangeOptions options;
+  options.ExactReads = true;
+  options.DiskCache.Enabled = disk;
+  options.DiskCache.Directory = cachePath;
+  CHECK_HR(stream.Open(url, options));
+  CHECK(stream.DiskCache.Enabled() == disk);
+  CHECK(stream.Source.Downloaded == 1);
+  std::vector<Byte> data(300000);
+  UInt32 done;
+  auto read = [&](UInt64 offset, UInt32 count, UInt32 expected) -> int
+  {
+    CHECK_HR(static_cast<IInStream *>(&stream)->Seek(offset, STREAM_SEEK_SET, NULL));
+    CHECK_HR(static_cast<IInStream *>(&stream)->Read(data.data(), count, &done));
+    CHECK(done == expected);
+    for (UInt32 i = 0; i < done; ++i) CHECK(data[i] == (Byte)(offset + i));
+    return 0;
+  };
+  if (slice)
+  {
+    CHECK(read(101, 1, 1) == 0);
+    CHECK(read(99, 7, 1) == 0);
+    CHECK(read(100, 6, 1) == 0);
+    CHECK(read(101, 5, 1) == 0);
+    CHECK(read(102, 4, 1) == 0);
+    CHECK(read(103, 3, 3) == 0);
+    CHECK(stream.Source.Downloaded == 1 && stream.DiskCacheHits == 5);
+    UInt64 estimate;
+    CHECK(stream.EstimateMissingBytes({{97, 10}, {97, 10}}, estimate) && estimate == 2);
+    printf("EXACT_DISK_SLICE_OK\n");
+    return 0;
+  }
+  CHECK(read(100, 3, 3) == 0);
+  const UInt64 firstBytes = stream.Source.Downloaded;
+  if (!disk) CHECK(firstBytes == 4);
+  CHECK(read(101, 1, 1) == 0); // Interior cache hit must use the right offset.
+  CHECK(stream.Source.Downloaded == firstBytes);
+  CHECK(read(98, 8, 2) == 0); // Stop at a cached interval, don't download it again.
+  CHECK(read(100, 6, 3) == 0);
+  CHECK(read(103, 3, 3) == 0);
+  if (!disk) CHECK(stream.Source.Downloaded == 9);
+  UInt64 estimate;
+  CHECK(stream.EstimateMissingBytes({{97, 10}, {97, 10}, {100, 2}}, estimate) && estimate == 2);
+  CHECK(read(262143, 3, 3) == 0); // Cross the old fixed block boundary.
+  CHECK(read(500000, 300000, 262144) == 0); // Upper cap, never a lower bound.
+  CHECK(read(stream.Source.Size - 2, 10, 2) == 0);
+  CHECK(read(stream.Source.Size, 1, 0) == 0);
+  CHECK(read(0, 0, 0) == 0);
+  if (!disk) CHECK(stream.Source.Downloaded == 262158);
+  printf("EXACT_DISK %llu %llu\n", stream.Source.Downloaded, stream.DiskCacheHits);
+  printf("EXACT_STREAM_OK\n");
+  return 0;
+}
+
 int __cdecl wmain(int argc, wchar_t **argv)
 {
   if (argc < 3) return 2;
   g_hInstance = GetModuleHandleW(NULL);
   My_SetDefaultDllDirectories();
   CHECK(CheckNetworkSync() == 0);
+  if (argc > 3 && wcscmp(argv[3], L"--exact-stream-check") == 0)
+    return CheckExactStream(argv[1], argv[2], false);
+  if (argc > 3 && wcscmp(argv[3], L"--exact-disk-stream-check") == 0)
+    return CheckExactStream(argv[1], argv[2], true);
+  if (argc > 3 && wcscmp(argv[3], L"--exact-disk-slice-check") == 0)
+    return CheckExactStream(argv[1], argv[2], true, true);
   const bool remote = IsHttpArchiveUrl(UString(argv[1]));
   CArchiveFolderManager *manager = new CArchiveFolderManager;
   CMyComPtr<IFolderManager> managerRef = manager;
@@ -348,6 +410,7 @@ int __cdecl wmain(int argc, wchar_t **argv)
       return 0;
     }
     if (wcscmp(argv[i], L"--skip-http-etag") == 0) manager->SetSkipHttpETag(true);
+    if (wcscmp(argv[i], L"--exact-http-reads") == 0) manager->SetExactHttpReads(true);
     if (wcsncmp(argv[i], L"--format=", 9) == 0) arcFormat = argv[i] + 9;
     if (wcscmp(argv[i], L"--rar-family-check") == 0) rarFamilyCheck = true;
     if (wcscmp(argv[i], L"--estimate-archive-check") == 0) estimateArchiveCheck = true;

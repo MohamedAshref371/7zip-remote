@@ -14,6 +14,7 @@ bool CHttpInStream::EstimateMissingBytes(std::vector<CHttpReadRange> ranges, UIn
   {
     if (range.Start > Source.Size || range.Size > Source.Size - range.Start) return false;
     if (!range.Size) continue;
+    if (_exactReads) continue;
     const UInt64 end = range.Start + range.Size;
     const UInt64 roundedEnd = (std::min)(Source.Size,
         ((end - 1) / kBlockSize + 1) * kBlockSize);
@@ -34,6 +35,28 @@ bool CHttpInStream::EstimateMissingBytes(std::vector<CHttpReadRange> ranges, UIn
     }
     else merged.push_back(range);
   }
+  if (_exactReads)
+  {
+    for (const auto &range : merged)
+    {
+      bytes += range.Size;
+      std::vector<CHttpReadRange> cached;
+      for (const auto &part : DiskCache.Blocks()) cached.push_back({part.first, part.second});
+      for (const auto &block : _cache)
+        cached.push_back({block.Start, block.Data.size()});
+      std::sort(cached.begin(), cached.end(), [](const CHttpReadRange &a, const CHttpReadRange &b)
+          { return a.Start < b.Start; });
+      UInt64 coveredEnd = range.Start;
+      for (const auto &block : cached)
+      {
+        const UInt64 start = (std::max)(coveredEnd, block.Start);
+        const UInt64 end = (std::min)(range.Start + range.Size, block.Start + block.Size);
+        if (end > start) bytes -= end - start;
+        coveredEnd = (std::max)(coveredEnd, end);
+      }
+    }
+    return true;
+  }
   for (const auto &range : merged)
   {
     bytes += range.Size;
@@ -49,12 +72,13 @@ bool CHttpInStream::EstimateMissingBytes(std::vector<CHttpReadRange> ranges, UIn
 
 HRESULT CHttpInStream::Open(const wchar_t *url, const NWindows::CHttpRangeOptions &options)
 {
+  _exactReads = options.ExactReads;
   try
   {
     _failure = Source.Open(url, options);
     if (_failure == S_OK)
     {
-      try { _failure = DiskCache.Open(options.DiskCache, url, Source); }
+      try { _failure = DiskCache.Open(options.DiskCache, url, Source, _exactReads); }
       catch (...) { DiskCache.Close(); DiskCache.Status = L"Cache unavailable (memory only)"; }
     }
   }
@@ -110,21 +134,33 @@ Z7_COM7F_IMF(CHttpInStream::Read(void *data, UInt32 size, UInt32 *processed))
   if (_pos >= Source.Size) return S_OK;
   try
   {
-    const UInt64 start = _pos / kBlockSize * kBlockSize;
+    const UInt64 start = _exactReads ? _pos : _pos / kBlockSize * kBlockSize;
     auto block = _cache.begin();
-    for (; block != _cache.end() && block->Start != start; ++block) {}
+    for (; block != _cache.end(); ++block)
+      if (_exactReads ? (_pos >= block->Start && _pos - block->Start < block->Data.size())
+          : block->Start == start) break;
     if (block == _cache.end())
     {
       CBlock fetched;
       fetched.Start = start;
-      const unsigned length = static_cast<unsigned>((std::min)(
+      unsigned length = static_cast<unsigned>((std::min)(
           Source.Size - start, static_cast<UInt64>(kBlockSize)));
+      if (_exactReads)
+      {
+        length = (std::min)(length, size);
+        // Stop before an existing entry: never refetch bytes still in memory.
+        for (const auto &cached : _cache)
+          if (cached.Start > start && cached.Start - start < length)
+            length = static_cast<unsigned>(cached.Start - start);
+      }
       bool diskHit = false;
-      try { diskHit = DiskCache.Read(start, length, fetched.Data); }
+      try { diskHit = _exactReads ? DiskCache.ReadRange(start, length, fetched.Data)
+          : DiskCache.Read(start, length, fetched.Data); }
       catch (...) { DiskCache.Close(); DiskCache.Status = L"Cache read failed (memory only)"; }
       if (diskHit) ++DiskCacheHits;
       else
       {
+        if (_exactReads) length = DiskCache.MissingPrefix(start, length);
         _failure = Source.Fetch(start, length, fetched.Data);
         if (_failure == S_OK && !DiskCache.MatchesEndpoint(Source.FinalUrl()))
         {
@@ -152,7 +188,7 @@ Z7_COM7F_IMF(CHttpInStream::Read(void *data, UInt32 size, UInt32 *processed))
       _cache.splice(_cache.begin(), _cache, block);
     }
     const CBlock &current = _cache.front();
-    const size_t offset = static_cast<size_t>(_pos - start);
+    const size_t offset = static_cast<size_t>(_pos - current.Start);
     const UInt32 count = static_cast<UInt32>((std::min)(
         static_cast<size_t>(size), current.Data.size() - offset));
     memcpy(data, current.Data.data() + offset, count);

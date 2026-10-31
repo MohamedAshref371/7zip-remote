@@ -16,6 +16,16 @@ design, evidence, and remaining work.
 
 - **File Manager:** File → Open URL..., archive browsing, selected extraction,
   password handling, and fresh-session Refresh.
+- **Download only requested data:** optional Open URL checkbox removes the
+  256 KiB minimum fetch. Small reads request only the bytes asked for by the
+  archive engine; larger reads may be split. Optional disk caching saves these
+  exact parts and reuses them on subsequent opens, without padding or fetching
+  extra bytes to complete a block. More requests can reduce speed. Archive
+  metadata, engine buffering and solid-compression dependencies still require
+  data beyond the selected file. The choice is remembered and retained on
+  Refresh and URL renewal; unchecked preserves the existing block-cache mode.
+  The two modes use separate cache generations. Cache reuse keeps the existing
+  ETag/explicit-consent rules and integrity checks.
 - **Renew expired links:** File ? Renew archive URL... opens a replacement link,
   retaining the current folder and selection where possible. Linking previous
   cached parts requires separate consent to partial verification. Failed renewal
