@@ -1472,6 +1472,15 @@ void CAgentFolder::GetRealIndices(
 }
 
 #ifdef Z7_HTTP
+Z7_COM7F_IMF(CAgentFolder::GetRemoteHttpStatus(UInt32 *status))
+{
+  if (!status) return E_POINTER;
+  *status = 0;
+  if (!_agentSpec->IsRemote()) return S_FALSE;
+  *status = _agentSpec->RemoteSource.Spec->Source.Status;
+  return S_OK;
+}
+
 Z7_COM7F_IMF(CAgentFolder::SetCacheSuspended(UInt32 suspended))
 {
   if (!_agentSpec->IsRemote()) return S_FALSE;

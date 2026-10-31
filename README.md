@@ -16,6 +16,10 @@ design, evidence, and remaining work.
 
 - **File Manager:** File → Open URL..., archive browsing, selected extraction,
   password handling, and fresh-session Refresh.
+- **Renew expired links:** File ? Renew archive URL... opens a replacement link,
+  retaining the current folder and selection where possible. Linking previous
+  cached parts requires separate consent to partial verification. Failed renewal
+  preserves the previous view; interrupted extraction is restarted manually.
 - **Archive type selection:** Auto, ZIP, 7z, RAR, or ISO. The single RAR choice detects
   the appropriate RAR/RAR5 handler internally. Refresh retains the selected type.
 - **Console:** direct URLs for `l`, `x`, `e`, and `t`.
@@ -102,6 +106,25 @@ previous view. Refresh temporarily hands off the disk-cache lock so the new
 session can reuse saved parts immediately, subject to the same verification policy. URLs are kept in the session; displayed/history paths use a
 sanitized archive name.
 
+### Renew a download link
+
+With a remote archive open, choose **File ? Renew archive URL...** and paste a
+new direct URL. The command also becomes an offered action after HTTP 403/404/410
+errors during extraction/testing, or after a failed Refresh. Prompts wait until
+the current operation and its error dialogs finish.
+
+For a changed URL, choose whether to link the previous cache: **Yes** runs fresh
+metadata/sample checks before reusing parts; **No** opens without linking that
+cache; **Cancel** leaves the current session alone. Samples cannot prove full
+content equality, even when both servers return the same ETag. The existing
+ETag verification setting remains in effect. No URL history is saved.
+
+The previous folder, flat view and selected names are restored when available.
+Renewing from a nested archive returns to the outer archive. If renewal fails,
+the previous view survives; an expired old link may still prevent further reads.
+Run Extract/Test again after successful renewal. Existing overwrite prompts
+still apply; decompression does not resume from the point where it stopped.
+
 ### Disk cache
 
 Open **Cache settings...** to enable it and choose storage. Leave ETag verification
@@ -162,6 +185,7 @@ python Tests/RemoteArchive/test_retry.py --exe "$PWD/.build/msvc/disk-cache/7z.e
 python Tests/RemoteArchive/build.py --cache-check
 python Tests/RemoteArchive/test_disk_cache.py
 python Tests/RemoteArchive/test_disk_cache_agent.py --exe "$PWD/.build/msvc/disk-cache/agentcheck.exe"
+python Tests/RemoteArchive/test_renewal.py --exe "$PWD/.build/msvc/disk-cache/agentcheck.exe"
 
 # Supply your own local RAR-generation fixtures:
 python Tests/RemoteArchive/test_rar_family.py --rar4 'path/to/legacy.rar' --rar5 'path/to/modern.rar'

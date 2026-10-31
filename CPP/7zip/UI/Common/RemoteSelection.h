@@ -35,10 +35,11 @@ struct Z7_DECLSPEC_NOVTABLE IRemoteSelection: public IUnknown
 Z7_PURE_INTERFACES_END
 
 static const GUID IID_IRemoteCacheStatus =
-    { 0x6ac90d38, 0x5de2, 0x4c92, { 0x8d, 0xc5, 0x0d, 0xc1, 0x18, 0x98, 0x14, 0x28 } };
+    { 0x6ac90d38, 0x5de2, 0x4c92, { 0x8d, 0xc5, 0x0d, 0xc1, 0x18, 0x98, 0x14, 0x29 } };
 #define Z7_IFACEM_IRemoteCacheStatus(x) \
   x(GetCacheStatus(BSTR *status, BSTR *entryId)) \
-  x(SetCacheSuspended(UInt32 suspended))
+  x(SetCacheSuspended(UInt32 suspended)) \
+  x(GetRemoteHttpStatus(UInt32 *status))
 Z7_PURE_INTERFACES_BEGIN
 struct Z7_DECLSPEC_NOVTABLE IRemoteCacheStatus: public IUnknown
 {
@@ -56,7 +57,8 @@ public:
     if (folder && folder->QueryInterface(IID_IRemoteCacheStatus, (void **)&_cache) == S_OK)
       _cache->SetCacheSuspended(1);
   }
-  ~CRemoteCacheRefreshScope() { if (_cache) _cache->SetCacheSuspended(0); }
+  ~CRemoteCacheRefreshScope() { Restore(); }
+  void Restore() { if (_cache) { _cache->SetCacheSuspended(0); _cache.Release(); } }
   void Commit() { _cache.Release(); }
 private:
   CRemoteCacheRefreshScope(const CRemoteCacheRefreshScope &) = delete;

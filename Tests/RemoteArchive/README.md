@@ -325,3 +325,17 @@ The internal `streamcheck raw URL` command expects byte N to equal N modulo
   stream code are **26.05**. This is not a full build/test of the 26.05 engine.
 
 See [the initial prototype results](../../Notes/06-prototype-results.md).
+
+## URL renewal
+
+```powershell
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/renew-url
+python Tests/RemoteArchive/test_renewal.py --exe .build/msvc/renew-url/agentcheck.exe
+```
+
+The renewal suite uses local ZIP, 7z and encrypted 7z fixtures. It checks expired
+403/404/410 responses, explicit cache-link consent, changed-content isolation,
+no-cache operation, ETag bypass, canceled/failed replacement opens and retained
+browsing after both links fail. Successful extraction is compared byte-for-byte
+with the intended source. It exercises Agent/backend policy; desktop menu,
+selection restoration and modal prompt timing still require interactive testing.

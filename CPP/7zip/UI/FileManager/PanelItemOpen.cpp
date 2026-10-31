@@ -31,6 +31,7 @@
 #include "RegistryUtils.h"
 #ifdef Z7_HTTP
 #include "RemoteCacheDialog.h"
+#include "../Common/RemoteRenewal.h"
 #endif
 #include "UpdateCallback100.h"
 
@@ -621,6 +622,132 @@ public:
   NWindows::CHttpDiskCacheOptions CacheOptions;
   INT_PTR Create(HWND parent) { return CModalDialog::Create(IDD_REMOTE_OPEN, parent); }
 };
+
+HRESULT CPanel::ReopenRemoteArchive(const UString &url,
+    const NWindows::CHttpDiskCacheOptions &cacheOptions)
+{
+  if (_parentFolders.IsEmpty() || _parentFolders[0].RemoteUrl.IsEmpty()) return E_UNEXPECTED;
+  CDisableTimerProcessing disableTimerProcessing(*this);
+  CDisableNotify disableNotify(*this);
+  const UString format = _parentFolders[0].RemoteArcFormat;
+  const bool skipETag = _parentFolders[0].SkipHttpETag;
+  const bool outer = _parentFolders.Size() == 1;
+  const bool flat = _flatMode;
+  const UString folderPath = outer ? GetFolderPath(_folder) : UString();
+  CSelectedState selected;
+  SaveSelectedState(selected);
+  CRemoteCacheRefreshScope handoff(outer ? (IFolderFolder *)_folder
+      : (IFolderFolder *)_parentFolders[1].ParentFolder);
+  COpenResult openRes;
+  const HRESULT result = OpenRemoteArchive(url, format, openRes, skipETag, &cacheOptions);
+  bool restoreSelection = outer;
+  if (result == S_OK)
+  {
+    handoff.Commit();
+    if (outer)
+    {
+      _flatMode = flat;
+      if (!folderPath.IsEmpty())
+      {
+        CMyComPtr<IFolderFolder> folder;
+        if (_folder->BindToFolder(folderPath, &folder) == S_OK && folder)
+          SetNewFolder(folder);
+        else restoreSelection = false;
+      }
+    }
+  }
+  else
+  {
+    handoff.Restore();
+    restoreSelection = true; // The previous view, including nested archives, survives.
+  }
+  if (restoreSelection) RefreshListCtrl(selected);
+  else RefreshListCtrl();
+  return result;
+}
+
+void CPanel::RenewRemoteArchiveDialog()
+{
+  if (_remoteRenewDialogActive || _parentFolders.IsEmpty() || _parentFolders[0].RemoteUrl.IsEmpty()) return;
+  struct CDialogGuard
+  {
+    bool &Active;
+    explicit CDialogGuard(bool &active): Active(active) { Active = true; }
+    ~CDialogGuard() { Active = false; }
+  } guard(_remoteRenewDialogActive);
+  CDisableTimerProcessing disableTimerProcessing(*this);
+  const UString oldUrl = _parentFolders[0].RemoteUrl;
+  const NWindows::CHttpDiskCacheOptions previous = _parentFolders[0].HttpCacheOptions;
+  CComboDialog dialog;
+  dialog.Title = L"Renew archive URL";
+  dialog.Static = L"New direct HTTP or HTTPS archive URL:";
+  // Never store signed URLs in combo history or prefill the old access token.
+  for (;;)
+  {
+    if (dialog.Create(GetParent()) != IDOK) { SetFocusToList(); return; }
+    dialog.Value.Trim();
+    if (IsHttpArchiveUrl(dialog.Value)) break;
+    MessageBox_Error(L"Enter a direct HTTP or HTTPS archive URL.");
+  }
+  NWindows::CHttpDiskCacheOptions options = previous;
+  if (dialog.Value != oldUrl)
+  {
+    CMyComPtr<IRemoteCacheStatus> cache;
+    CMyComBSTR status, id;
+    IFolderFolder *outer = _parentFolders.Size() > 1
+        ? (IFolderFolder *)_parentFolders[1].ParentFolder : (IFolderFolder *)_folder;
+    std::wstring entryId;
+    if (outer && outer->QueryInterface(IID_IRemoteCacheStatus, (void **)&cache) == S_OK
+        && cache->GetCacheStatus(&status, &id) == S_OK && id) entryId = (const wchar_t *)id;
+    bool consent = false;
+    if (previous.Enabled && !entryId.empty())
+    {
+      const int answer = MessageBoxW(GetParent(),
+          L"Link the previous cache to this new URL?\n\n"
+          L"Yes: reuse saved parts after checking metadata and samples. These checks cannot prove the entire archive is unchanged; incorrect output is possible.\n\n"
+          L"No: open without linking the previous cache.\n"
+          L"Cancel: keep the current session.",
+          L"Renew archive URL", MB_YESNOCANCEL | MB_ICONWARNING | MB_DEFBUTTON2);
+      if (answer == IDCANCEL) { SetFocusToList(); return; }
+      consent = answer == IDYES;
+    }
+    options = RemoteRenewalCacheOptions(previous, entryId, consent);
+  }
+  ReopenRemoteArchive(dialog.Value, options);
+  SetFocusToList();
+}
+
+void CPanel::QueueRemoteUrlRenewal(bool refreshFailed)
+{
+  if (_remoteRenewDialogActive || _parentFolders.IsEmpty() || _parentFolders[0].RemoteUrl.IsEmpty()) return;
+  _remoteRenewUrl = _parentFolders[0].RemoteUrl;
+  _remoteRenewPath = _currentFolderPrefix;
+  SaveSelectedState(_remoteRenewSelection);
+  _remoteRenewRefreshFailed = refreshFailed;
+  _remoteRenewPending = true;
+}
+
+void CPanel::OfferRemoteUrlRenewal(bool refreshFailed)
+{
+  if (_remoteRenewDialogActive || _parentFolders.IsEmpty() || _parentFolders[0].RemoteUrl.IsEmpty()) return;
+  if (!refreshFailed)
+  {
+    CMyComPtr<IRemoteCacheStatus> source;
+    IFolderFolder *outer = _parentFolders.Size() > 1
+        ? (IFolderFolder *)_parentFolders[1].ParentFolder : (IFolderFolder *)_folder;
+    UInt32 status = 0;
+    if (!outer || outer->QueryInterface(IID_IRemoteCacheStatus, (void **)&source) != S_OK
+        || source->GetRemoteHttpStatus(&status) != S_OK || !IsRenewableHttpStatus(status)) return;
+  }
+  if (MessageBoxW(GetParent(),
+      L"The remote archive could not be accessed. Enter a new direct download URL?\n\n"
+      L"After renewing the link, run Extract or Test again. Interrupted extraction will not restart automatically.",
+      L"Renew archive URL", MB_YESNO | MB_ICONQUESTION) == IDYES)
+  {
+    RefreshListCtrl(_remoteRenewSelection);
+    RenewRemoteArchiveDialog();
+  }
+}
 
 void CPanel::OpenRemoteArchiveDialog()
 {

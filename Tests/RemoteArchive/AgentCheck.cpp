@@ -4,6 +4,7 @@
 #include <thread>
 #include "../../CPP/7zip/UI/Agent/Agent.h"
 #include "../../CPP/Common/StringConvert.h"
+#include "../../CPP/7zip/UI/Common/RemoteRenewal.h"
 #include "../../C/DllSecur.h"
 #include "../../CPP/7zip/UI/FileManager/OpenCallback.h"
 #include "../../CPP/7zip/UI/FileManager/ExtractCallback.h"
@@ -311,6 +312,8 @@ int __cdecl wmain(int argc, wchar_t **argv)
   bool estimateArchiveCheck = false;
   bool selectionCheck = false;
   bool cacheRefreshCheck = false;
+  const wchar_t *renewUrl = NULL;
+  bool renewConsent = false, renewFails = false, renewReuse = false, expireCheck = false, renewCancel = false;
   bool selectionAds = false;
   NWindows::CHttpDiskCacheOptions cacheOptions;
   const wchar_t *skipItem = NULL;
@@ -321,6 +324,12 @@ int __cdecl wmain(int argc, wchar_t **argv)
     if (wcsncmp(argv[i], L"--cache-dir=", 12) == 0) { cacheOptions.Enabled = true; cacheOptions.Directory = argv[i] + 12; }
     if (wcsncmp(argv[i], L"--cache-limit=", 14) == 0) cacheOptions.MaxBytes = _wcstoui64(argv[i] + 14, NULL, 10);
     if (wcsncmp(argv[i], L"--cache-reuse=", 14) == 0) cacheOptions.ReuseId = argv[i] + 14;
+    if (wcsncmp(argv[i], L"--renew-url=", 12) == 0) renewUrl = argv[i] + 12;
+    if (wcscmp(argv[i], L"--renew-consent") == 0) renewConsent = true;
+    if (wcscmp(argv[i], L"--renew-cancel") == 0) renewCancel = true;
+    if (wcscmp(argv[i], L"--renew-fails") == 0) renewFails = true;
+    if (wcscmp(argv[i], L"--renew-reuse") == 0) renewReuse = true;
+    if (wcscmp(argv[i], L"--expire-check") == 0) expireCheck = true;
     if (wcscmp(argv[i], L"--cache-refresh-check") == 0) cacheRefreshCheck = true;
     if (wcscmp(argv[i], L"--cache-trust") == 0) cacheOptions.AllowUnverified = true;
     if (wcscmp(argv[i], L"--transport-retry-check") == 0)
@@ -372,6 +381,72 @@ int __cdecl wmain(int argc, wchar_t **argv)
     callback->PrintNetwork("open");
   } // Destroy the open callback before subsequent reads: no retained raw pointer.
   CHECK_HR(folder->LoadItems());
+  if (renewUrl)
+  {
+    CMyComPtr<IRemoteCacheStatus> oldCache;
+    CHECK_HR(folder.QueryInterface(IID_IRemoteCacheStatus, &oldCache));
+    CMyComBSTR oldStatus, oldId;
+    CHECK_HR(oldCache->GetCacheStatus(&oldStatus, &oldId));
+    if (expireCheck)
+    {
+      auto *spec = static_cast<CAgentFolder *>((IFolderFolder *)folder)->_agentSpec->RemoteSource.Spec;
+      std::vector<unsigned char> bytes;
+      CHECK(spec->Source.Fetch(12345, 1, bytes) != S_OK);
+      UInt32 status = 0;
+      CHECK_HR(oldCache->GetRemoteHttpStatus(&status));
+      CHECK(IsRenewableHttpStatus(status));
+      printf("EXPIRED %u\n", status);
+    }
+    const auto renewed = RemoteRenewalCacheOptions(cacheOptions,
+        oldId ? std::wstring((const wchar_t *)oldId) : std::wstring(), renewConsent);
+    CHECK(renewed.AllowUnverified == (cacheOptions.Enabled && renewConsent && oldId && *oldId));
+    CRemoteCacheRefreshScope handoff(folder);
+    manager->SetHttpCacheOptions(renewed);
+    CMyComPtr<IFolderFolder> replacement;
+    CTestCallback *callback = new CTestCallback;
+    CMyComPtr<IProgress> progress = callback;
+    callback->Cancel = renewCancel;
+    const HRESULT result = managerRef->OpenFolderFile(NULL, renewUrl, arcFormat, &replacement, progress);
+    if (renewFails)
+    {
+      CHECK(result != S_OK);
+      replacement.Release();
+      handoff.Restore();
+      CMyComBSTR restoredStatus, restoredId;
+      CHECK_HR(oldCache->GetCacheStatus(&restoredStatus, &restoredId));
+      CHECK(wcscmp(oldStatus, restoredStatus) == 0 && wcscmp(oldId, restoredId) == 0);
+      manager->SetHttpCacheOptions(cacheOptions);
+      printf("RENEW_ROLLBACK_OK\n");
+    }
+    else
+    {
+      CHECK_HR(result);
+      CMyComPtr<IRemoteCacheStatus> current;
+      CHECK_HR(replacement.QueryInterface(IID_IRemoteCacheStatus, &current));
+      CMyComBSTR status, id;
+      CHECK_HR(current->GetCacheStatus(&status, &id));
+      if (cacheOptions.Enabled)
+      {
+        CHECK(id && *id);
+        CHECK((wcscmp(oldId, id) == 0) == renewReuse);
+      }
+      folder = replacement;
+      handoff.Commit();
+      printf("RENEW_OK %u\n", renewReuse ? 1u : 0u);
+    }
+    CHECK_HR(folder->LoadItems());
+    if (renewFails && expireCheck)
+    {
+      CMyComPtr<IFolderFolder> savedDocs;
+      CHECK_HR(folder->BindToFolder(L"docs", &savedDocs));
+      CHECK_HR(savedDocs->LoadItems());
+      UInt32 count = 0;
+      CHECK_HR(savedDocs->GetNumberOfItems(&count));
+      CHECK(count > 0);
+      printf("RENEW_EXPIRED_VIEW_PRESERVED\n");
+      return 0; // An expired original URL cannot be made downloadable by rollback.
+    }
+  }
   if (cacheRefreshCheck)
   {
     for (unsigned iteration = 0; iteration < 3; ++iteration)

@@ -31,6 +31,8 @@ These are engineering choices for the study, not settings currently available in
 
 ## Study Files
 
+Latest follow-up: [Renew archive URLs](22-url-renewal.md).
+
 Latest follow-up: [Optional persistent disk cache](21-persistent-cache.md).
 
 Latest follow-up: [Selection download preview](20-selection-preview.md).

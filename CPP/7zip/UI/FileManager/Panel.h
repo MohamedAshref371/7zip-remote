@@ -577,6 +577,15 @@ public:
   HRESULT OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes,
       bool skipHttpETag = false, const NWindows::CHttpDiskCacheOptions *cacheOptions = NULL);
   void OpenRemoteArchiveDialog();
+  HRESULT ReopenRemoteArchive(const UString &url, const NWindows::CHttpDiskCacheOptions &cacheOptions);
+  void RenewRemoteArchiveDialog();
+  void OfferRemoteUrlRenewal(bool refreshFailed);
+  void QueueRemoteUrlRenewal(bool refreshFailed);
+  bool _remoteRenewPending = false;
+  bool _remoteRenewRefreshFailed = false;
+  UString _remoteRenewUrl, _remoteRenewPath;
+  CSelectedState _remoteRenewSelection;
+  bool _remoteRenewDialogActive = false;
   #endif
   void OpenDrivesFolder();
   

@@ -954,6 +954,9 @@ void CPanel::CreateFileMenu(HMENU menuSpec,
   fm.readOnly = IsThereReadOnlyFolder();
   fm.isHashFolder = IsHashFolder();
   fm.isFsFolder = Is_IO_FS_Folder();
+  #ifdef Z7_HTTP
+  fm.isRemote = !_parentFolders.IsEmpty() && !_parentFolders[0].RemoteUrl.IsEmpty();
+  #endif
   fm.programMenu = programMenu;
   fm.allAreFiles = (firstDirIndex == -1);
   fm.numItems = operatedIndices.Size();

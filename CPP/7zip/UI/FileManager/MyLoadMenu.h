@@ -16,6 +16,7 @@ struct CFileMenu
   bool readOnly;
   bool isHashFolder;
   bool isFsFolder;
+  bool isRemote;
   bool allAreFiles;
   bool isAltStreamsSupported;
   unsigned numItems;
@@ -27,6 +28,7 @@ struct CFileMenu
       readOnly(false),
       isHashFolder(false),
       isFsFolder(false),
+      isRemote(false),
       allAreFiles(false),
       isAltStreamsSupported(true),
       numItems(0)

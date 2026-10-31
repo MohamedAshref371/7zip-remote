@@ -37,6 +37,7 @@ BEGIN
     MENUITEM "&Open\tEnter",                IDM_OPEN
     #ifdef Z7_HTTP
     MENUITEM "Open &URL...",                IDM_OPEN_URL
+    MENUITEM "Renew archive URL...",        IDM_RENEW_URL
     #endif
     MENUITEM "Open &Inside\tCtrl+PgDn",     IDM_OPEN_INSIDE
     MENUITEM "Open Inside *",               IDM_OPEN_INSIDE_ONE

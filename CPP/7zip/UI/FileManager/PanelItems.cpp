@@ -1457,25 +1457,9 @@ void CPanel::OnReload(bool onTimer)
   if (!onTimer && !_parentFolders.IsEmpty() && !_parentFolders[0].RemoteUrl.IsEmpty())
   {
     const UString url = _parentFolders[0].RemoteUrl;
-    const UString arcFormat = _parentFolders[0].RemoteArcFormat;
-    const bool skipHttpETag = _parentFolders[0].SkipHttpETag;
     const NWindows::CHttpDiskCacheOptions cacheOptions = _parentFolders[0].HttpCacheOptions;
-    const UString folderPath = _parentFolders.Size() == 1 ? GetFolderPath(_folder) : UString();
-    // Nested archives still borrow the outer remote stream/cache.
-    CRemoteCacheRefreshScope cacheRefresh(_parentFolders.Size() > 1
-        ? (IFolderFolder *)_parentFolders[1].ParentFolder : (IFolderFolder *)_folder);
-    COpenResult openRes;
-    if (OpenRemoteArchive(url, arcFormat, openRes, skipHttpETag, &cacheOptions) == S_OK)
-    {
-      cacheRefresh.Commit();
-      if (!folderPath.IsEmpty())
-      {
-        CMyComPtr<IFolderFolder> folder;
-        if (_folder->BindToFolder(folderPath, &folder) == S_OK && folder)
-          SetNewFolder(folder);
-      }
-    }
-    RefreshListCtrl();
+    const HRESULT result = ReopenRemoteArchive(url, cacheOptions);
+    if (result != S_OK && result != E_ABORT) QueueRemoteUrlRenewal(true);
     return;
   }
   #endif
@@ -1488,6 +1472,19 @@ void CPanel::OnTimer()
 {
   if (!_processTimer)
     return;
+  #ifdef Z7_HTTP
+  // Operation error dialogs pump messages too. Wait until their callers have
+  // restored timer/notification processing and the main window is enabled.
+  if (_remoteRenewPending && _processNotify && !_remoteRenewDialogActive
+      && ::IsWindowEnabled(GetParent()))
+  {
+    _remoteRenewPending = false;
+    if (!_parentFolders.IsEmpty() && _parentFolders[0].RemoteUrl == _remoteRenewUrl
+        && _currentFolderPrefix == _remoteRenewPath)
+      OfferRemoteUrlRenewal(_remoteRenewRefreshFailed);
+    return;
+  }
+  #endif
   if (!AutoRefresh_Mode)
     return;
   if (!_folder) // it's unexpected case, but we use it as additional protection.

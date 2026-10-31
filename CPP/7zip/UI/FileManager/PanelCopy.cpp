@@ -346,6 +346,12 @@ HRESULT CPanel::CopyTo(CCopyToOptions &options,
   }
   
   RefreshTitleAlways();
+  #ifdef Z7_HTTP
+  // Defer renewal until CopyTo's callers have finished restoring their state.
+  // Never replace a folder while extraction callbacks still hold its indices.
+  if (!filePaths && res != E_ABORT)
+    QueueRemoteUrlRenewal(false);
+  #endif
   return res;
 }
 

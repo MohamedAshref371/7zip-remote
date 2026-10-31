@@ -632,6 +632,9 @@ void CFileMenu::Load(HMENU hMenu, unsigned startPos)
 
       bool isOneFsFile = (isFsFolder && numItems == 1 && allAreFiles);
       bool disable = (!isOneFsFile && (item.wID == IDM_SPLIT || item.wID == IDM_COMBINE));
+      #ifdef Z7_HTTP
+      if (item.wID == IDM_RENEW_URL) disable = !isRemote;
+      #endif
 
       if (readOnly)
       {
@@ -749,6 +752,7 @@ bool ExecuteFileCommand(unsigned id)
     case IDM_OPEN: g_App.OpenItem(); break;
     #ifdef Z7_HTTP
     case IDM_OPEN_URL: g_App.GetFocusedPanel().OpenRemoteArchiveDialog(); break;
+    case IDM_RENEW_URL: g_App.GetFocusedPanel().RenewRemoteArchiveDialog(); break;
     #endif
     
     case IDM_OPEN_INSIDE:        g_App.OpenItemInside(NULL); break;
