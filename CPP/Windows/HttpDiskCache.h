@@ -31,21 +31,30 @@ private:
   CCacheHandle(const CCacheHandle &) = delete;
   CCacheHandle &operator=(const CCacheHandle &) = delete;
 };
-inline bool Hash(const void *data, size_t size, BYTE *digest)
+struct CHashProvider
 {
-  HCRYPTPROV provider = 0;
+  HCRYPTPROV Value = 0;
+  CHashProvider() { CryptAcquireContextW(&Value, NULL, NULL, PROV_RSA_AES, CRYPT_VERIFYCONTEXT); }
+  ~CHashProvider() { if (Value) CryptReleaseContext(Value, 0); }
+private:
+  CHashProvider(const CHashProvider &) = delete;
+  CHashProvider &operator=(const CHashProvider &) = delete;
+};
+inline bool Hash(const void *data, size_t size, BYTE *digest, HCRYPTPROV shared = 0)
+{
+  HCRYPTPROV provider = shared;
   HCRYPTHASH hash = 0;
-  if (!CryptAcquireContextW(&provider, NULL, NULL, PROV_RSA_AES, CRYPT_VERIFYCONTEXT)) return false;
+  if (!provider && !CryptAcquireContextW(&provider, NULL, NULL, PROV_RSA_AES, CRYPT_VERIFYCONTEXT)) return false;
   bool ok = CryptCreateHash(provider, CALG_SHA_256, 0, 0, &hash) != FALSE;
   if (ok) ok = size <= MAXDWORD && CryptHashData(hash, (const BYTE *)data, (DWORD)size, 0) != FALSE;
   DWORD length = 32;
   if (ok) ok = CryptGetHashParam(hash, HP_HASHVAL, digest, &length, 0) != FALSE && length == 32;
   if (hash) CryptDestroyHash(hash);
-  CryptReleaseContext(provider, 0);
+  if (!shared) CryptReleaseContext(provider, 0);
   return ok;
 }
-inline bool HashText(const std::wstring &text, BYTE *digest)
-{ return Hash(text.data(), text.size() * sizeof(wchar_t), digest); }
+inline bool HashText(const std::wstring &text, BYTE *digest, HCRYPTPROV shared = 0)
+{ return Hash(text.data(), text.size() * sizeof(wchar_t), digest, shared); }
 inline std::wstring Hex(ULONGLONG value)
 {
   std::wstring text(16, L'0');
@@ -161,6 +170,11 @@ struct CBlockHeader
   BYTE Digest[32];
   BYTE Archive[32];
 };
+struct CPackHeader
+{
+  CBlockHeader Block;
+  BYTE HeaderDigest[32]; // authenticates offset/length as well as the body digest
+};
 inline bool BlockName(const std::wstring &name, ULONGLONG &offset)
 {
   if (name.size() != 21 || name[0] != L'b' || name.substr(17) != L".bin" || !IsHex(name.substr(1, 16), 16)) return false;
@@ -171,7 +185,8 @@ inline bool BlockName(const std::wstring &name, ULONGLONG &offset)
 inline bool OwnedFile(const std::wstring &name)
 {
   ULONGLONG offset;
-  if (name == L"info.bin" || name == L"entry.owner" || name == L"session.lock" || BlockName(name, offset)) return true;
+  if (name == L"info.bin" || name == L"entry.owner" || name == L"session.lock"
+      || name == L"parts.bin" || BlockName(name, offset)) return true;
   const size_t pos = name.find(L".tmp-");
   return pos != std::wstring::npos && IsHex(name.substr(pos + 5), 32)
       && (name.substr(0, pos) == L"info.bin" || name.substr(0, pos) == L"entry.owner" || BlockName(name.substr(0, pos), offset));
@@ -182,7 +197,8 @@ inline bool Info(const std::wstring &folder, CInfo &info)
   if (!ReadFileBytes(folder + L"\\info.bin", bytes, sizeof(info)) || bytes.size() != sizeof(info)) return false;
   memcpy(&info, bytes.data(), sizeof(info));
   BYTE digest[32];
-  return (!memcmp(info.Magic, "7ZHC01I", 8) || !memcmp(info.Magic, "7ZHC02I", 8))
+  return (!memcmp(info.Magic, "7ZHC01I", 8) || !memcmp(info.Magic, "7ZHC02I", 8)
+      || !memcmp(info.Magic, "7ZHC03I", 8))
       && info.Name[160] == 0 && info.Verified <= 1
       && info.Size > 0 && info.Size <= 0x7fffffffffffffffull
       && Hash(&info, offsetof(CInfo, Digest), digest) && !memcmp(digest, info.Digest, 32);
@@ -261,6 +277,94 @@ class CHttpDiskCache
   std::wstring _resumeStatus;
   NHttpCache::CInfo _info = {};
   std::map<ULONGLONG, unsigned> _blocks;
+  NHttpCache::CHashProvider _hashProvider; // scoped to this single-consumer cache
+  struct CPackedPart { ULONGLONG Position; unsigned Size; };
+  std::map<ULONGLONG, CPackedPart> _packed;
+  ULONGLONG _packEnd = 0;
+  std::wstring PackPath() const { return _folder + L"\\parts.bin"; }
+  static bool ReadAt(HANDLE file, ULONGLONG at, void *data, DWORD size)
+  {
+    LARGE_INTEGER pos; pos.QuadPart = (LONGLONG)at;
+    DWORD got = 0;
+    return SetFilePointerEx(file, pos, NULL, FILE_BEGIN)
+        && ::ReadFile(file, data, size, &got, NULL) && got == size;
+  }
+  bool PackHeaderValid(const NHttpCache::CPackHeader &header) const
+  {
+    BYTE digest[32], identity[32];
+    return !memcmp(header.Block.Magic, "7ZHC03P", 8)
+        && header.Block.Size && header.Block.Size <= 262144
+        && header.Block.Offset < _info.Size && header.Block.Size <= _info.Size - header.Block.Offset
+        && NHttpCache::Hash(&header.Block, sizeof(header.Block), digest, _hashProvider.Value)
+        && !memcmp(digest, header.HeaderDigest, 32)
+        && BlockIdentity(identity) && !memcmp(identity, header.Block.Archive, 32);
+  }
+  template<class TSource> HRESULT LoadPack(TSource &source)
+  {
+    using namespace NHttpCache;
+    _packed.clear(); _packEnd = 0;
+    if (!_exactReads || !Regular(PackPath(), false)) return S_OK;
+    CCacheHandle file(CreateFileW(PackPath().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, NULL));
+    LARGE_INTEGER size;
+    if (!file.Valid() || !GetFileSizeEx(file.Value, &size) || size.QuadPart < 0) return S_OK;
+    while ((ULONGLONG)size.QuadPart - _packEnd >= sizeof(CPackHeader))
+    {
+      if (source.IsCancelled()) return E_ABORT;
+      CPackHeader header;
+      if (!ReadAt(file.Value, _packEnd, &header, sizeof(header)) || !PackHeaderValid(header)
+          || header.Block.Size > (ULONGLONG)size.QuadPart - _packEnd - sizeof(header)) break;
+      const ULONGLONG offset = header.Block.Offset;
+      _packed[offset] = {_packEnd, header.Block.Size};
+      _blocks[offset] = header.Block.Size;
+      _packEnd += sizeof(header) + header.Block.Size;
+    }
+    // A crash can leave only the last record incomplete. It is never indexed;
+    // the next successful append truncates that tail before writing.
+    return S_OK;
+  }
+  bool ReadPacked(ULONGLONG offset, unsigned length, std::vector<unsigned char> &data)
+  {
+    using namespace NHttpCache;
+    const auto part = _packed.find(offset);
+    if (part == _packed.end() || part->second.Size != length || !Regular(PackPath(), false)) return false;
+    CCacheHandle file(CreateFileW(PackPath().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, NULL));
+    CPackHeader header;
+    BYTE digest[32];
+    if (!file.Valid() || !ReadAt(file.Value, part->second.Position, &header, sizeof(header))
+        || !PackHeaderValid(header) || header.Block.Offset != offset || header.Block.Size != length) return false;
+    data.resize(length);
+    if (!ReadAt(file.Value, part->second.Position + sizeof(header), data.data(), length)
+        || !Hash(data.data(), data.size(), digest, _hashProvider.Value) || memcmp(digest, header.Block.Digest, 32))
+    { data.clear(); return false; }
+    Touch(PackPath()); Touch(_folder + L"\\info.bin");
+    return true;
+  }
+  bool WritePacked(ULONGLONG offset, const std::vector<unsigned char> &data)
+  {
+    using namespace NHttpCache;
+    const DWORD attrs = GetFileAttributesW(PackPath().c_str());
+    if (attrs != INVALID_FILE_ATTRIBUTES && !Regular(PackPath(), false)) return false;
+    CCacheHandle file(CreateFileW(PackPath().c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL,
+        OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, NULL));
+    if (!file.Valid()) return false;
+    LARGE_INTEGER pos; pos.QuadPart = (LONGLONG)_packEnd;
+    if (!SetFilePointerEx(file.Value, pos, NULL, FILE_BEGIN) || !SetEndOfFile(file.Value)) return false;
+    CPackHeader header = {};
+    memcpy(header.Block.Magic, "7ZHC03P", 8);
+    header.Block.Offset = offset; header.Block.Size = (DWORD)data.size();
+    if (!Hash(data.data(), data.size(), header.Block.Digest, _hashProvider.Value) || !BlockIdentity(header.Block.Archive)
+        || !Hash(&header.Block, sizeof(header.Block), header.HeaderDigest, _hashProvider.Value)) return false;
+    DWORD wrote = 0;
+    if (!::WriteFile(file.Value, &header, sizeof(header), &wrote, NULL) || wrote != sizeof(header)
+        || !::WriteFile(file.Value, data.data(), (DWORD)data.size(), &wrote, NULL) || wrote != data.size()
+        || !FlushFileBuffers(file.Value)) return false;
+    _packed[offset] = {_packEnd, (unsigned)data.size()};
+    _packEnd += sizeof(header) + data.size();
+    _unprunedBytes += sizeof(header) + data.size();
+    return true;
+  }
   bool BlockIdentity(BYTE *digest) const
   {
     // Bind each part to this cache generation and source identity as well as its
@@ -269,7 +373,8 @@ class CHttpDiskCache
         "Cache identity layout changed");
     BYTE identity[168];
     memcpy(identity, &_info.Size, 136);
-    return NHttpCache::HashText(_id, identity + 136) && NHttpCache::Hash(identity, sizeof(identity), digest);
+    return NHttpCache::HashText(_id, identity + 136, _hashProvider.Value)
+        && NHttpCache::Hash(identity, sizeof(identity), digest, _hashProvider.Value);
   }
   std::wstring BlockPath(ULONGLONG offset) const { return _folder + L"\\b" + NHttpCache::Hex(offset) + L".bin"; }
   bool LockEntry(const std::wstring &id)
@@ -342,6 +447,7 @@ public:
     if (_lock != INVALID_HANDLE_VALUE) CloseHandle(_lock);
     _lock = INVALID_HANDLE_VALUE;
     _folder.clear(); _id.clear(); _blocks.clear(); _liveEndpoint.clear();
+    _packed.clear(); _packEnd = 0;
   }
   static std::vector<NHttpCache::CEntry> Catalog(const std::wstring &directory)
   {
@@ -431,7 +537,7 @@ public:
     {
       if (!entry.Valid) continue;
       // Separate generations keep legacy fixed-block readers compatible.
-      if ((!memcmp(entry.Info.Magic, "7ZHC02I", 8)) != _exactReads) continue;
+      if ((memcmp(entry.Info.Magic, "7ZHC01I", 8) != 0) != _exactReads) continue;
       const bool sameUrl = !memcmp(entry.Info.Url, urlHash, 32) && !memcmp(entry.Info.Endpoint, endpoint, 32);
       if ((!options.ReuseId.empty() && options.ReuseId == entry.Id) || (options.ReuseId.empty() && sameUrl))
       {
@@ -493,6 +599,8 @@ public:
       // partial coverage and preview subtraction always remain unambiguous.
       if (_exactReads)
       {
+        const HRESULT loaded = LoadPack(source);
+        if (loaded != S_OK) { Close(); return loaded; }
         ULONGLONG end = 0;
         for (auto part = _blocks.begin(); part != _blocks.end(); )
           if (part->first < end) part = _blocks.erase(part);
@@ -532,7 +640,7 @@ public:
     if (id.empty() || !CreateDirectoryW((_root + L"\\" + id).c_str(), NULL) || !LockEntry(id)) return S_OK;
     if (!AtomicWrite(_folder + L"\\entry.owner", "7ZHC01E", 8)) { Close(); return S_OK; }
     memset(&_info, 0, sizeof(_info));
-    memcpy(_info.Magic, _exactReads ? "7ZHC02I" : "7ZHC01I", 8);
+    memcpy(_info.Magic, _exactReads ? "7ZHC03I" : "7ZHC01I", 8);
     _info.Size = source.Size;
     _info.Verified = source.SkipsETag() ? 0 : 1;
     memcpy(_info.Url, urlHash, 32); memcpy(_info.Endpoint, endpoint, 32);
@@ -555,6 +663,13 @@ public:
     if (!Enabled()) return false;
     const auto block = _blocks.find(offset);
     if (block == _blocks.end() || block->second != length) return false;
+    if (_packed.count(offset))
+    {
+      if (ReadPacked(offset, length, data)) return true;
+      _packed.erase(offset); _blocks.erase(offset);
+      Status = L"Damaged cache part ignored; downloading again";
+      return false;
+    }
     std::vector<BYTE> bytes;
     CBlockHeader header;
     BYTE digest[32], identity[32];
@@ -563,7 +678,7 @@ public:
       memcpy(&header, bytes.data(), sizeof(header));
       if (!memcmp(header.Magic, "7ZHC01B", 8) && header.Offset == offset && header.Size == length
           && BlockIdentity(identity) && !memcmp(identity, header.Archive, 32)
-          && Hash(bytes.data() + sizeof(header), length, digest) && !memcmp(digest, header.Digest, 32))
+          && Hash(bytes.data() + sizeof(header), length, digest, _hashProvider.Value) && !memcmp(digest, header.Digest, 32))
       {
         data.assign(bytes.begin() + sizeof(header), bytes.end());
         Touch(BlockPath(offset)); Touch(_folder + L"\\info.bin");
@@ -606,9 +721,17 @@ public:
     CCacheHandle manager(CreateFileW((_root + L"\\manage.lock").c_str(), GENERIC_WRITE, 0,
         NULL, OPEN_ALWAYS, FILE_FLAG_OPEN_REPARSE_POINT, NULL));
     if (!manager.Valid()) { Status = L"Cache busy; new bytes kept in memory"; return; }
+    if (_exactReads)
+    {
+      if (!WritePacked(offset, data)) { Status = L"Cache write failed (memory only for new data)"; return; }
+      _blocks[offset] = (unsigned)data.size();
+      Touch(_folder + L"\\info.bin");
+      if (_maximum && _unprunedBytes >= (std::min)(4ull << 20, (std::max)(1ull, _maximum / 16))) Prune();
+      return;
+    }
     CBlockHeader header = {};
     memcpy(header.Magic, "7ZHC01B", 8); header.Offset = offset; header.Size = (DWORD)data.size();
-    if (!Hash(data.data(), data.size(), header.Digest) || !BlockIdentity(header.Archive)) return;
+    if (!Hash(data.data(), data.size(), header.Digest, _hashProvider.Value) || !BlockIdentity(header.Archive)) return;
     std::vector<BYTE> bytes(sizeof(header) + data.size());
     memcpy(bytes.data(), &header, sizeof(header)); memcpy(bytes.data() + sizeof(header), data.data(), data.size());
     if (!AtomicWrite(BlockPath(offset), bytes.data(), (DWORD)bytes.size()))
@@ -646,7 +769,8 @@ private:
       for (const auto &file : Children(folder))
       {
         ULONGLONG at = 0;
-        if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || !BlockName(file.cFileName, at)) continue;
+        if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            || (!BlockName(file.cFileName, at) && wcscmp(file.cFileName, L"parts.bin"))) continue;
         CVictim victim;
         victim.Folder = folder; victim.Name = file.cFileName; victim.Own = entry.Id == _id; victim.Offset = at;
         victim.Size = ((ULONGLONG)file.nFileSizeHigh << 32) | file.nFileSizeLow;
@@ -659,7 +783,18 @@ private:
     {
       if (used <= _maximum) break;
       if (DeleteFileW((victim.Folder + L"\\" + victim.Name).c_str()))
-      { used -= victim.Size; if (victim.Own) _blocks.erase(victim.Offset); }
+      {
+        used -= victim.Size;
+        if (victim.Own)
+        {
+          if (victim.Name == L"parts.bin")
+          {
+            for (const auto &part : _packed) _blocks.erase(part.first);
+            _packed.clear(); _packEnd = 0;
+          }
+          else _blocks.erase(victim.Offset);
+        }
+      }
     }
     // Remove empty inactive metadata too, so many old entries cannot grow forever.
     for (const auto &entry : catalog)
@@ -675,7 +810,7 @@ private:
         for (const auto &file : Children(folder))
         {
           ULONGLONG at = 0;
-          if (BlockName(file.cFileName, at)) { hasBlocks = true; break; }
+          if (BlockName(file.cFileName, at) || !wcscmp(file.cFileName, L"parts.bin")) { hasBlocks = true; break; }
         }
         if (hasBlocks) continue;
         for (const auto &file : Children(folder))

@@ -1,9 +1,11 @@
 """Check exact HTTP ranges, cache overlaps, extraction and download savings."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import random
 import subprocess
+import struct
 import tempfile
 import threading
 import zipfile
@@ -65,20 +67,50 @@ def main():
         raw_cache = work / 'raw-cache'
         _, total = run('disk-stream-first', 'raw.bin', ['--exact-disk-stream-check'], output=raw_cache)
         assert total == 262158
-        parts = list(raw_cache.glob('.7z-http-cache-v1/*/b*.bin'))
-        assert sorted(p.stat().st_size - 88 for p in parts) == [2, 2, 3, 3, 3, 262144]
+        packs = list(raw_cache.glob('.7z-http-cache-v1/*/parts.bin'))
+        assert len(packs) == 1 and not list(raw_cache.glob('.7z-http-cache-v1/*/b*.bin'))
+        pack = packs[0]
+        saved = pack.read_bytes()
+        parts = []
+        cursor = 0
+        while cursor < len(saved):
+            header = saved[cursor:cursor + 120]
+            offset, = struct.unpack_from('<Q', header, 8)
+            length, = struct.unpack_from('<I', header, 16)
+            assert header[:8] == b'7ZHC03P\0'
+            assert hashlib.sha256(header[:88]).digest() == header[88:120]
+            body = saved[cursor + 120:cursor + 120 + length]
+            assert hashlib.sha256(body).digest() == header[20:52]
+            assert body == files['raw.bin'][offset:offset + length]
+            parts.append((offset, length, cursor))
+            cursor += 120 + length
+        assert sorted(n for _, n, _ in parts) == [2, 2, 3, 3, 3, 262144]
         # Persisted payload bytes are precisely the requested data, with no padding.
-        assert sum(p.stat().st_size - 88 for p in parts) == total - 1
+        assert sum(n for _, n, _ in parts) == total - 1
         records, total = run('disk-stream-reopen', 'raw.bin', ['--exact-disk-stream-check'], output=raw_cache)
         assert total == 1 and len(records) == 1
         _, total = run('disk-stream-slices', 'raw.bin', ['--exact-disk-slice-check'], output=raw_cache)
         assert total == 1
-        broken = next(p for p in parts if p.name == 'b0000000000000064.bin')
-        damaged = bytearray(broken.read_bytes())
-        damaged[-1] ^= 1
-        broken.write_bytes(damaged)
+        damaged = bytearray(saved)
+        damaged[120] ^= 1
+        pack.write_bytes(damaged)
         records, total = run('disk-stream-repair', 'raw.bin', ['--exact-disk-stream-check'], output=raw_cache)
         assert total == 4 and [(r['start'], r['end']) for r in records] == [(0, 0), (100, 102)]
+        _, total = run('disk-stream-repaired-reopen', 'raw.bin', ['--exact-disk-stream-check'], output=raw_cache)
+        assert total == 1
+        # A torn final record is ignored; complete earlier records survive.
+        with pack.open('ab') as out:
+            out.write(b'7ZHC03P\0partial-header')
+        _, total = run('disk-stream-torn-tail', 'raw.bin', ['--exact-disk-stream-check'], output=raw_cache)
+        assert total == 1
+        # Header corruption cannot silently move a cached payload to another offset.
+        damaged = bytearray(pack.read_bytes())
+        damaged[8] ^= 1
+        pack.write_bytes(damaged)
+        _, total = run('disk-stream-header-recovery', 'raw.bin', ['--exact-disk-stream-check'], output=raw_cache)
+        assert total == 262158
+        _, total = run('disk-stream-header-recovered-reopen', 'raw.bin', ['--exact-disk-stream-check'], output=raw_cache)
+        assert total == 1
         for name in ('sample.zip', 'sample.7z', 'solid.7z', 'secret.7z'):
             _, baseline = run(name + '-blocks', name)
             _, exact = run(name + '-exact', name, ['--exact-http-reads', '--selection-check'])

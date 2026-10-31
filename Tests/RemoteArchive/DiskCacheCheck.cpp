@@ -20,6 +20,7 @@ int wmain(int argc, wchar_t **argv)
   options.DiskCache.Enabled = true;
   options.DiskCache.Directory = argv[2];
   unsigned blocks = 16, first = 0;
+  unsigned fragmentSize = 0, stride = 4096;
   bool hold = false;
   for (int i = 3; i < argc; ++i)
   {
@@ -43,6 +44,9 @@ int wmain(int argc, wchar_t **argv)
       return 0;
     }
     if (wcscmp(argv[i], L"--skip-http-etag") == 0) options.SkipETagVerification = true;
+    if (wcscmp(argv[i], L"--exact-http-reads") == 0) options.ExactReads = true;
+    if (wcsncmp(argv[i], L"--fragment-size=", 16) == 0) fragmentSize = (unsigned)_wtoi(argv[i] + 16);
+    if (wcsncmp(argv[i], L"--fragment-stride=", 18) == 0) stride = (unsigned)_wtoi(argv[i] + 18);
     if (wcscmp(argv[i], L"--cache-trust") == 0) options.DiskCache.AllowUnverified = true;
     if (wcscmp(argv[i], L"--cache-hold") == 0) hold = true;
     if (wcsncmp(argv[i], L"--cache-reuse=", 14) == 0) options.DiskCache.ReuseId = argv[i] + 14;
@@ -51,7 +55,7 @@ int wmain(int argc, wchar_t **argv)
     if (wcsncmp(argv[i], L"--cache-limit=", 14) == 0) options.DiskCache.MaxBytes = _wcstoui64(argv[i] + 14, NULL, 10);
     if (wcsncmp(argv[i], L"--cache-cancel-ms=", 18) == 0) g_CancelMs = (unsigned)_wtoi(argv[i] + 18);
   }
-  if (blocks > 64) return 2;
+  if (blocks > (fragmentSize ? 4096u : 64u) || fragmentSize > CHttpInStream::kBlockSize || !stride) return 2;
   options.CancelCheck = Cancel;
   g_Started = GetTickCount();
   CHttpInStream *spec = new CHttpInStream;
@@ -63,7 +67,9 @@ int wmain(int argc, wchar_t **argv)
     result = stream->Seek((Int64)first * CHttpInStream::kBlockSize, STREAM_SEEK_SET, NULL);
     for (unsigned i = 0; i < blocks && result == S_OK; ++i)
     {
-      std::vector<unsigned char> block(CHttpInStream::kBlockSize);
+      if (fragmentSize) result = stream->Seek((Int64)(first + i) * stride, STREAM_SEEK_SET, NULL);
+      if (result != S_OK) break;
+      std::vector<unsigned char> block(fragmentSize ? fragmentSize : CHttpInStream::kBlockSize);
       UInt32 got = 0;
       result = stream->Read(block.data(), (UInt32)block.size(), &got);
       if (result == S_OK) data.insert(data.end(), block.begin(), block.begin() + got);
