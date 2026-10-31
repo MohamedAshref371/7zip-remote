@@ -30,6 +30,7 @@
 
 #include "../Common/FindSignature.h"
 #include "../Common/ItemNameUtils.h"
+#include "../IArchiveOpenFileProgress.h"
 #include "../Common/OutStreamWithCRC.h"
 
 #include "../HandlerCont.h"
@@ -1083,6 +1084,7 @@ HRESULT CHandler::Open2(IInStream *stream,
 {
   {
     CMyComPtr<IArchiveOpenVolumeCallback> openVolumeCallback;
+    CMyComPtr<IArchiveOpenFileProgress> fileProgress;
     CMyComPtr<ICryptoGetTextPassword> getTextPassword;
     
     CVolumeName seqName;
@@ -1093,6 +1095,7 @@ HRESULT CHandler::Open2(IInStream *stream,
     if (openCallback)
     {
       openCallback->QueryInterface(IID_IArchiveOpenVolumeCallback, (void **)&openVolumeCallback);
+      openCallback->QueryInterface(IID_IArchiveOpenFileProgress, (void **)&fileProgress);
       openCallback->QueryInterface(IID_ICryptoGetTextPassword, (void **)&getTextPassword);
     }
 
@@ -1232,6 +1235,12 @@ HRESULT CHandler::Open2(IInStream *stream,
         }
 
         _items.Add(item);
+
+        if (fileProgress)
+        {
+          const UString name = NItemName::WinPathToOsPath(item.GetName());
+          RINOK(fileProgress->SetCurrentFileName(name, _refItems.Size()))
+        }
         
         if (openCallback && _items.Size() % 100 == 0)
         {

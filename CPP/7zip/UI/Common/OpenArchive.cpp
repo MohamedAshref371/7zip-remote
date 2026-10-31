@@ -28,6 +28,7 @@
 
 #include "DefaultName.h"
 #include "OpenArchive.h"
+#include "../../Archive/IArchiveOpenFileProgress.h"
 
 #ifndef Z7_SFX
 #include "SetProperties.h"
@@ -1131,6 +1132,7 @@ static bool IsNewStyleSignature(const CArcInfoEx &ai)
 
 class CArchiveOpenCallback_Offset Z7_final:
   public IArchiveOpenCallback,
+  public IArchiveOpenFileProgress,
   public IArchiveOpenVolumeCallback,
  #ifndef Z7_NO_CRYPTO
   public ICryptoGetTextPassword,
@@ -1138,6 +1140,7 @@ class CArchiveOpenCallback_Offset Z7_final:
   public CMyUnknownImp
 {
   Z7_COM_QI_BEGIN2(IArchiveOpenCallback)
+  Z7_COM_QI_ENTRY(IArchiveOpenFileProgress)
   Z7_COM_QI_ENTRY(IArchiveOpenVolumeCallback)
  #ifndef Z7_NO_CRYPTO
   Z7_COM_QI_ENTRY(ICryptoGetTextPassword)
@@ -1146,6 +1149,7 @@ class CArchiveOpenCallback_Offset Z7_final:
   Z7_COM_ADDREF_RELEASE
 
   Z7_IFACE_COM7_IMP(IArchiveOpenCallback)
+  Z7_IFACE_COM7_IMP(IArchiveOpenFileProgress)
   Z7_IFACE_COM7_IMP(IArchiveOpenVolumeCallback)
  #ifndef Z7_NO_CRYPTO
   Z7_IFACE_COM7_IMP(ICryptoGetTextPassword)
@@ -1176,6 +1180,15 @@ Z7_COM7F_IMF(CArchiveOpenCallback_Offset::CryptoGetTextPassword(BSTR *password))
 Z7_COM7F_IMF(CArchiveOpenCallback_Offset::SetTotal(const UInt64 *, const UInt64 *))
 {
   return S_OK;
+}
+
+Z7_COM7F_IMF(CArchiveOpenCallback_Offset::SetCurrentFileName(const wchar_t *name, UInt64 files))
+{
+  COM_TRY_BEGIN
+  CMyComPtr<IArchiveOpenFileProgress> progress;
+  if (Callback) Callback->QueryInterface(IID_IArchiveOpenFileProgress, (void **)&progress);
+  return progress ? progress->SetCurrentFileName(name, files) : S_OK;
+  COM_TRY_END
 }
 
 Z7_COM7F_IMF(CArchiveOpenCallback_Offset::SetCompleted(const UInt64 *, const UInt64 *bytes))

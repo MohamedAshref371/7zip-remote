@@ -32,6 +32,7 @@
 
 #include "../../Archive/Common/FindSignature.h"
 #include "../../Archive/Common/ItemNameUtils.h"
+#include "../IArchiveOpenFileProgress.h"
 #include "../../Archive/Common/HandlerOut.h"
 
 #include "../../Archive/HandlerCont.h"
@@ -2281,6 +2282,7 @@ HRESULT CHandler::Open2(IInStream *stream,
     IArchiveOpenCallback *openCallback)
 {
   CMyComPtr<IArchiveOpenVolumeCallback> openVolumeCallback;
+  CMyComPtr<IArchiveOpenFileProgress> fileProgress;
   // CMyComPtr<ICryptoGetTextPassword> getTextPassword;
   NRar::CVolumeName seqName;
   CTempBuf tempBuf;
@@ -2289,6 +2291,7 @@ HRESULT CHandler::Open2(IInStream *stream,
   if (openCallback)
   {
     openCallback->QueryInterface(IID_IArchiveOpenVolumeCallback, (void **)&openVolumeCallback);
+    openCallback->QueryInterface(IID_IArchiveOpenFileProgress, (void **)&fileProgress);
     openCallback->QueryInterface(IID_ICryptoGetTextPassword, (void **)&unpacker.getTextPassword);
   }
   // unpacker.getTextPassword = getTextPassword;
@@ -2574,6 +2577,14 @@ HRESULT CHandler::Open2(IInStream *stream,
       _items.Add(item);
       if (needAdd)
         _refs.Add(ref);
+
+      if (fileProgress && needAdd && !item.IsService())
+      {
+        UString name;
+        ConvertUTF8ToUnicode(item.Name, name);
+        NItemName::ReplaceToOsSlashes_Remove_TailSlash(name);
+        RINOK(fileProgress->SetCurrentFileName(name, _refs.Size()))
+      }
       
       if (openCallback && (_items.Size() & 0xFF) == 0)
       {

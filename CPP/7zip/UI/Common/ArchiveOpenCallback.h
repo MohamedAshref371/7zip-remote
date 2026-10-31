@@ -13,6 +13,7 @@
 #include "../../IPassword.h"
 #endif
 #include "../../Archive/IArchive.h"
+#include "../../Archive/IArchiveOpenFileProgress.h"
 #ifdef Z7_HTTP
 #include "RemoteProgress.h"
 #endif
@@ -43,6 +44,7 @@ Z7_PURE_INTERFACES_BEGIN
 DECLARE_INTERFACE(IOpenCallbackUI)
 {
   Z7_IFACE_PURE(IOpenCallbackUI)
+  virtual HRESULT Open_CurrentFile(const wchar_t *, UInt64) { return S_OK; }
  #ifdef Z7_HTTP
   virtual HRESULT Open_NetworkProgress(UInt64, UInt64, UInt64) { return S_OK; }
   virtual HRESULT Open_NetworkEstimate(UInt64, Int32) { return S_OK; }
@@ -106,6 +108,7 @@ public:
 
 class COpenCallbackImp Z7_final:
   public IArchiveOpenCallback,
+  public IArchiveOpenFileProgress,
  #ifdef Z7_HTTP
   public IRemoteProgress,
  #endif
@@ -118,6 +121,7 @@ class COpenCallbackImp Z7_final:
   public CMyUnknownImp
 {
   Z7_COM_QI_BEGIN2(IArchiveOpenCallback)
+  Z7_COM_QI_ENTRY(IArchiveOpenFileProgress)
  #ifdef Z7_HTTP
   Z7_COM_QI_ENTRY(IRemoteProgress)
  #endif
@@ -131,6 +135,7 @@ class COpenCallbackImp Z7_final:
   Z7_COM_ADDREF_RELEASE
   
   Z7_IFACE_COM7_IMP(IArchiveOpenCallback)
+  Z7_IFACE_COM7_IMP(IArchiveOpenFileProgress)
  #ifdef Z7_HTTP
   Z7_IFACE_COM7_IMP(IRemoteProgress)
  #endif

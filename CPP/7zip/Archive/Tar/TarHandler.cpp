@@ -16,6 +16,7 @@
 #include "../../Common/StreamUtils.h"
 
 #include "../Common/ItemNameUtils.h"
+#include "../IArchiveOpenFileProgress.h"
 
 #include "TarHandler.h"
 
@@ -213,6 +214,8 @@ AString CEncodingCharacts::GetCharactsString() const
 
 HRESULT CHandler::Open2(IInStream *stream, IArchiveOpenCallback *callback)
 {
+  CMyComPtr<IArchiveOpenFileProgress> fileProgress;
+  if (callback) callback->QueryInterface(IID_IArchiveOpenFileProgress, (void **)&fileProgress);
   UInt64 endPos;
   {
     RINOK(InStream_AtBegin_GetSize(stream, endPos))
@@ -250,6 +253,13 @@ HRESULT CHandler::Open2(IInStream *stream, IArchiveOpenCallback *callback)
     _encodingCharacts.Update(item.EncodingCharacts);
 
     _items.Add(item);
+
+    if (fileProgress)
+    {
+      NWindows::NCOM::CPropVariant name;
+      TarStringToUnicode(item.Name, name, true);
+      RINOK(fileProgress->SetCurrentFileName(name.bstrVal, _items.Size()))
+    }
 
     RINOK(stream->Seek((Int64)item.Get_PackSize_Aligned(), STREAM_SEEK_CUR, &_arc._phySize))
     if (_arc._phySize > endPos)

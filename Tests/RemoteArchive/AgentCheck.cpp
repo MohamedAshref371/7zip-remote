@@ -15,9 +15,10 @@ static const wchar_t *g_TestPassword = L"fixture-password";
 class CTestCallback Z7_final:
     public IFolderArchiveExtractCallback, public IArchiveOpenCallback,
     public ICryptoGetTextPassword, public CMyUnknownImp
-    , public IRemoteProgress
+    , public IRemoteProgress, public IArchiveOpenFileProgress
 {
-  Z7_COM_UNKNOWN_IMP_4(IFolderArchiveExtractCallback, IArchiveOpenCallback, ICryptoGetTextPassword, IRemoteProgress)
+  Z7_COM_UNKNOWN_IMP_5(IFolderArchiveExtractCallback, IArchiveOpenCallback, ICryptoGetTextPassword, IRemoteProgress, IArchiveOpenFileProgress)
+  Z7_IFACE_COM7_IMP(IArchiveOpenFileProgress)
   Z7_IFACE_COM7_IMP(IRemoteProgress)
   Z7_IFACE_COM7_IMP(IProgress)
   Z7_IFACE_COM7_IMP(IArchiveOpenCallback)
@@ -25,6 +26,8 @@ class CTestCallback Z7_final:
   Z7_IFACE_COM7_IMP(ICryptoGetTextPassword)
 public:
   bool Cancel = false;
+  bool ShowOpenFiles = false;
+  unsigned CancelOpenFile = 0;
   bool Failed = false;
   DWORD CancelStarted = 0;
   unsigned CancelDelay = 0;
@@ -64,6 +67,16 @@ Z7_COM7F_IMF(CTestCallback::SetNetworkEstimate(UInt64 bytes, Int32 defined))
     EstimateCaptured = true;
   }
   return S_OK;
+}
+
+Z7_COM7F_IMF(CTestCallback::SetCurrentFileName(const wchar_t *name, UInt64 files))
+{
+  if (ShowOpenFiles)
+  {
+    printf("OPEN_FILE %llu %s\n", files, UnicodeStringToMultiByte(UString(name), CP_UTF8).Ptr());
+    fflush(stdout);
+  }
+  return IsCancelled() || (CancelOpenFile && files >= CancelOpenFile) ? E_ABORT : S_OK;
 }
 
 Z7_COM7F_IMF(CTestCallback::SetNetworkProgress(UInt64 bytes, UInt64 size, UInt64 requests))
@@ -281,7 +294,16 @@ static int CheckNetworkSync()
   CHECK(open.ProgressDialog.Sync._completedBytes == 0);
   CHECK_HR(progress->SetNetworkEstimate(200, 1));
   CHECK(open.ProgressDialog.Sync._networkEstimateDefined && open.ProgressDialog.Sync._networkEstimate == 200);
+  CMyComPtr<IArchiveOpenFileProgress> names;
+  CHECK_HR(bridgeRef.QueryInterface(IID_IArchiveOpenFileProgress, &names));
+  CHECK_HR(names->SetCurrentFileName(L"docs/\x0645\x0644\x0641.txt", 7));
+  CHECK(open.ProgressDialog.Sync._filePath == L"docs/\x0645\x0644\x0641.txt");
+  CHECK(open.ProgressDialog.Sync._status == L"Reading archive headers");
+  CHECK(open.ProgressDialog.Sync._curFiles == 7);
+  open.ProgressDialog.Sync.Set_Stopped(true);
+  CHECK(names->SetCurrentFileName(L"next", 8) == E_ABORT);
   bridge->Callback = NULL;
+  CHECK_HR(names->SetCurrentFileName(L"closed", 9));
 
   CExtractCallbackImp *extract = new CExtractCallbackImp;
   CMyComPtr<IFolderArchiveExtractCallback> extractRef = extract;
@@ -380,6 +402,8 @@ int __cdecl wmain(int argc, wchar_t **argv)
   NWindows::CHttpDiskCacheOptions cacheOptions;
   const wchar_t *skipItem = NULL;
   unsigned cancelOpenMs = 0, cancelExtractMs = 0, transportRepeats = 0;
+  unsigned cancelOpenFile = 0;
+  bool showOpenFiles = false;
   bool cancelEventMode = false;
   for (int i = 3; i < argc; ++i)
   {
@@ -422,6 +446,8 @@ int __cdecl wmain(int argc, wchar_t **argv)
     if (wcsncmp(argv[i], L"--cancel-extract-ms=", 20) == 0) cancelExtractMs = (unsigned)_wtoi(argv[i] + 20);
     if (wcsncmp(argv[i], L"--transport-repeats=", 20) == 0) transportRepeats = (unsigned)_wtoi(argv[i] + 20);
     if (wcscmp(argv[i], L"--cancel-event") == 0) cancelEventMode = true;
+    if (wcscmp(argv[i], L"--open-file-progress") == 0) showOpenFiles = true;
+    if (wcsncmp(argv[i], L"--cancel-open-file=", 19) == 0) cancelOpenFile = (unsigned)_wtoi(argv[i] + 19);
   }
   if (transportRepeats) return CheckTransportCancel(argv[1], cancelEventMode, transportRepeats);
   manager->SetHttpCacheOptions(cacheOptions);
@@ -429,6 +455,8 @@ int __cdecl wmain(int argc, wchar_t **argv)
   {
     CTestCallback *callback = new CTestCallback;
     CMyComPtr<IProgress> progress = callback;
+    callback->ShowOpenFiles = showOpenFiles;
+    callback->CancelOpenFile = cancelOpenFile;
     if (argc > 3 && wcscmp(argv[3], L"cancel") == 0) callback->Cancel = true;
     if (cancelOpenMs) callback->CancelAfter(cancelOpenMs);
     const HRESULT result = managerRef->OpenFolderFile(NULL, argv[1], arcFormat, &folder, progress);

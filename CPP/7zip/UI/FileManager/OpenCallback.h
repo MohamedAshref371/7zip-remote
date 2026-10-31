@@ -44,6 +44,13 @@ public:
   */
 
   Z7_IFACE_IMP(IOpenCallbackUI)
+ #ifndef Z7_SFX
+  HRESULT Open_CurrentFile(const wchar_t *name, UInt64 files) Z7_override
+  {
+    ProgressDialog.Sync.Set_NumFilesCur(files);
+    return ProgressDialog.Sync.Set_Status2(UString(L"Reading archive headers"), name);
+  }
+ #endif
  #if defined(Z7_HTTP) && !defined(Z7_SFX)
   HRESULT Open_NetworkEstimate(UInt64 bytes, Int32 defined) Z7_override
   {

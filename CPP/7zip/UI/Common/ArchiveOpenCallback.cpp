@@ -27,6 +27,19 @@
 
 using namespace NWindows;
 
+Z7_COM7F_IMF(COpenCallbackImp::SetCurrentFileName(const wchar_t *name, UInt64 files))
+{
+  COM_TRY_BEGIN
+  if (ReOpenCallback)
+  {
+    CMyComPtr<IArchiveOpenFileProgress> progress;
+    ReOpenCallback->QueryInterface(IID_IArchiveOpenFileProgress, (void **)&progress);
+    return progress ? progress->SetCurrentFileName(name, files) : S_OK;
+  }
+  return Callback ? Callback->Open_CurrentFile(name, files) : S_OK;
+  COM_TRY_END
+}
+
 #ifdef Z7_HTTP
 Z7_COM7F_IMF(COpenCallbackImp::SetNetworkEstimate(UInt64 bytes, Int32 defined))
 {
