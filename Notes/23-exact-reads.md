@@ -1,5 +1,11 @@
 # Optional reads without HTTP block rounding
 
+This note records the v0.5.0 implementation. The next development preview stores
+new exact ranges together in `parts.bin` (manifest `7ZHC03I`), retains support
+for the older layouts described below, and has completed desktop acceptance.
+See [current validation](26-development-validation.md) for the compact format,
+35 exact-read cases and the complete validation results.
+
 Open URL now offers **Download only requested data (no read-ahead)**, unchecked
 by default. Its preference is saved on OK. The active session retains its mode
 on Refresh and URL renewal, including when reopening from a nested archive.

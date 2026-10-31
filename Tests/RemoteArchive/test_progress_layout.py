@@ -68,7 +68,7 @@ def main():
     args = parser.parse_args()
     width, height, items = read_dialog(args.exe)
     previous_bottom = items[126][1] + items[126][3]  # compression ratio
-    for item_id in (127, 128, 129, 103):  # network rows, then status
+    for item_id in (127, 128, 129, 103, 130, 102):  # network, status, path label/name
         x, y, w, h = items[item_id]
         assert y >= previous_bottom, (item_id, items[item_id])
         assert x >= 0 and x + w <= width and y + h <= height
@@ -77,6 +77,9 @@ def main():
         _, local_height, local_items = read_dialog(args.local_exe)
         assert not any(i in local_items for i in (127, 128, 129))
         assert height - local_height == 33
+    _, _, about = read_dialog(args.exe, 2900)
+    assert about[2901][1] + about[2901][3] <= about[103][1]
+    assert about[103][1] + about[103][3] <= about[1][1]
     print('PASS compiled network rows fit without overlap; local layout retained.')
 
 

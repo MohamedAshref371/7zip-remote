@@ -4,7 +4,12 @@ Study date: October 29, 2026.
 Local version: **7-Zip 26.05**, with source release date `2026-10-21`.
 Git reference at the time of the study: `8204ba7d01f8cd73abee5e2f82ac98e7ce3edef9`.
 
-**Latest implementation update:** File Manager supports Auto, ZIP, 7z, a shared RAR/RAR5 choice, and ISO, along with selection download estimates and optional persistent caching. ETag bypass starts unchecked; Open URL remembers the user's verification preferences and Refresh retains session settings. The current suites cover 60 Agent, 62 cache and 40 redirect scenarios. See [persistent cache](21-persistent-cache.md) and the root README for current behavior and validation. The sections below preserve the original study.
+**Latest implementation update:** v0.5.0 is published. The next development
+preview adds compact exact-range caching, clearer operation progress, nested
+folder restoration and portable packaging. Desktop acceptance and 374 automated
+scenarios passed. See [preview changes](25-next-preview.md),
+[validation and benchmarks](26-development-validation.md), and the root README.
+The sections below preserve the original study.
 
 ## Conclusion
 
@@ -30,6 +35,14 @@ The project does contain low-level components in `C` and `Asm`, but the requeste
 These are engineering choices for the study, not settings currently available in the application.
 
 ## Study Files
+
+Latest follow-up: [Post-v0.5.0 validation and benchmarks](26-development-validation.md).
+
+Latest follow-up: [0.6.0-dev preview notes](25-next-preview.md).
+
+Latest follow-up: [Discovered filenames](24-open-file-progress.md).
+
+Latest follow-up: [Optional exact reads](23-exact-reads.md).
 
 Latest follow-up: [Renew archive URLs](22-url-renewal.md).
 

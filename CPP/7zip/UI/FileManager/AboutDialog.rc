@@ -2,8 +2,13 @@
 #include "../../GuiCommon.rc"
 #include "../../MyVersion.h"
 
+#ifdef Z7_HTTP
+#define xc 216
+#define yc 172
+#else
 #define xc 144
 #define yc 144
+#endif
 
 #define y 93
 
@@ -22,5 +27,12 @@ CAPTION "About 7-Zip"
   LTEXT  "", IDT_ABOUT_VERSION, m, 54, xc, 8
   LTEXT  "", IDT_ABOUT_DATE, m, 67, xc, 8
   LTEXT  MY_COPYRIGHT, -1, m, 80, xc, 8
+ #ifdef Z7_HTTP
+  LTEXT  "7-Zip is free software", IDT_ABOUT_INFO, m, y, xc, 18
+ #else
   LTEXT  "7-Zip is free software", IDT_ABOUT_INFO, m, y, xc, (by - y - 1)
+ #endif
+ #ifdef Z7_HTTP
+  LTEXT "", IDT_ABOUT_REMOTE, m, 119, xc, 22
+ #endif
 }

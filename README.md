@@ -12,6 +12,10 @@ archive.
 is the tested platform. See the [implementation notes](Notes/README.md) for the
 design, evidence, and remaining work.
 
+**v0.5.0 has been released.** Current development is **0.6.0-dev**. See the
+[development preview notes](Notes/25-next-preview.md) and
+[measurements and desktop validation](Notes/26-development-validation.md).
+
 ## Features
 
 - **File Manager:** File → Open URL..., archive browsing, selected extraction,
@@ -65,6 +69,13 @@ design, evidence, and remaining work.
   Exact resource/strong-ETag matches can reuse parts automatically. Changed URLs
   and ETag bypass need separate consent to partial verification before reusing
   old data. See [cache settings and verification](Notes/21-persistent-cache.md).
+- **Compact exact-read cache:** saves the downloaded ranges in one data file,
+  with checksums and an in-memory index, reducing the number of tiny part files.
+  Earlier cache entries remain readable. Cache quotas may evict a whole data
+  file when necessary; a missing part is downloaded again when needed.
+- **Clear opening stages:** connecting, checking saved parts and reading headers;
+  discovered items are labeled separately from the current extraction item.
+  Unknown item totals show counts and elapsed time without a fabricated percent.
 - **ETag policy:** the Open URL dialog initially leaves **Skip ETag verification**
   unchecked and remembers the user's choice. The console verifies ETags by
   default and exposes `-shttp-no-etag` to opt out.
@@ -225,9 +236,11 @@ Recorded validation across the development milestones:
 
 A real MediaFire HTTPS link was also tested with ETag bypass: listing and selected
 extraction succeeded, and the extracted file matched the local reference.
-The maintainer confirmed the earlier GUI URL-opening flow. Full interactive
-acceptance testing of the latest dialog and Refresh flow remains pending;
-headless Agent tests cover the backend rather than desktop interaction.
+Interactive acceptance on the development build covered URL opening, browsing,
+selected extraction, cancellation, encrypted opening, cache settings, nested ISO
+names, Refresh and manual URL renewal. It exposed a subfolder-restoration bug
+that was fixed. See [desktop validation](Notes/26-development-validation.md) for
+the tested scope and distinction from broader server compatibility.
 
 See [ETag results](Notes/09-etag-option.md), [RAR-family results](Notes/11-rar-family.md),
 and the [full test guide](Tests/RemoteArchive/README.md). Local archive fixtures
