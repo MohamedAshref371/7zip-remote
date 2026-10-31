@@ -134,7 +134,19 @@ def main():
             mode = 'late-' + final
             origin.redirects[mode] = (307, [other + '/' + final + '/sample.zip'])
             origin.redirect_after_probe.add(mode)
-            run(mode, mode, success=final == 'ok', agent_mode=final == 'ok')
+            run(mode, mode, success=False, hint='source location changed')
+            run(mode + '-agent', mode, success=False, hint='source location changed', agent_mode=True)
+
+        # Different resources can have the same strong ETag and byte length.
+        original = destination.files['sample.zip']
+        destination.files['sample.zip'] = bytes([original[0] ^ 1]) + original[1:]
+        before = len(destination.records)
+        run('late-etag-collision', 'late-ok', success=False, hint='source location changed')
+        assert len(destination.records) == before
+        destination.files['sample.zip'] = original
+
+        run('late-ok-etag-bypass', 'late-ok', success=False, hint='source location changed',
+            options=('-shttp-no-etag',))
 
         # Cancellation must still abort a stalled destination after a cross-host hop.
         origin.redirects['cancel'] = (302, [other + '/hang-headers/sample.zip'])

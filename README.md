@@ -22,7 +22,7 @@ design, evidence, and remaining work.
 - **HTTP input stream:** WinHTTP transport, seekable reads, a bounded memory
   cache, and validation of ranges, lengths, and source size.
 - **Redirects:** follow HTTP 301/302/303/307/308, including relative links, with
-  at most five hops per range request. HTTPS-to-HTTP redirects are rejected.
+  at most five hops during the initial probe. Once the source is established, a redirect to another URL requires reopening with the final direct URL. HTTPS-to-HTTP redirects are rejected.
 - **Automatic retries:** up to two retries for temporary network failures and
   HTTP 408/429/500/502/503/504. Waits are cancellable, respect `Retry-After`,
   and share the original range-request deadline.
@@ -176,7 +176,7 @@ Recorded validation across the development milestones:
 | Stream/prototype | 72 | Read/Seek, offsets above 4 GiB, HTTP validation, cache, cancellation, and extraction hashes |
 | Console | 99 | Local/remote commands, actionable diagnostics, ETag policies, selected extraction, zones, and failure cases |
 | File Manager Agent | 60 | Browsing, extraction/testing, passwords, read-only enforcement, format selection, network counters, and ZIP/7z/RAR/ISO estimates |
-| Persistent cache | 51 | Source identity, explicit reuse consent, corruption, quotas, locks, safe clearing, interrupted writes, and validation cancellation |
+| Persistent cache | 62 | Source identity, explicit reuse consent, corruption, quotas, locks, safe clearing, interrupted writes, and validation cancellation |
 | Cache with real archives | 10 | ZIP/7z extraction hashes, saved-part reuse, independent ETag consent, and GNU/MSVC cache compatibility |
 | Compressed RAR estimates | 10 | RAR/RAR5 metadata plans, solid predecessors, encrypted RAR4 headers/data, ETag policies, and extracted hashes |
 | Cancellation | 8 | Stalled headers/body during opening/extraction, repeated callback/event cancellation, closed connections, and partial-range rejection |

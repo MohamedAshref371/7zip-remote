@@ -58,11 +58,10 @@ miss changes outside the checked regions and can cause wrong output; the dialog
 states this before consent. Generations reused this way remain unverified and
 are never silently promoted to verified status.
 
-If a redirect changes the resolved resource during cache acceptance, caching is
-paused and the source uses memory. A later scope change while verified cached
-bytes are already in use stops the read, quarantines the old generation from
-automatic reuse, and requests reopening. This prevents mixing cached bytes from
-one resource with another resource merely because their ETag strings coincide.
+The transport pins the resolved resource after its initial probe, independently
+of disk caching. A later redirect to another URL fails before any bytes from
+that destination are accepted; reopen using the final direct URL. Matching ETag
+strings and sizes from distinct resources do not establish content identity.
 Initial normal redirect chains continue to resolve before cache matching.
 
 ## Storage and lifecycle
@@ -99,7 +98,7 @@ and metadata; filesystem allocation can differ. Old eligible parts are pruned by
 last use, and empty inactive entries can be removed. Foreign active entries stay
 protected, so a newly reduced limit may remain exceeded until they close. Within
 the owning session, disk parts can be evicted without losing data already in RAM.
-Unlimited mode disables quota pruning. Limits are applied on opens and writes.
+Unlimited mode disables quota pruning. Limits are applied on opens, batched writes, and session close. Writes batch at most 4 MiB (or 1/16 of the configured limit, whichever is smaller), so active sessions can temporarily exceed the limit by that amount each. Small limits are checked every block. A busy close defers pruning to the next open/write.
 
 **Clear cache** skips active entries and reports their count; close those archives
 and clear again to remove them. Unrecognized files are retained. If a part cannot
@@ -133,7 +132,7 @@ python Tests/RemoteArchive/build_msvc.py --target filemanager --rebuild --bin-di
 python Tests/RemoteArchive/test_cache_layout.py --exe .build/msvc/disk-cache/7zFM.exe --local-exe .build/msvc/disk-cache-local/7zFM.exe
 ```
 
-The cache transport suite passes 51 scenarios: fresh/verified opens, changed URLs,
+The cache transport suite passes 62 scenarios: fresh/verified opens, changed URLs,
 manual linking, explicit bypass consent, known validator/size changes, stable
 redirect scopes, rejected-link isolation, corrupt parts/manifests, generation-bound
 parts, interrupted writes, unlimited/reduced limits, actual sharing-related I/O
@@ -146,7 +145,7 @@ and extends an MSVC-produced cache, then the MSVC Agent reuses it. In the contro
 verified reopen cases, extraction used the saved parts with only the one-byte
 validation probe downloaded. Fixture hashes match local inputs.
 
-The existing 99 CLI, 60 Agent, 35 redirect, 71 retry, eight cancellation and
+The original milestone also passed 99 CLI, 60 Agent, 35 redirect, 71 retry, eight cancellation and
 72 stream/prototype regressions pass. MSVC HTTP/local-only builds and portable
 GNU builds succeed. Compiled Open URL/cache resources fit without control overlap;
 the HTTP-only dialogs are absent from the local-only build.
@@ -157,3 +156,19 @@ Before publication, manually check Browse, saved settings across restart, partia
 reuse confirmation, Clear with an archive open, dropdown readability and status
 tooltips. Existing WinHTTP internal event retention after cancellation remains a
 separate unresolved observation; see [the cancellation notes](17-responsive-cancellation.md).
+
+## Review fixes (October 31, 2026)
+
+The review build is `.build/msvc/review-fixes/`. Cache usage scans in the settings
+dialog run in a background worker after a 300 ms typing delay. Results are bound
+to the requested path generation; closing the dialog does not wait for the worker
+or let it access the destroyed window. At most one scan runs per dialog.
+Clear checks metadata deletion failures and preserves ownership for retry.
+The extended cache suite covers locked metadata, recovery and pruning at close.
+Interactive desktop acceptance of the asynchronous usage display remains pending.
+
+Validation of the review build: 62 cache, 40 redirect, 60 Agent, 10 cache-Agent,
+99 CLI, 71 retry, and 8 cancellation scenarios passed (350 total), plus compiled
+Open URL/cache resource layout checks. MSVC rebuilt the engine, console, File
+Manager and Agent harness; Zig rebuilt the cache harness. No performance
+benchmark or interactive desktop acceptance is claimed by these checks.

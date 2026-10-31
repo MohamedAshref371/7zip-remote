@@ -17,7 +17,7 @@ python Tests/RemoteArchive/test_disk_cache_agent.py --exe .build/msvc/disk-cache
 python Tests/RemoteArchive/test_cache_layout.py --exe .build/msvc/disk-cache/7zFM.exe
 ```
 
-The 51-scenario transport suite covers identity, consent, corruption, scope
+The 62-scenario transport suite covers identity, consent, corruption, scope
 changes, generation binding, write/clear failures, limits, process locks, crash
 recovery, junctions and cancellation. Ten real-Agent cache scenarios cover ZIP/7z
 selected extraction and GNU/MSVC cache-format interoperability. These are
@@ -64,7 +64,8 @@ The current shared transport follows 301/302/303/307/308 redirects, with a maxim
 of five hops and one deadline for the entire range request. Relative Location
 values are resolved without decoding signed paths/queries. HTTPS downgrades and
 embedded credentials are rejected; cookies and authentication stay disabled.
-The resolved destination is reused for subsequent reads in the session. Refresh
+The resolved destination is reused for subsequent reads in the session. Later
+redirects to a different resource require reopening with the final direct URL. Refresh
 starts from the original user URL. See [redirect implementation and validation](../../Notes/18-http-redirects.md).
 
 ```powershell
@@ -91,7 +92,7 @@ The dialog also has an **Archive type** dropdown: **Auto** (default), **ZIP**,
 the engine identify the generation. Auto uses normal format detection; other explicit
 selections are passed to the existing handler selection. Refresh retains both the
 type and ETag policy. Direct address-bar opens and the console retain their
-existing strict ETag defaults. The latest GUI build is in `.build/msvc/iso-options/`.
+existing strict ETag defaults. The review GUI build is in `.build/msvc/review-fixes/`.
 
 The unified RAR choice is covered by `test_rar_family.py --rar4 PATH --rar5 PATH`,
 using caller-supplied fixtures. It compares complete extracted file hashes with

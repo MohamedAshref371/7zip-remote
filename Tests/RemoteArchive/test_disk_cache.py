@@ -99,9 +99,11 @@ def main():
         server.redirects['late-cache'] = (307, ['/ok/cache.bin?sig=new-endpoint'])
         server.redirect_after_probe.add('late-cache')
         changed, text = run('late-redirect-never-mixes-cached-scope', late, mode='late-cache', code=1)
-        assert changed['hits'] == 4 and not changed['id'] and 'source location changed' in text
-        reopened, text = run('late-redirect-reopen-memory-fallback', late, mode='late-cache')
-        assert reopened['hits'] == 0 and not reopened['id'] and 'paused after a source redirect' in text
+        assert changed['hits'] == 4
+        # Transport rejects the new resource before reading its response body.
+        run('late-redirect-reopen-still-rejected', late, mode='late-cache', code=1)
+        fresh, _ = run('late-redirect-final-url', late, source=base + '/ok/cache.bin?sig=new-endpoint')
+        assert fresh['hits'] == 0
 
         version = work / 'version'
         initial, _ = run('version-first', version)
@@ -179,11 +181,35 @@ def main():
         run('clear-after-io-recovers', failed_io, options=('--cache-clear',))
         assert not block.exists() and not list(failed_io.rglob('*.tmp-*'))
 
+        for name in ('info.bin', 'entry.owner', 'session.lock'):
+            folder = work / ('clear-locked-' + name)
+            seeded, _ = run('seed-locked-' + name, folder)
+            entry = folder / '.7z-http-cache-v1' / seeded['id']
+            # Allow reads/writes, but deny deletion of metadata.
+            handle = api.CreateFileW(str(entry / name), 0x80000000, 3, None, 3, 0, None)
+            assert handle not in (None, ctypes.c_void_p(-1).value)
+            try:
+                if name == 'session.lock':
+                    run('clear-locked-' + name, folder, options=('--cache-clear',))
+                    assert (entry / 'info.bin').exists()
+                else:
+                    run('clear-locked-' + name, folder, options=('--cache-clear',), code=1)
+                    assert (entry / 'entry.owner').exists()
+            finally:
+                api.CloseHandle(handle)
+            run('clear-recovered-' + name, folder, options=('--cache-clear',))
+            assert not entry.exists()
+
         limited = work / 'limited'
         saved, _ = run('unlimited-cache', limited, options=('--cache-limit=0',))
         limited_stats, _ = run('lowered-limit-on-open', limited, options=('--cache-limit=1048576',))
         used = sum(p.stat().st_size for p in (limited / '.7z-http-cache-v1').rglob('*') if p.is_file())
         assert used <= 1048576 and limited_stats['id'] == saved['id']
+
+        batch = work / 'batched-limit'
+        run('batched-limit-close', batch, options=('--cache-limit=4194304', '--cache-blocks=32'))
+        used = sum(p.stat().st_size for p in (batch / '.7z-http-cache-v1').rglob('*') if p.is_file())
+        assert used <= 4194304
 
         bad = work / 'not-a-folder'; bad.write_bytes(b'preserve')
         stats, text = run('io-failure-memory-fallback', bad)

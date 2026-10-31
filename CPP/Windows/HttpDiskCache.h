@@ -254,6 +254,7 @@ class CHttpDiskCache
   std::wstring _root, _folder, _id, _liveEndpoint;
   HANDLE _lock = INVALID_HANDLE_VALUE;
   ULONGLONG _maximum = 0;
+  ULONGLONG _unprunedBytes = 0;
   NHttpCache::CInfo _info = {};
   std::map<ULONGLONG, unsigned> _blocks;
   bool BlockIdentity(BYTE *digest) const
@@ -298,6 +299,17 @@ public:
   ~CHttpDiskCache() { Close(); }
   void Close()
   {
+    // Finish a batch when a session closes. Busy management falls back to the
+    // next open/write; never throw from the destructor.
+    if (Enabled() && _unprunedBytes)
+      try
+      {
+        NHttpCache::CCacheHandle manager(CreateFileW((_root + L"\\manage.lock").c_str(), GENERIC_WRITE, 0,
+            NULL, OPEN_ALWAYS, FILE_FLAG_OPEN_REPARSE_POINT, NULL));
+        if (manager.Valid()) Prune();
+      }
+      catch (...) {}
+    _unprunedBytes = 0;
     if (_lock != INVALID_HANDLE_VALUE) CloseHandle(_lock);
     _lock = INVALID_HANDLE_VALUE;
     _folder.clear(); _id.clear(); _blocks.clear(); _liveEndpoint.clear();
@@ -346,11 +358,22 @@ public:
               && wcscmp(file.cFileName, L"entry.owner") != 0)
             if (!DeleteFileW((folder + L"\\" + file.cFileName).c_str())) entryOk = false;
         if (entryOk)
-        { DeleteFileW((folder + L"\\info.bin").c_str()); DeleteFileW((folder + L"\\entry.owner").c_str()); }
-        else ok = false;
+        {
+          // Retain the ownership marker if metadata cannot be removed, so a
+          // later Clear can still discover and finish this entry.
+          const bool removed = DeleteFileW((folder + L"\\info.bin").c_str()) != FALSE;
+          if (!removed && GetLastError() != ERROR_FILE_NOT_FOUND) entryOk = false;
+          if (entryOk && !DeleteFileW((folder + L"\\entry.owner").c_str())
+              && GetLastError() != ERROR_FILE_NOT_FOUND) entryOk = false;
+        }
+        if (!entryOk) ok = false;
       }
-      DeleteFileW((folder + L"\\session.lock").c_str());
-      RemoveDirectoryW(folder.c_str());
+      if (!DeleteFileW((folder + L"\\session.lock").c_str()) && GetLastError() != ERROR_FILE_NOT_FOUND) ok = false;
+      if (!RemoveDirectoryW(folder.c_str()))
+      {
+        // Unrelated files intentionally keep their directory alive.
+        if (GetLastError() != ERROR_DIR_NOT_EMPTY && GetLastError() != ERROR_PATH_NOT_FOUND) ok = false;
+      }
     }
     return ok;
   }
@@ -520,13 +543,16 @@ public:
     { Status = L"Cache write failed (memory only for new data)"; return; }
     _blocks[offset] = (unsigned)data.size();
     Touch(_folder + L"\\info.bin");
-    Prune();
+    _unprunedBytes += bytes.size();
+    // Bound temporary excess while amortizing directory scans for large caches.
+    if (_maximum && _unprunedBytes >= (std::min)(4ull << 20, (std::max)(1ull, _maximum / 16))) Prune();
   }
 private:
   // Caller holds manage.lock. Active foreign entries remain untouched.
   void Prune()
   {
     using namespace NHttpCache;
+    _unprunedBytes = 0;
     if (!_maximum) return;
     const auto catalog = CatalogRoot(_root);
     ULONGLONG used = 0;

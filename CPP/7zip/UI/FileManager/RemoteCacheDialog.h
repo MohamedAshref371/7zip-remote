@@ -4,6 +4,9 @@
 #include "../../../Windows/Shell.h"
 #include "../Common/RemoteSelection.h"
 #include "ComboDialogRes.h"
+#include <atomic>
+#include <memory>
+#include <thread>
 
 inline void LoadRemoteOpenSettings(bool &skipETag, bool &reuseUnverified)
 {
@@ -69,21 +72,74 @@ inline bool SaveRemoteCacheSettings(const NWindows::CHttpDiskCacheOptions &optio
 
 class CRemoteCacheDialog Z7_final: public NWindows::NControl::CModalDialog
 {
+  struct CUsageResult
+  {
+    std::atomic<bool> Done{false};
+    bool Ok = false;
+    ULONGLONG Used = 0;
+    size_t Count = 0;
+    unsigned Generation = 0;
+    std::wstring Path;
+  };
+  std::shared_ptr<CUsageResult> _usage;
+  unsigned _usageGeneration = 0;
+  DWORD _usageChanged = 0;
+  bool _usagePending = false;
   void Usage()
   {
-    try
+    ++_usageGeneration;
+    _usageChanged = GetTickCount();
+    _usagePending = true;
+    SetItemText(IDC_CACHE_USAGE, L"Calculating cache usage...");
+    if (!::SetTimer(*this, 1, 100, NULL))
+      SetItemText(IDC_CACHE_USAGE, L"Cache usage unavailable");
+  }
+  bool OnTimer(WPARAM timerID, LPARAM callback) Z7_override
+  {
+    if (timerID != 1) return CModalDialog::OnTimer(timerID, callback);
+    if (_usage && _usage->Done.load())
     {
-    UString path;
-    GetItemText(IDC_CACHE_PATH, path);
-    ULONGLONG used = 0;
-    const auto entries = NWindows::CHttpDiskCache::Catalog(path.Ptr());
-    for (const auto &entry : entries) used += entry.Used;
-    UString text = L"Used: ";
-    text += RemoteSelectionSize(used);
-    text += L" in "; text.Add_UInt64(entries.size()); text += L" saved archives";
-    SetItemText(IDC_CACHE_USAGE, text);
+      if (_usage->Generation == _usageGeneration)
+      {
+        if (_usage->Ok)
+        {
+          UString text = L"Used: ";
+          text += RemoteSelectionSize(_usage->Used);
+          text += L" in "; text.Add_UInt64(_usage->Count); text += L" saved archives";
+          SetItemText(IDC_CACHE_USAGE, text);
+        }
+        else SetItemText(IDC_CACHE_USAGE, L"Cache usage unavailable");
+      }
+      _usage.reset();
     }
-    catch (...) { SetItemText(IDC_CACHE_USAGE, L"Cache usage unavailable"); }
+    if (!_usage && _usagePending && GetTickCount() - _usageChanged >= 300)
+    {
+      _usagePending = false;
+      try
+      {
+        auto result = std::make_shared<CUsageResult>();
+        UString path; GetItemText(IDC_CACHE_PATH, path);
+        result->Path = path.Ptr();
+        result->Generation = _usageGeneration;
+        // The worker owns only its result, never a dialog or HWND. Closing the
+        // dialog cannot leave a callback targeting a destroyed/reused window.
+        std::thread([result]()
+        {
+          try
+          {
+            const auto entries = NWindows::CHttpDiskCache::Catalog(result->Path);
+            for (const auto &entry : entries) result->Used += entry.Used;
+            result->Count = entries.size(); result->Ok = true;
+          }
+          catch (...) {}
+          result->Done.store(true);
+        }).detach();
+        _usage = result;
+      }
+      catch (...) { SetItemText(IDC_CACHE_USAGE, L"Cache usage unavailable"); }
+    }
+    if (!_usage && !_usagePending) ::KillTimer(*this, 1);
+    return true;
   }
   bool OnInit() Z7_override
   {

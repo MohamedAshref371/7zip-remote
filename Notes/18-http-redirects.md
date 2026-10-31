@@ -24,8 +24,9 @@ the existing ETag policy. Error messages exclude both original and destination
 URLs. No browser login, HTML sharing-page resolution, retry or fallback is added.
 
 The resolved URL becomes the source's next request destination, avoiding a repeat
-of the initial chain for every cache miss. Later data-range redirects are also
-supported and must pass the established source identity/size checks. File Manager
+of the initial chain for every cache miss. After the probe establishes the resource, a data-range redirect to a different
+URL is rejected before contacting that destination, even with ETag bypass or
+disk caching disabled. Reopen using the final direct URL. File Manager
 retains the original user URL for explicit Refresh, so refreshed sessions resolve
 the link again. Redirect response bodies are not read or published as archive
 data; downloaded-byte statistics continue to count only body bytes delivered to
@@ -48,10 +49,10 @@ python Tests/RemoteArchive/build_msvc.py --target filemanager --bin-dir .build/m
 ```
 
 MSVC HTTP and local-only File Manager builds and the portable Zig build succeed.
-The redirect suite passes 35 scenarios, checking selected extraction hashes,
+The redirect suite passes 40 scenarios, checking selected extraction hashes,
 five redirect status codes, signed queries, relative references, cross-origin
 ports, five/six-hop boundaries, malformed destinations, absent cookies/auth/Referer,
-late data-range redirects, retained ETag/size checks, bypass behavior, request and
+rejected late resource changes (including equal-size/ETag collisions), retained ETag/size checks, bypass behavior, request and
 byte accounting, cancellation at a stalled destination, and a shared 250 ms
 deadline across delayed hops. Cross-origin fixtures use two loopback ports.
 

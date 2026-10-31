@@ -378,6 +378,10 @@ HRESULT CHttpRangeSource::Request(ULONGLONG start, unsigned length, bool probe,
     }
     if (result == S_FALSE)
     {
+      // Validators are scoped to a resource, not globally unique. Once the
+      // probe has established identity, another URL needs a fresh session.
+      if (!probe && ResolveRedirect(_url, redirect) != _url)
+        return Fail("Archive source location changed. Reopen using the final direct download URL.");
       if (hops++ == 5) return Fail("Too many HTTP redirects (maximum 5). Obtain a fresh direct download URL.");
       if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
       const HRESULT changed = SetUrl(ResolveRedirect(_url, redirect));
