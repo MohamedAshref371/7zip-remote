@@ -298,6 +298,7 @@ HRESULT CHttpRangeSource::Open(const wchar_t *url, const CHttpRangeOptions &opti
 {
   if (_session) return Fail("Create a new source to reopen an archive.", E_UNEXPECTED);
   _options = options;
+  ReportStage(kHttpConnecting);
   if (IsCancelled()) return Fail("Cancelled.", E_ABORT);
   if (!url || options.TimeoutMs <= 0 || options.RequestDeadlineMs == 0)
     return Fail("Invalid source options.", E_INVALIDARG);

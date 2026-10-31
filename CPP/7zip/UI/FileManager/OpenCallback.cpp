@@ -27,7 +27,9 @@ HRESULT COpenArchiveCallback::Open_SetTotal(const UInt64 *numFiles, const UInt64
     ProgressDialog.Sync.Set_NumFilesTotal(numFiles ? *numFiles : (UInt64)(Int64)-1);
     // if (numFiles)
     {
-      ProgressDialog.Sync.Set_FilesProgressMode(numFiles != NULL);
+      // Archive size is not the total amount of metadata/download work. During
+      // opening, show a percentage only when the actual item total is known.
+      ProgressDialog.Sync.Set_FilesProgressMode(true);
     }
     if (numBytes)
       ProgressDialog.Sync.Set_NumBytesTotal(*numBytes);

@@ -15,9 +15,10 @@ static const wchar_t *g_TestPassword = L"fixture-password";
 class CTestCallback Z7_final:
     public IFolderArchiveExtractCallback, public IArchiveOpenCallback,
     public ICryptoGetTextPassword, public CMyUnknownImp
-    , public IRemoteProgress, public IArchiveOpenFileProgress
+    , public IRemoteProgress, public IArchiveOpenFileProgress, public IRemoteOperationProgress
 {
-  Z7_COM_UNKNOWN_IMP_5(IFolderArchiveExtractCallback, IArchiveOpenCallback, ICryptoGetTextPassword, IRemoteProgress, IArchiveOpenFileProgress)
+  Z7_COM_UNKNOWN_IMP_6(IFolderArchiveExtractCallback, IArchiveOpenCallback, ICryptoGetTextPassword, IRemoteProgress, IArchiveOpenFileProgress, IRemoteOperationProgress)
+  Z7_IFACE_COM7_IMP(IRemoteOperationProgress)
   Z7_IFACE_COM7_IMP(IArchiveOpenFileProgress)
   Z7_IFACE_COM7_IMP(IRemoteProgress)
   Z7_IFACE_COM7_IMP(IProgress)
@@ -77,6 +78,12 @@ Z7_COM7F_IMF(CTestCallback::SetCurrentFileName(const wchar_t *name, UInt64 files
     fflush(stdout);
   }
   return IsCancelled() || (CancelOpenFile && files >= CancelOpenFile) ? E_ABORT : S_OK;
+}
+
+Z7_COM7F_IMF(CTestCallback::SetOperationStage(UInt32 stage))
+{
+  printf("STAGE %u\n", stage);
+  return IsCancelled() ? E_ABORT : S_OK;
 }
 
 Z7_COM7F_IMF(CTestCallback::SetNetworkProgress(UInt64 bytes, UInt64 size, UInt64 requests))
@@ -281,6 +288,10 @@ static int CheckNetworkSync()
   ranges.clear();
   CHECK(stream.EstimateMissingBytes(ranges, estimate) && estimate == 0);
   COpenArchiveCallback open;
+  const UInt64 referenceSize = 1000000;
+  CHECK_HR(open.Open_SetTotal(NULL, &referenceSize));
+  CHECK(open.ProgressDialog.Sync._filesProgressMode
+      && open.ProgressDialog.Sync._totalFiles == (UInt64)(Int64)-1);
   COpenCallbackImp *bridge = new COpenCallbackImp;
   CMyComPtr<IArchiveOpenCallback> bridgeRef = bridge;
   bridge->Callback = &open;
@@ -294,12 +305,22 @@ static int CheckNetworkSync()
   CHECK(open.ProgressDialog.Sync._completedBytes == 0);
   CHECK_HR(progress->SetNetworkEstimate(200, 1));
   CHECK(open.ProgressDialog.Sync._networkEstimateDefined && open.ProgressDialog.Sync._networkEstimate == 200);
+  CMyComPtr<IRemoteOperationProgress> stages;
+  CHECK_HR(bridgeRef.QueryInterface(IID_IRemoteOperationProgress, &stages));
+  CHECK_HR(stages->SetOperationStage(NWindows::kHttpConnecting));
+  CHECK(open.ProgressDialog.Sync._status == L"Connecting to archive");
+  CHECK(open.ProgressDialog.Sync._lastDiscovered);
+  CHECK_HR(stages->SetOperationStage(NWindows::kHttpCheckingCache));
+  CHECK(open.ProgressDialog.Sync._status == L"Checking saved archive parts");
+  CHECK_HR(stages->SetOperationStage(NWindows::kHttpReadingHeaders));
   CMyComPtr<IArchiveOpenFileProgress> names;
   CHECK_HR(bridgeRef.QueryInterface(IID_IArchiveOpenFileProgress, &names));
   CHECK_HR(names->SetCurrentFileName(L"docs/\x0645\x0644\x0641.txt", 7));
   CHECK(open.ProgressDialog.Sync._filePath == L"docs/\x0645\x0644\x0641.txt");
   CHECK(open.ProgressDialog.Sync._status == L"Reading archive headers");
   CHECK(open.ProgressDialog.Sync._curFiles == 7);
+  CHECK(open.ProgressDialog.Sync._filesProgressMode);
+  CHECK(open.ProgressDialog.Sync._totalFiles == (UInt64)(Int64)-1);
   open.ProgressDialog.Sync.Set_Stopped(true);
   CHECK(names->SetCurrentFileName(L"next", 8) == E_ABORT);
   bridge->Callback = NULL;
@@ -310,6 +331,11 @@ static int CheckNetworkSync()
   CProgressDialog dialog;
   extract->ProgressDialog = &dialog;
   CHECK_HR(extractRef.QueryInterface(IID_IRemoteProgress, &progress));
+  CHECK_HR(extractRef.QueryInterface(IID_IRemoteOperationProgress, &stages));
+  CHECK_HR(stages->SetOperationStage(NWindows::kHttpExtracting));
+  CHECK(dialog.Sync._status == L"Extracting selected files" && !dialog.Sync._lastDiscovered);
+  CHECK_HR(stages->SetOperationStage(NWindows::kHttpTesting));
+  CHECK(dialog.Sync._status == L"Testing selected files");
   CHECK_HR(progress->SetNetworkProgress(789, 1024, 3));
   CHECK(dialog.Sync._networkBytes == 789 && dialog.Sync._networkRequests == 3);
   CHECK(dialog.Sync._networkSize == 1024 && dialog.Sync._completedBytes == 0);
@@ -472,6 +498,17 @@ int __cdecl wmain(int argc, wchar_t **argv)
     callback->PrintNetwork("open");
   } // Destroy the open callback before subsequent reads: no retained raw pointer.
   CHECK_HR(folder->LoadItems());
+  if (showOpenFiles)
+  {
+    CMyComPtr<IFolderFolder> restored;
+    CHECK_HR(BindRemoteArchivePath(folder, L"docs\\", restored));
+    CHECK_HR(restored->LoadItems());
+    CHECK_HR(BindRemoteArchivePath(folder, L"docs/", restored));
+    CHECK(BindRemoteArchivePath(folder, L"docs/missing/", restored) != S_OK && !restored);
+    CHECK_HR(BindRemoteArchivePath(folder, UString(), restored));
+    CHECK(restored == folder);
+    printf("RESTORE_PATH_OK\n");
+  }
   if (renewUrl)
   {
     CMyComPtr<IRemoteCacheStatus> oldCache;

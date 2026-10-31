@@ -47,11 +47,15 @@ public:
  #ifndef Z7_SFX
   HRESULT Open_CurrentFile(const wchar_t *name, UInt64 files) Z7_override
   {
-    ProgressDialog.Sync.Set_NumFilesCur(files);
-    return ProgressDialog.Sync.Set_Status2(UString(L"Reading archive headers"), name);
+    return ProgressDialog.Sync.Set_OpenFile(name, files);
   }
  #endif
  #if defined(Z7_HTTP) && !defined(Z7_SFX)
+  HRESULT Open_OperationStage(UInt32 stage) Z7_override
+  {
+    ProgressDialog.Sync.Set_OperationStage(stage);
+    return ProgressDialog.Sync.CheckStop();
+  }
   HRESULT Open_NetworkEstimate(UInt64 bytes, Int32 defined) Z7_override
   {
     ProgressDialog.Sync.Set_NetworkEstimate(bytes, defined != 0);

@@ -19,4 +19,15 @@ struct Z7_DECLSPEC_NOVTABLE IRemoteProgress: public IUnknown
 };
 Z7_PURE_INTERFACES_END
 
+static const GUID IID_IRemoteOperationProgress =
+    { 0x0a430ab1, 0xca24, 0x42ac, { 0x88, 0xae, 0x06, 0x7d, 0x31, 0x20, 0xa1, 0x19 } };
+#define Z7_IFACEM_IRemoteOperationProgress(x) \
+  x(SetOperationStage(UInt32 stage))
+Z7_PURE_INTERFACES_BEGIN
+struct Z7_DECLSPEC_NOVTABLE IRemoteOperationProgress: public IUnknown
+{
+  Z7_IFACE_COM7_PURE(IRemoteOperationProgress)
+};
+Z7_PURE_INTERFACES_END
+
 #endif

@@ -252,6 +252,36 @@ void CProgressSync::Set_FilePath(const wchar_t *path, bool isDir)
   _isDir = isDir;
 }
 
+HRESULT CProgressSync::Set_OpenFile(const wchar_t *path, UInt64 files)
+{
+  {
+    CRITICAL_LOCK
+    _curFiles = files;
+    _status = L"Reading archive headers";
+    _filePath = path ? path : L"";
+    _lastDiscovered = true;
+    // The discovered-item total is unknown while scanning headers. Archive
+    // size is a reference, not a known total number of items or download bytes.
+    _filesProgressMode = true;
+    _totalFiles = UNDEFINED_VAL;
+    _isDir = false;
+  }
+  return CheckStop();
+}
+
+#ifdef Z7_HTTP
+void CProgressSync::Set_OperationStage(UInt32 stage)
+{
+  static const wchar_t * const names[] = { L"Connecting to archive", L"Checking saved archive parts",
+      L"Reading archive headers", L"Extracting selected files", L"Testing selected files" };
+  if (stage >= Z7_ARRAY_SIZE(names)) return;
+  CRITICAL_LOCK
+  _status = names[stage];
+  _lastDiscovered = stage <= 2;
+  if (stage < 2) _filePath.Empty();
+}
+#endif
+
 
 void CProgressSync::AddError_Message(const wchar_t *message)
 {
@@ -741,6 +771,7 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
  #endif
   UInt64 total, completed, totalFiles, completedFiles, inSize, outSize;
   bool filesProgressMode;
+  bool lastDiscovered;
 
   bool titleFileName_Changed;
   bool curFilePath_Changed;
@@ -755,6 +786,7 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
     inSize = Sync._inSize;
     outSize = Sync._outSize;
     filesProgressMode = Sync._filesProgressMode;
+    lastDiscovered = Sync._lastDiscovered;
    #ifdef Z7_HTTP
     networkDefined = Sync._networkDefined;
     estimateDefined = Sync._networkEstimateDefined;
@@ -777,6 +809,7 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
   }
 
   UInt32 curTime = ::GetTickCount();
+  SetItemText(IDT_PROGRESS_PATH_KIND, lastDiscovered ? L"Last discovered item:" : L"Current item:");
 
  #ifdef Z7_HTTP
   if (networkDefined)
@@ -925,7 +958,7 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
     }
 
     {
-      UInt64 percent = 0;
+      UInt64 percent = UNDEFINED_VAL;
       {
         if (IS_DEFINED_VAL(progressTotal))
         {

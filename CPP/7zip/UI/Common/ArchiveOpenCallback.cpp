@@ -41,6 +41,19 @@ Z7_COM7F_IMF(COpenCallbackImp::SetCurrentFileName(const wchar_t *name, UInt64 fi
 }
 
 #ifdef Z7_HTTP
+Z7_COM7F_IMF(COpenCallbackImp::SetOperationStage(UInt32 stage))
+{
+  COM_TRY_BEGIN
+  if (ReOpenCallback)
+  {
+    CMyComPtr<IRemoteOperationProgress> progress;
+    ReOpenCallback->QueryInterface(IID_IRemoteOperationProgress, (void **)&progress);
+    return progress ? progress->SetOperationStage(stage) : S_OK;
+  }
+  return Callback ? Callback->Open_OperationStage(stage) : S_OK;
+  COM_TRY_END
+}
+
 Z7_COM7F_IMF(COpenCallbackImp::SetNetworkEstimate(UInt64 bytes, Int32 defined))
 {
   COM_TRY_BEGIN

@@ -36,6 +36,7 @@ class CProgressSync
 public:
   bool _filesProgressMode;
   bool _isDir;
+  bool _lastDiscovered = false;
   UInt64 _totalBytes;
   UInt64 _completedBytes;
   UInt64 _totalFiles;
@@ -50,6 +51,7 @@ public:
   ULONGLONG _networkStarted;
   void Set_NetworkProgress(UInt64 downloaded, UInt64 size, UInt64 requests);
   void Set_NetworkEstimate(UInt64 bytes, bool defined);
+  void Set_OperationStage(UInt32 stage);
  #endif
   
   UString _titleFileName;
@@ -102,6 +104,7 @@ public:
   void Set_Status(const UString &s);
   HRESULT Set_Status2(const UString &s, const wchar_t *path, bool isDir = false);
   void Set_FilePath(const wchar_t *path, bool isDir = false);
+  HRESULT Set_OpenFile(const wchar_t *path, UInt64 files);
 
   void AddError_Message(const wchar_t *message);
   void AddError_Message_Name(const wchar_t *message, const wchar_t *name);

@@ -144,10 +144,16 @@ class CRemoteProgressScope
 {
   CRemoteArchiveSource &_source;
   CMyComPtr<IRemoteProgress> _callback;
+  CMyComPtr<IRemoteOperationProgress> _stageCallback;
   UInt64 _bytesBase;
   UInt64 _requestsBase;
   bool _estimateDefined;
   UInt64 _estimate;
+  static void Stage(void *context, unsigned stage)
+  {
+    CRemoteProgressScope &self = *static_cast<CRemoteProgressScope *>(context);
+    if (self._stageCallback) self._stageCallback->SetOperationStage(stage);
+  }
   static void Report(void *context, ULONGLONG bytes, ULONGLONG size, ULONGLONG requests)
   {
     CRemoteProgressScope &self = *static_cast<CRemoteProgressScope *>(context);
@@ -162,6 +168,7 @@ public:
       _source(source), _bytesBase(0), _requestsBase(0), _estimateDefined(false), _estimate(0)
   {
     if (callback) callback->QueryInterface(IID_IRemoteProgress, (void **)&_callback);
+    if (callback) callback->QueryInterface(IID_IRemoteOperationProgress, (void **)&_stageCallback);
     if (source.Spec)
     {
       _bytesBase = source.Spec->Source.Downloaded;
@@ -173,7 +180,9 @@ public:
   {
     options.Progress = Report;
     options.ProgressContext = this;
+    options.OperationStage = Stage;
   }
+  void SetStage(unsigned stage) { if (_source.Spec) Stage(this, stage); }
   void Estimate(IInArchive *archive, const UInt32 *indices, UInt32 count)
   {
     if (!_source.Spec || !_callback || !archive) return;

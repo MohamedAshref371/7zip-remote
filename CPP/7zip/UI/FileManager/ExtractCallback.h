@@ -182,6 +182,7 @@ class CExtractCallbackImp Z7_final:
   public IFolderArchiveExtractCallback,
  #ifdef Z7_HTTP
   public IRemoteProgress,
+  public IRemoteOperationProgress,
  #endif
   /* IExtractCallbackUI:
        before v23.00 : it         included IFolderArchiveExtractCallback
@@ -204,6 +205,7 @@ class CExtractCallbackImp Z7_final:
   Z7_COM_QI_BEGIN2(IFolderArchiveExtractCallback)
  #ifdef Z7_HTTP
   Z7_COM_QI_ENTRY(IRemoteProgress)
+  Z7_COM_QI_ENTRY(IRemoteOperationProgress)
  #endif
   Z7_COM_QI_ENTRY(IFolderArchiveExtractCallback2)
  #ifndef Z7_SFX
@@ -222,6 +224,7 @@ class CExtractCallbackImp Z7_final:
   Z7_IFACE_IMP(IOpenCallbackUI)
  #ifdef Z7_HTTP
   Z7_IFACE_COM7_IMP(IRemoteProgress)
+  Z7_IFACE_COM7_IMP(IRemoteOperationProgress)
   HRESULT Open_NetworkEstimate(UInt64 bytes, Int32 defined) Z7_override
   {
     return SetNetworkEstimate(bytes, defined);

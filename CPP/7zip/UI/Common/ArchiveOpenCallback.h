@@ -48,6 +48,7 @@ DECLARE_INTERFACE(IOpenCallbackUI)
  #ifdef Z7_HTTP
   virtual HRESULT Open_NetworkProgress(UInt64, UInt64, UInt64) { return S_OK; }
   virtual HRESULT Open_NetworkEstimate(UInt64, Int32) { return S_OK; }
+  virtual HRESULT Open_OperationStage(UInt32) { return S_OK; }
  #endif
 };
 
@@ -111,6 +112,7 @@ class COpenCallbackImp Z7_final:
   public IArchiveOpenFileProgress,
  #ifdef Z7_HTTP
   public IRemoteProgress,
+  public IRemoteOperationProgress,
  #endif
   public IArchiveOpenVolumeCallback,
   public IArchiveOpenSetSubArchiveName,
@@ -124,6 +126,7 @@ class COpenCallbackImp Z7_final:
   Z7_COM_QI_ENTRY(IArchiveOpenFileProgress)
  #ifdef Z7_HTTP
   Z7_COM_QI_ENTRY(IRemoteProgress)
+  Z7_COM_QI_ENTRY(IRemoteOperationProgress)
  #endif
   Z7_COM_QI_ENTRY(IArchiveOpenVolumeCallback)
   Z7_COM_QI_ENTRY(IArchiveOpenSetSubArchiveName)
@@ -138,6 +141,7 @@ class COpenCallbackImp Z7_final:
   Z7_IFACE_COM7_IMP(IArchiveOpenFileProgress)
  #ifdef Z7_HTTP
   Z7_IFACE_COM7_IMP(IRemoteProgress)
+  Z7_IFACE_COM7_IMP(IRemoteOperationProgress)
  #endif
   Z7_IFACE_COM7_IMP(IArchiveOpenVolumeCallback)
   Z7_IFACE_COM7_IMP(IProgress)

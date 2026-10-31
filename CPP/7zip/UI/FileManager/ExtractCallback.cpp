@@ -40,6 +40,12 @@ using namespace NFind;
 extern bool g_DisableUserQuestions;
 
 #ifdef Z7_HTTP
+Z7_COM7F_IMF(CExtractCallbackImp::SetOperationStage(UInt32 stage))
+{
+  ProgressDialog->Sync.Set_OperationStage(stage);
+  return ProgressDialog->Sync.CheckStop();
+}
+
 Z7_COM7F_IMF(CExtractCallbackImp::SetNetworkEstimate(UInt64 bytes, Int32 defined))
 {
   ProgressDialog->Sync.Set_NetworkEstimate(bytes, defined != 0);

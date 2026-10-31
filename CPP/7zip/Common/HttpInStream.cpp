@@ -78,9 +78,11 @@ HRESULT CHttpInStream::Open(const wchar_t *url, const NWindows::CHttpRangeOption
     _failure = Source.Open(url, options);
     if (_failure == S_OK)
     {
+      if (options.DiskCache.Enabled) Source.ReportStage(NWindows::kHttpCheckingCache);
       try { _failure = DiskCache.Open(options.DiskCache, url, Source, _exactReads); }
       catch (...) { DiskCache.Close(); DiskCache.Status = L"Cache unavailable (memory only)"; }
     }
+    if (_failure == S_OK) Source.ReportStage(NWindows::kHttpReadingHeaders);
   }
   catch (const std::bad_alloc &) { _failure = E_OUTOFMEMORY; }
   catch (...) { _failure = E_FAIL; }

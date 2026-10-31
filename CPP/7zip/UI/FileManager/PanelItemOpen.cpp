@@ -669,7 +669,7 @@ HRESULT CPanel::ReopenRemoteArchive(const UString &url,
       if (!folderPath.IsEmpty())
       {
         CMyComPtr<IFolderFolder> folder;
-        if (_folder->BindToFolder(folderPath, &folder) == S_OK && folder)
+        if (BindRemoteArchivePath(_folder, folderPath, folder) == S_OK && folder)
           SetNewFolder(folder);
         else restoreSelection = false;
       }

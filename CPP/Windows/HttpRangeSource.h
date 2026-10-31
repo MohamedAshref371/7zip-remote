@@ -9,6 +9,9 @@
 
 namespace NWindows {
 
+enum EHttpOperationStage { kHttpConnecting, kHttpCheckingCache, kHttpReadingHeaders,
+    kHttpExtracting, kHttpTesting };
+
 struct CHttpRangeOptions
 {
   HANDLE CancelEvent = NULL; // caller-owned, must outlive the source
@@ -21,6 +24,7 @@ struct CHttpRangeOptions
   CHttpDiskCacheOptions DiskCache;
   void (*Progress)(void *, ULONGLONG, ULONGLONG, ULONGLONG) = NULL;
   void *ProgressContext = NULL; // scoped to the current operation
+  void (*OperationStage)(void *, unsigned) = NULL;
 };
 
 class CHttpRangeSource
@@ -59,10 +63,13 @@ public:
   const std::wstring &ETag() const { return _etag; }
   const std::wstring &FinalUrl() const { return _url; }
   bool SkipsETag() const { return _options.SkipETagVerification; }
+  void ReportStage(unsigned stage) const
+  { if (_options.OperationStage) _options.OperationStage(_options.ProgressContext, stage); }
   void SetProgress(void (*progress)(void *, ULONGLONG, ULONGLONG, ULONGLONG), void *context)
   {
     _options.Progress = progress;
     _options.ProgressContext = context;
+    if (!progress) _options.OperationStage = NULL;
     ReportProgress();
   }
   void SetCancelCheck(bool (*check)(void *), void *context)
