@@ -20,7 +20,7 @@ design, evidence, and remaining work.
   retaining the current folder and selection where possible. Linking previous
   cached parts requires separate consent to partial verification. Failed renewal
   preserves the previous view; interrupted extraction is restarted manually.
-- **Archive type selection:** Auto, ZIP, 7z, RAR, or ISO. The single RAR choice detects
+- **Archive type selection:** Auto, ZIP, 7z, RAR, ISO, or TAR. The single RAR choice detects
   the appropriate RAR/RAR5 handler internally. Refresh retains the selected type.
 - **Console:** direct URLs for `l`, `x`, `e`, and `t`.
 - **HTTP input stream:** WinHTTP transport, seekable reads, a bounded memory
@@ -94,7 +94,7 @@ Zig/Clang build instructions are available in the [test and build guide](Tests/R
 ```
 
 1. Choose **File → Open URL...** and paste a direct archive URL.
-2. Leave **Archive type** on **Auto**, or choose ZIP, 7z, RAR, or ISO if known.
+2. Leave **Archive type** on **Auto**, or choose ZIP, 7z, RAR, ISO, or TAR if known.
 3. Select the desired ETag policy; bypass is initially unchecked. Both the ETag
    bypass and unverified cache reuse choices are remembered after pressing OK.
 4. Browse and extract items through the normal File Manager controls.

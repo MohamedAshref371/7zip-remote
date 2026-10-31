@@ -568,6 +568,7 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
     _format.AddString(L"7z");
     _format.AddString(L"RAR");
     _format.AddString(L"ISO");
+    _format.AddString(L"TAR");
     _format.SetCurSel(0);
     bool reuseUnverified = false;
     LoadRemoteOpenSettings(SkipHttpETag, reuseUnverified);
@@ -596,6 +597,7 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
       case 2: ArcFormat = "7z"; break;
       case 3: ArcFormat = "rar"; break;
       case 4: ArcFormat = "iso"; break;
+      case 5: ArcFormat = "tar"; break;
       default: ArcFormat.Empty(); break; // Empty uses the engine's format detection.
     }
     if (!SaveRemoteOpenSettings(SkipHttpETag, reuseUnverified))

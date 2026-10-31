@@ -163,6 +163,8 @@ def main():
         assert all(r['if_match'] is None for r in server.records[strict_end:])
         run('default-still-strict', f'{base}/missing-etag/sample.zip', 1)
         run('selected-zip', f'{base}/ok/sample.zip', extra=['--format=zip'])
+        run('selected-tar', f'{base}/ok/sample.tar', extra=['--format=tar'])
+        run('tar-rejects-zip', f'{base}/ok/sample.zip', 1, ['--format=tar'])
         run('selected-7z', f'{base}/ok/nonsolid.7z', extra=['--format=7z'])
         run('selected-encrypted-7z', f'{base}/ok/secret.7z', extra=['--format=7z'])
         run('selected-zip-no-etag', f'{base}/missing-etag/sample.zip',

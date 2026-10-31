@@ -88,7 +88,7 @@ partial-verification confirmation remains in place. Refresh retains the session
 policy; the panel path shows `[HTTP; ETag off]` when bypass is enabled.
 
 The dialog also has an **Archive type** dropdown: **Auto** (default), **ZIP**,
-**7z**, **RAR**, and **ISO**. RAR restricts detection to the RAR and RAR5 handlers and lets
+**7z**, **RAR**, **ISO**, and **TAR**. RAR restricts detection to the RAR and RAR5 handlers and lets
 the engine identify the generation. Auto uses normal format detection; other explicit
 selections are passed to the existing handler selection. Refresh retains both the
 type and ETag policy. Direct address-bar opens and the console retain their
