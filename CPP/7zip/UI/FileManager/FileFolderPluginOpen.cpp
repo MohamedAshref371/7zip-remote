@@ -1,6 +1,7 @@
 // FileFolderPluginOpen.cpp
 
 #include "StdAfx.h"
+#include "RemoteLang.h"
 
 #include "resource.h"
 
@@ -379,7 +380,7 @@ HRESULT CFfpOpen::OpenFileFolderPlugin(IInStream *inStream,
     */
     t.OpenCallbackProgress.Release();
     #ifdef Z7_HTTP
-    if (!t.RemoteError.IsEmpty()) ErrorMessage = t.RemoteError;
+    if (!t.RemoteError.IsEmpty()) ErrorMessage = RemoteLangMessage(t.RemoteError);
     #endif
 
     if (t.Result != S_FALSE && t.Result != S_OK)

@@ -1,6 +1,7 @@
 // AboutDialog.cpp
 
 #include "StdAfx.h"
+#include "RemoteLang.h"
 
 #include "../../../../C/CpuArch.h"
 
@@ -47,10 +48,10 @@ bool CAboutDialog::OnInit()
   LangSetDlgItems(*this, kLangIDs, Z7_ARRAY_SIZE(kLangIDs));
   #endif
  #ifdef Z7_HTTP
-  SetText(L"About 7-Zip Remote");
+  SetText(RemoteLang(L"About 7-Zip Remote"));
   SetItemText(IDT_ABOUT_VERSION, L"7-Zip Remote " LLL(REMOTE_ARCHIVE_VERSION));
-  SetItemText(IDT_ABOUT_DATE, UString("Based on 7-Zip " MY_VERSION_CPU));
-  SetItemText(IDT_ABOUT_REMOTE, L"7-Zip engine date: " LLL(MY_DATE) L"\nDeveloped with OpenAI Codex");
+  SetItemText(IDT_ABOUT_DATE, RemoteLangFormat(L"Based on 7-Zip {0}", UString(MY_VERSION_CPU)));
+  SetItemText(IDT_ABOUT_REMOTE, RemoteLangFormat(L"7-Zip engine date: {0}\nDeveloped with OpenAI Codex", UString(MY_DATE)));
  #else
   SetItemText(IDT_ABOUT_VERSION, UString("7-Zip " MY_VERSION_CPU));
   SetItemText(IDT_ABOUT_DATE, LLL(MY_DATE));

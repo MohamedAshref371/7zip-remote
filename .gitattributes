@@ -1,0 +1,3 @@
+# Preserve the official UTF-8 / CRLF language payload and its recorded hashes.
+Lang/*.txt -text -whitespace
+Lang/*.ttt -text -whitespace

@@ -1,6 +1,7 @@
 // PanelListNotify.cpp
 
 #include "StdAfx.h"
+#include "RemoteLang.h"
 
 #include "resource.h"
 
@@ -799,13 +800,22 @@ void CPanel::Refresh_StatusBar()
     UString files, download, tip;
     if (!indices.IsEmpty())
     {
-      RemoteSelectionText(estimate, files, download);
+      files = RemoteLang(L"Unpacked: ");
+      files += (estimate.Flags & kRemoteSelectionUnpacked) ? RemoteSelectionSize(estimate.Unpacked) : RemoteLang(L"unavailable");
+      download = RemoteLang(L"Download: ");
+      if (estimate.Flags & kRemoteSelectionDownload)
+      {
+        download += L'~';
+        download += RemoteSelectionSize(estimate.Download);
+      }
+      else download += RemoteLang(L"unavailable");
+      if (estimate.Flags & kRemoteSelectionSolid) download += RemoteLang(L" [Solid]");
       tip = files;
       if (estimate.Flags & kRemoteSelectionUnpacked)
       {
         tip += " (";
         tip.Add_UInt64(estimate.Unpacked);
-        tip += " bytes after extraction)";
+        tip += RemoteLang(L" bytes after extraction)");
       }
     }
     CMyComPtr<IRemoteCacheStatus> cacheStatus;
@@ -814,7 +824,7 @@ void CPanel::Refresh_StatusBar()
         && cacheStatus->GetCacheStatus(&cacheText, &cacheId) == S_OK && cacheText && *cacheText)
     {
       if (!download.IsEmpty()) download += L" | ";
-      download += (const wchar_t *)cacheText;
+      download += RemoteLang((const wchar_t *)cacheText);
     }
     _statusBar.SetText(1, files);
     _statusBar.SetText(2, download);
@@ -826,12 +836,12 @@ void CPanel::Refresh_StatusBar()
       {
         tip += " (";
         tip.Add_UInt64(estimate.Download);
-        tip += " bytes)";
-        tip += L". Approximate additional download after cached data. Actual download may be larger.";
+        tip += RemoteLang(L" bytes)");
+        tip += RemoteLang(L". Approximate additional download after cached data. Actual download may be larger.");
       }
-      else tip += L". Estimate unavailable for this format, archive layout or selection size.";
+      else tip += RemoteLang(L". Estimate unavailable for this format, archive layout or selection size.");
       if (estimate.Flags & kRemoteSelectionSolid)
-        tip += L" Solid archives may need other files in the same block.";
+        tip += RemoteLang(L" Solid archives may need other files in the same block.");
     }
     _statusBar.SendMsg(SB_SETTIPTEXTW, 2, (LPARAM)tip.Ptr());
     return;

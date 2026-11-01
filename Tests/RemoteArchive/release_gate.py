@@ -24,6 +24,7 @@ def main():
     parser.add_argument('--package', action='store_true', help='Package and verify a clean committed source tree')
     parser.add_argument('--legacy-agent', type=Path, help='Previous-version Agent for legacy cache migration checks')
     args = parser.parse_args()
+    run('test_localization.py')
     binary = args.bin_dir.resolve()
     local = binary.with_name(binary.name + '-local')
     if args.build:
@@ -36,6 +37,7 @@ def main():
         if not path.is_file():
             raise SystemExit(f'Missing {path}. Run with --build first.')
     suites = [
+        ('test_localization.py', '--agent', agent),
         ('test_cli.py', '--exe', console),
         ('test_agent.py', '--exe', agent),
         ('test_redirect.py', '--exe', console, '--agent', agent),

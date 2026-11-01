@@ -1,6 +1,7 @@
 // PanelItemOpen.cpp
 
 #include "StdAfx.h"
+#include "RemoteLang.h"
 
 #include "../../../Common/MyWindows.h"
 
@@ -476,8 +477,8 @@ HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, 
   if (res != S_OK)
   {
     if (res != E_ABORT)
-      MessageBox_Error(!ffp.ErrorMessage.IsEmpty() ? ffp.ErrorMessage.Ptr() :
-          (res == S_FALSE ? L"Cannot open remote archive." : HResultToMessage(res).Ptr()));
+      MessageBox_Error(!ffp.ErrorMessage.IsEmpty() ? RemoteLangMessage(ffp.ErrorMessage).Ptr() :
+          (res == S_FALSE ? RemoteLang(L"Cannot open remote archive.").Ptr() : HResultToMessage(res).Ptr()));
     return res;
   }
 
@@ -531,7 +532,7 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
   {
     _reuse.ResetContent();
     _reuse.SendMsg(CB_SETDROPPEDWIDTH, 720, 0);
-    _reuse.AddString(L"Automatic / new cache");
+    _reuse.AddString(RemoteLang(L"Automatic / new cache"));
     try
     {
     _entries = NWindows::CHttpDiskCache::Catalog(CacheOptions.Directory);
@@ -540,15 +541,15 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
     for (const auto &entry : _entries)
     {
       UString text(entry.Info.Name);
-      text += L" | archive "; text += RemoteSelectionSize(entry.Info.Size);
-      text += L" | cached "; text += RemoteSelectionSize(entry.Used);
+      text += RemoteLang(L" | archive "); text += RemoteSelectionSize(entry.Info.Size);
+      text += RemoteLang(L" | cached "); text += RemoteSelectionSize(entry.Used);
       FILETIME utc; utc.dwHighDateTime = (DWORD)(entry.LastUse >> 32); utc.dwLowDateTime = (DWORD)entry.LastUse;
       FILETIME local; SYSTEMTIME time;
       wchar_t date[64] = {};
       if (FileTimeToLocalFileTime(&utc, &local) && FileTimeToSystemTime(&local, &time)
           && GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time, NULL, date, 64))
       {
-        text += L" | used "; text += date;
+        text += RemoteLang(L" | used "); text += date;
         if (GetTimeFormatW(LOCALE_USER_DEFAULT, TIME_NOSECONDS, &time, NULL, date, 64))
         { text += L' '; text += date; }
       }
@@ -557,19 +558,20 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
     }
     catch (...)
     {
-      _entries.clear(); _reuse.ResetContent(); _reuse.AddString(L"Automatic / new cache");
+      _entries.clear(); _reuse.ResetContent(); _reuse.AddString(RemoteLang(L"Automatic / new cache"));
     }
     _reuse.SetCurSel(0);
     UpdateCacheControls();
   }
   virtual bool OnInit() Z7_override
   {
+    RemoteLangDialog(*this);
     _url.Attach(GetItem(IDC_COMBO));
     _format.Attach(GetItem(IDC_REMOTE_FORMAT));
     _reuse.Attach(GetItem(IDC_REMOTE_CACHE_REUSE));
     LoadRemoteCacheSettings(CacheOptions);
     CacheEntries();
-    _format.AddString(L"Auto");
+    _format.AddString(RemoteLang(L"Auto"));
     _format.AddString(L"ZIP");
     _format.AddString(L"7z");
     _format.AddString(L"RAR");
@@ -597,10 +599,10 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
     const int saved = _reuse.GetCurSel();
     if (useCache && saved > 0 && (size_t)saved <= _entries.size()) CacheOptions.ReuseId = _entries[(size_t)saved - 1].Id;
     if (!CacheOptions.ReuseId.empty() && !CacheOptions.AllowUnverified)
-    { MessageBoxW(*this, L"Linking a saved cache requires separate consent to partial version verification.", L"Remote cache", MB_OK | MB_ICONWARNING); return; }
+    { MessageBoxW(*this, RemoteLang(L"Linking a saved cache requires separate consent to partial version verification."), RemoteLang(L"Remote cache"), MB_OK | MB_ICONWARNING); return; }
     if (CacheOptions.AllowUnverified && MessageBoxW(*this,
-        L"Matching metadata and samples cannot prove that the entire archive is unchanged. Reusing old data may cause incorrect output. Continue with partial verification?",
-        L"Reuse saved archive cache", MB_YESNO | MB_ICONWARNING) != IDYES) return;
+        RemoteLang(L"Matching metadata and samples cannot prove that the entire archive is unchanged. Reusing old data may cause incorrect output. Continue with partial verification?"),
+        RemoteLang(L"Reuse saved archive cache"), MB_YESNO | MB_ICONWARNING) != IDYES) return;
     switch (_format.GetCurSel())
     {
       case 1: ArcFormat = "zip"; break;
@@ -611,7 +613,7 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
       default: ArcFormat.Empty(); break; // Empty uses the engine's format detection.
     }
     if (!SaveRemoteOpenSettings(SkipHttpETag, reuseUnverified, ExactHttpReads))
-    { MessageBoxW(*this, L"Cannot save Open URL settings.", L"Open URL", MB_OK | MB_ICONWARNING); return; }
+    { MessageBoxW(*this, RemoteLang(L"Cannot save Open URL settings."), RemoteLang(L"Open URL"), MB_OK | MB_ICONWARNING); return; }
     CModalDialog::OnOK();
   }
   bool OnButtonClicked(unsigned id, HWND hwnd) Z7_override
@@ -698,15 +700,15 @@ void CPanel::RenewRemoteArchiveDialog()
   const UString oldUrl = _parentFolders[0].RemoteUrl;
   const NWindows::CHttpDiskCacheOptions previous = _parentFolders[0].HttpCacheOptions;
   CComboDialog dialog;
-  dialog.Title = L"Renew archive URL";
-  dialog.Static = L"New direct HTTP or HTTPS archive URL:";
+  dialog.Title = RemoteLang(L"Renew archive URL");
+  dialog.Static = RemoteLang(L"New direct HTTP or HTTPS archive URL:");
   // Never store signed URLs in combo history or prefill the old access token.
   for (;;)
   {
     if (dialog.Create(GetParent()) != IDOK) { SetFocusToList(); return; }
     dialog.Value.Trim();
     if (IsHttpArchiveUrl(dialog.Value)) break;
-    MessageBox_Error(L"Enter a direct HTTP or HTTPS archive URL.");
+    MessageBox_Error(RemoteLang(L"Enter a direct HTTP or HTTPS archive URL."));
   }
   NWindows::CHttpDiskCacheOptions options = previous;
   if (dialog.Value != oldUrl)
@@ -722,11 +724,11 @@ void CPanel::RenewRemoteArchiveDialog()
     if (previous.Enabled && !entryId.empty())
     {
       const int answer = MessageBoxW(GetParent(),
-          L"Link the previous cache to this new URL?\n\n"
+          RemoteLang(L"Link the previous cache to this new URL?\n\n"
           L"Yes: reuse saved parts after checking metadata and samples. These checks cannot prove the entire archive is unchanged; incorrect output is possible.\n\n"
           L"No: open without linking the previous cache.\n"
-          L"Cancel: keep the current session.",
-          L"Renew archive URL", MB_YESNOCANCEL | MB_ICONWARNING | MB_DEFBUTTON2);
+          L"Cancel: keep the current session."),
+          RemoteLang(L"Renew archive URL"), MB_YESNOCANCEL | MB_ICONWARNING | MB_DEFBUTTON2);
       if (answer == IDCANCEL) { SetFocusToList(); return; }
       consent = answer == IDYES;
     }
@@ -759,9 +761,9 @@ void CPanel::OfferRemoteUrlRenewal(bool refreshFailed)
         || source->GetRemoteHttpStatus(&status) != S_OK || !IsRenewableHttpStatus(status)) return;
   }
   if (MessageBoxW(GetParent(),
-      L"The remote archive could not be accessed. Enter a new direct download URL?\n\n"
-      L"After renewing the link, run Extract or Test again. Interrupted extraction will not restart automatically.",
-      L"Renew archive URL", MB_YESNO | MB_ICONQUESTION) == IDYES)
+      RemoteLang(L"The remote archive could not be accessed. Enter a new direct download URL?\n\n"
+      L"After renewing the link, run Extract or Test again. Interrupted extraction will not restart automatically."),
+      RemoteLang(L"Renew archive URL"), MB_YESNO | MB_ICONQUESTION) == IDYES)
   {
     RefreshListCtrl(_remoteRenewSelection);
     RenewRemoteArchiveDialog();
@@ -774,7 +776,7 @@ void CPanel::OpenRemoteArchiveDialog()
   if (dialog.Create(GetParent()) != IDOK) return;
   if (!IsHttpArchiveUrl(dialog.Value))
   {
-    MessageBox_Error(L"Enter a direct HTTP or HTTPS archive URL.");
+    MessageBox_Error(RemoteLang(L"Enter a direct HTTP or HTTPS archive URL."));
     return;
   }
   COpenResult openRes;

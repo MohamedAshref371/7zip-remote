@@ -16,6 +16,7 @@
 #include "BrowseDialog2.h"
 #include "HelpUtils.h"
 #include "LangUtils.h"
+#include "RemoteLang.h"
 #include "MyLoadMenu.h"
 #include "RegistryUtils.h"
 
@@ -246,6 +247,12 @@ static void MyChangeMenu(HMENU menuLoc, unsigned menuID, unsigned level, unsigne
         }
         else
         {
+#ifdef Z7_HTTP
+          if (item.wID == IDM_OPEN_URL) newString = RemoteLang(L"Open &URL...");
+          else if (item.wID == IDM_RENEW_URL) newString = RemoteLang(L"Renew archive URL...");
+          else if (item.wID == IDM_ABOUT) newString = RemoteLang(L"&About 7-Zip Remote...");
+          else
+#endif
           LangString_OnlyFromLangFile(langID, newString);
         }
 
