@@ -8,11 +8,12 @@ The original 7-Zip engine and format handlers are reused. Depending on the archi
 and its compression layout, selected extraction can avoid downloading the entire
 archive.
 
-**Status:** v1.0.0-rc1 release candidate. Windows x64 is the tested platform.
-The stable v1.0.0 release awaits real-server and clean-machine acceptance.
+**Status:** [v1.0.0-rc1](https://github.com/MohamedAshref371/7zip-remote/releases/tag/v1.0.0-rc1)
+is a public Windows x64 prerelease. The stable v1.0.0 release awaits
+real-server and clean-machine acceptance.
 See the [release-candidate notes](Notes/27-release-candidate.md),
 [development validation](Notes/26-development-validation.md) and
-[implementation notes](Notes/README.md). v0.5.0 remains the latest published release.
+[implementation notes](Notes/README.md).
 
 ## Features
 

@@ -43,13 +43,18 @@ are outside this release's scope. Solid archives can require most of their data.
    HTTPS, signed URLs, redirects, strong/missing ETags and a proxy if supported by
    that audience. Record server type, outcome and byte counts without URL secrets.
 4. Review the packaged README, licenses, SHA-256 sidecars, source ZIP and release
-   notes. Publish an `rc1` release only after these checks. Tag stable `v1.0.0`
-   from the exact source used for the final validated package.
+   notes. Tag stable `v1.0.0` only after the remaining acceptance checks, from
+   the exact source used for the final validated package.
 
 Earlier controlled validation and benchmark details are in
 [26-development-validation.md](26-development-validation.md).
 
 ## Current candidate evidence
+
+The public [v1.0.0-rc1 prerelease](https://github.com/MohamedAshref371/7zip-remote/releases/tag/v1.0.0-rc1)
+was published from commit `a98e9dba67538cbb66903e46d3fbb8bb60712055`
+with Windows and matching source ZIPs plus SHA-256 sidecars. Stable acceptance
+remains pending.
 
 The local release gate passed on Windows x64 after a bounded retry was added
 for transient sharing violations while atomically replacing cache metadata.
