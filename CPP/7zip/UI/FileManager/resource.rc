@@ -160,7 +160,11 @@ BEGIN
     MENUITEM "&Contents...\tF1",            IDM_HELP_CONTENTS
   #endif
     MY_MENUITEM_SEPARATOR
-  MENUITEM "&About 7-Zip...",               IDM_ABOUT
+  #ifdef Z7_HTTP
+    MENUITEM "&About 7-Zip Remote...",      IDM_ABOUT
+  #else
+    MENUITEM "&About 7-Zip...",             IDM_ABOUT
+  #endif
   END
 END
 

@@ -121,6 +121,11 @@ Zig/Clang build instructions are available in the [test and build guide](Tests/R
 & .\.build\msvc\release-candidate\7zFM.exe
 ```
 
+For the portable ZIP, close an older File Manager instance and launch
+`7zRemoteFM.exe` from the extracted `7zip-remote-1.0.0-rc1` folder. **Help →
+About 7-Zip Remote** should show `1.0.0-rc1` as the product version;
+`26.05` is the underlying 7-Zip engine version.
+
 1. Choose **File → Open URL...** and paste a direct archive URL.
 2. Leave **Archive type** on **Auto**, or choose ZIP, 7z, RAR, ISO, or TAR if known.
 3. Select the desired ETag policy; bypass is initially unchecked. Both the ETag

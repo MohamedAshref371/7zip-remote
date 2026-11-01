@@ -19,7 +19,11 @@ IDI_LOGO ICON "../../UI/FileManager/7zipLogo.ico"
 #endif
 
 IDD_ABOUT DIALOG 0, 0, xs, ys  MY_MODAL_DIALOG_STYLE  MY_FONT
+#ifdef Z7_HTTP
+CAPTION "About 7-Zip Remote"
+#else
 CAPTION "About 7-Zip"
+#endif
 {
   DEFPUSHBUTTON  "OK", IDOK, bx1, by, bxs, bys
   PUSHBUTTON  "www.7-zip.org", IDB_ABOUT_HOMEPAGE, bx2, by, bxs, bys

@@ -5,6 +5,8 @@ acceptance, not yet a stable v1.0.0 publication.
 
 ## Changes since 0.6.0-dev
 
+- Help → About now puts `7-Zip Remote 1.0.0-rc1` first and labels `7-Zip 26.05`
+  separately as the upstream engine version.
 - HTTP-enabled File Manager and console preferences use
   `HKEY_CURRENT_USER\Software\7-Zip Remote` instead of the installed 7-Zip's
   registry tree. The default disk cache moved to
