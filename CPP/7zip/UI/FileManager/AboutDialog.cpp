@@ -49,7 +49,7 @@ bool CAboutDialog::OnInit()
   SetItemText(IDT_ABOUT_VERSION, UString("7-Zip " MY_VERSION_CPU));
   SetItemText(IDT_ABOUT_DATE, LLL(MY_DATE));
  #ifdef Z7_HTTP
-  SetItemText(IDT_ABOUT_REMOTE, L"Remote Archives " LLL(REMOTE_ARCHIVE_VERSION) L" (experimental)\nDeveloped with OpenAI Codex");
+  SetItemText(IDT_ABOUT_REMOTE, L"Remote Archives " LLL(REMOTE_ARCHIVE_VERSION) L"\nDeveloped with OpenAI Codex");
  #endif
   
   NormalizePosition();

@@ -1,5 +1,23 @@
 # Remote archive prototype (Windows x64)
 
+## v1.0.0-rc1 release gate
+
+On Windows x64 with Visual Studio C++ tools, Python 3 and Zig 0.13.0:
+
+```powershell
+python -m pip install --target .build/tools ziglang==0.13.0
+python Tests/RemoteArchive/release_gate.py --build
+```
+
+The gate rebuilds the HTTP-enabled and local-only programs and the cache checker,
+then exercises loopback HTTP, archives, cancellation, redirects, retries, cache,
+URL renewal and compiled dialog layout. The packed-cache suite runs its current
+format checks; pass `--legacy-agent PATH` to also test migration from a previous
+exact-cache Agent binary. After committing the tested source, run the same command
+with `--package` to create verified binary and source ZIPs. The package script
+rejects uncommitted or untracked source changes. Real-server and clean-machine
+acceptance remain separate steps in the [candidate notes](../../Notes/27-release-candidate.md).
+
 ## Optional persistent disk cache
 
 File Manager's **Open URL → Cache settings...** enables disk caching, chooses a

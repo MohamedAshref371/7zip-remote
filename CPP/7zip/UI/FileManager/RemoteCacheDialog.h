@@ -3,6 +3,7 @@
 #include "../../../Windows/HttpDiskCache.h"
 #include "../../../Windows/Shell.h"
 #include "../Common/RemoteSelection.h"
+#include "../Common/RemoteRegistryPath.h"
 #include "ComboDialogRes.h"
 #include <atomic>
 #include <memory>
@@ -12,7 +13,7 @@ inline void LoadRemoteOpenSettings(bool &skipETag, bool &reuseUnverified, bool &
 {
   skipETag = reuseUnverified = exactReads = false;
   HKEY key;
-  if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\7-Zip\\FM\\RemoteCache", 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return;
+  if (RegOpenKeyExW(HKEY_CURRENT_USER, Z7_REMOTE_CACHE_REGISTRY_PATH, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return;
   const wchar_t *names[] = { L"SkipETagVerification", L"ReuseUnverifiedCache", L"ExactReads" };
   bool *values[] = { &skipETag, &reuseUnverified, &exactReads };
   for (unsigned i = 0; i < 3; ++i)
@@ -27,7 +28,7 @@ inline void LoadRemoteOpenSettings(bool &skipETag, bool &reuseUnverified, bool &
 inline bool SaveRemoteOpenSettings(bool skipETag, bool reuseUnverified, bool exactReads)
 {
   HKEY key;
-  if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\7-Zip\\FM\\RemoteCache", 0, NULL, 0,
+  if (RegCreateKeyExW(HKEY_CURRENT_USER, Z7_REMOTE_CACHE_REGISTRY_PATH, 0, NULL, 0,
       KEY_SET_VALUE, NULL, &key, NULL) != ERROR_SUCCESS) return false;
   const DWORD skip = skipETag ? 1 : 0, reuse = reuseUnverified ? 1 : 0, exact = exactReads ? 1 : 0;
   const bool ok = RegSetValueExW(key, L"SkipETagVerification", 0, REG_DWORD, (const BYTE *)&skip, sizeof(skip)) == ERROR_SUCCESS
@@ -41,9 +42,9 @@ inline void LoadRemoteCacheSettings(NWindows::CHttpDiskCacheOptions &options)
 {
   wchar_t local[32768];
   const DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", local, 32768);
-  if (length && length < 32768) options.Directory = std::wstring(local) + L"\\7-Zip\\RemoteCache";
+  if (length && length < 32768) options.Directory = std::wstring(local) + L"\\7-Zip Remote\\RemoteCache";
   HKEY key;
-  if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\7-Zip\\FM\\RemoteCache", 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return;
+  if (RegOpenKeyExW(HKEY_CURRENT_USER, Z7_REMOTE_CACHE_REGISTRY_PATH, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return;
   DWORD enabled = 0, type = 0, size = sizeof(enabled);
   if (RegQueryValueExW(key, L"Enabled", NULL, &type, (BYTE *)&enabled, &size) == ERROR_SUCCESS && type == REG_DWORD && size == sizeof(enabled))
     options.Enabled = enabled != 0;
@@ -60,7 +61,7 @@ inline void LoadRemoteCacheSettings(NWindows::CHttpDiskCacheOptions &options)
 inline bool SaveRemoteCacheSettings(const NWindows::CHttpDiskCacheOptions &options)
 {
   HKEY key;
-  if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\7-Zip\\FM\\RemoteCache", 0, NULL, 0,
+  if (RegCreateKeyExW(HKEY_CURRENT_USER, Z7_REMOTE_CACHE_REGISTRY_PATH, 0, NULL, 0,
       KEY_SET_VALUE, NULL, &key, NULL) != ERROR_SUCCESS) return false;
   const DWORD enabled = options.Enabled ? 1 : 0;
   const bool ok = RegSetValueExW(key, L"Enabled", 0, REG_DWORD, (const BYTE *)&enabled, sizeof(enabled)) == ERROR_SUCCESS

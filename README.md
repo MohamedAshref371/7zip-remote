@@ -1,6 +1,6 @@
 # 7-Zip Remote Archive Support
 
-A Windows development build based on **7-Zip 26.05** that can open archives from
+A Windows x64 release candidate based on **7-Zip 26.05** that can open archives from
 direct HTTP/HTTPS URLs, browse their contents, and extract selected files using
 HTTP byte-range requests.
 
@@ -8,13 +8,11 @@ The original 7-Zip engine and format handlers are reused. Depending on the archi
 and its compression layout, selected extraction can avoid downloading the entire
 archive.
 
-**Status:** development and compatibility testing are in progress. Windows x64
-is the tested platform. See the [implementation notes](Notes/README.md) for the
-design, evidence, and remaining work.
-
-**v0.5.0 has been released.** Current development is **0.6.0-dev**. See the
-[development preview notes](Notes/25-next-preview.md) and
-[measurements and desktop validation](Notes/26-development-validation.md).
+**Status:** v1.0.0-rc1 release candidate. Windows x64 is the tested platform.
+The stable v1.0.0 release awaits real-server and clean-machine acceptance.
+See the [release-candidate notes](Notes/27-release-candidate.md),
+[development validation](Notes/26-development-validation.md) and
+[implementation notes](Notes/README.md). v0.5.0 remains the latest published release.
 
 ## Features
 
@@ -30,7 +28,8 @@ design, evidence, and remaining work.
   256 KiB minimum fetch. Small reads request only the bytes asked for by the
   archive engine; larger reads may be split. Optional disk caching saves these
   exact parts and reuses them on subsequent opens, without padding or fetching
-  extra bytes to complete a block. More requests can reduce speed. Archive
+  extra bytes to complete a block. Many requests can make RAR/TAR header scans
+  substantially slower; leave the default block mode on when speed matters. Archive
   metadata, engine buffering and solid-compression dependencies still require
   data beyond the selected file. The choice is remembered and retained on
   Refresh and URL renewal; unchecked preserves the existing block-cache mode.
@@ -66,7 +65,9 @@ design, evidence, and remaining work.
   files does not initiate HTTP requests. See [selection preview notes](Notes/20-selection-preview.md).
 - **Optional disk cache:** Open URL → **Cache settings...** enables persistent
   archive parts in a chosen folder, with an optional space limit and safe Clear.
-  Exact resource/strong-ETag matches can reuse parts automatically. Changed URLs
+  Exact resource/strong-ETag matches can reuse parts automatically. v1.0.0-rc1
+  stores GUI preferences under `Software\7-Zip Remote`, separately from upstream
+  7-Zip; existing v0.5.0 choices are not imported. Changed URLs
   and ETag bypass need separate consent to partial verification before reusing
   old data. See [cache settings and verification](Notes/21-persistent-cache.md).
 - **Compact exact-read cache:** saves the downloaded ranges in one data file,
@@ -97,7 +98,7 @@ Requirements:
 From the repository root:
 
 ```powershell
-python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/disk-cache
+python Tests/RemoteArchive/build_msvc.py --http --rebuild --agent-check --bin-dir .build/msvc/release-candidate
 ```
 
 The script discovers Visual Studio, loads its x64 environment, and builds the
@@ -117,7 +118,7 @@ Zig/Clang build instructions are available in the [test and build guide](Tests/R
 ### File Manager
 
 ```powershell
-& .\.build\msvc\disk-cache\7zFM.exe
+& .\.build\msvc\release-candidate\7zFM.exe
 ```
 
 1. Choose **File → Open URL...** and paste a direct archive URL.
@@ -132,6 +133,10 @@ archive returns to the outer remote archive. A failed refresh preserves the
 previous view. Refresh temporarily hands off the disk-cache lock so the new
 session can reuse saved parts immediately, subject to the same verification policy. URLs are kept in the session; displayed/history paths use a
 sanitized archive name.
+
+The portable build keeps its File Manager preferences separate from installed
+7-Zip. If you explicitly change associations under **Tools → Options → System**,
+those choices still change Windows file associations.
 
 ### Renew a download link
 
@@ -166,7 +171,7 @@ continues to use its existing memory cache defaults.
 ### Console
 
 ```powershell
-$sevenzip = '.\.build\msvc\disk-cache\7z.exe'
+$sevenzip = '.\.build\msvc\release-candidate\7z.exe'
 
 & $sevenzip l 'https://example.com/archive.zip'
 & $sevenzip x 'https://example.com/archive.zip' 'docs/readme.txt' -oOut
@@ -204,15 +209,28 @@ their existing behavior.
 
 ## Tests and Validation
 
+The release gate runs the Windows x64 build and the automated network, archive,
+cache, cancellation, renewal and resource-layout suites. Install Zig 0.13.0 into
+`.build/tools` as described in the [test guide](Tests/RemoteArchive/README.md),
+then run:
+
 ```powershell
-python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/disk-cache/7z.exe"
-python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/disk-cache/agentcheck.exe"
-python Tests/RemoteArchive/test_redirect.py --exe "$PWD/.build/msvc/disk-cache/7z.exe" --agent "$PWD/.build/msvc/disk-cache/agentcheck.exe"
-python Tests/RemoteArchive/test_retry.py --exe "$PWD/.build/msvc/disk-cache/7z.exe" --agent "$PWD/.build/msvc/disk-cache/agentcheck.exe"
+python Tests/RemoteArchive/release_gate.py --build
+```
+
+After committing the tested source, add `--package` to create and verify binary
+and matching source ZIPs. Packaging rejects a dirty Git working tree. The release
+gate uses loopback fixtures; real-server and clean-machine acceptance are separate.
+
+```powershell
+python Tests/RemoteArchive/test_cli.py --exe "$PWD/.build/msvc/release-candidate/7z.exe"
+python Tests/RemoteArchive/test_agent.py --exe "$PWD/.build/msvc/release-candidate/agentcheck.exe"
+python Tests/RemoteArchive/test_redirect.py --exe "$PWD/.build/msvc/release-candidate/7z.exe" --agent "$PWD/.build/msvc/release-candidate/agentcheck.exe"
+python Tests/RemoteArchive/test_retry.py --exe "$PWD/.build/msvc/release-candidate/7z.exe" --agent "$PWD/.build/msvc/release-candidate/agentcheck.exe"
 python Tests/RemoteArchive/build.py --cache-check
 python Tests/RemoteArchive/test_disk_cache.py
-python Tests/RemoteArchive/test_disk_cache_agent.py --exe "$PWD/.build/msvc/disk-cache/agentcheck.exe"
-python Tests/RemoteArchive/test_renewal.py --exe "$PWD/.build/msvc/disk-cache/agentcheck.exe"
+python Tests/RemoteArchive/test_disk_cache_agent.py --exe "$PWD/.build/msvc/release-candidate/agentcheck.exe"
+python Tests/RemoteArchive/test_renewal.py --exe "$PWD/.build/msvc/release-candidate/agentcheck.exe"
 
 # Supply your own local RAR-generation fixtures:
 python Tests/RemoteArchive/test_rar_family.py --rar4 'path/to/legacy.rar' --rar5 'path/to/modern.rar'

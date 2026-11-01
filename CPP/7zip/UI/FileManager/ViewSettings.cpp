@@ -11,11 +11,12 @@
 #include "../../../Windows/Synchronization.h"
 
 #include "ViewSettings.h"
+#include "../Common/RemoteRegistryPath.h"
 
 using namespace NWindows;
 using namespace NRegistry;
 
-#define REG_PATH_FM TEXT("Software") TEXT(STRING_PATH_SEPARATOR) TEXT("7-Zip") TEXT(STRING_PATH_SEPARATOR) TEXT("FM")
+#define REG_PATH_FM Z7_REGISTRY_ROOT TEXT(STRING_PATH_SEPARATOR) TEXT("FM")
 
 static LPCTSTR const kCUBasePath = REG_PATH_FM;
 static LPCTSTR const kCulumnsKeyName = REG_PATH_FM TEXT(STRING_PATH_SEPARATOR) TEXT("Columns");

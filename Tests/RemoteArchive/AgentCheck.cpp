@@ -555,6 +555,8 @@ int __cdecl wmain(int argc, wchar_t **argv)
       CHECK_HR(current->GetCacheStatus(&status, &id));
       if (cacheOptions.Enabled)
       {
+        if (!id || !*id)
+          fwprintf(stderr, L"Renewal cache status: %ls\n", status ? (const wchar_t *)status : L"unavailable");
         CHECK(id && *id);
         CHECK((wcscmp(oldId, id) == 0) == renewReuse);
       }

@@ -134,7 +134,19 @@ inline bool AtomicWrite(const std::wstring &path, const void *data, DWORD size)
     DWORD wrote = 0;
     if (file.Valid()) ok = ::WriteFile(file.Value, data, size, &wrote, NULL) && wrote == size && FlushFileBuffers(file.Value);
   }
-  if (ok) ok = MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
+  if (ok)
+  {
+    // A scanner can briefly open info.bin between our read and replacement.
+    // Keep the old complete file until a bounded retry succeeds.
+    for (unsigned attempt = 0; attempt < 4; ++attempt)
+    {
+      if (MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) break;
+      const DWORD error = GetLastError();
+      if (attempt == 3 || (error != ERROR_SHARING_VIOLATION && error != ERROR_LOCK_VIOLATION))
+      { ok = false; break; }
+      Sleep(10u << attempt);
+    }
+  }
   if (!ok) DeleteFileW(temporary.c_str());
   return ok;
 }

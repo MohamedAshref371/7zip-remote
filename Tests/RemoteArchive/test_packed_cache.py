@@ -15,6 +15,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--exe', type=Path, default=ROOT / '.build/remote/cachecheck.exe')
     parser.add_argument('--legacy-agent', type=Path, default=ROOT / '.build/msvc/exact-disk-cache/agentcheck.exe')
+    parser.add_argument('--skip-legacy', action='store_true', help='Run compact-cache checks without a previous-version binary')
     args = parser.parse_args()
     work = Path(tempfile.mkdtemp(prefix='packed-cache-', dir=ROOT / '.build/msvc/runs'))
     data = bytes(range(256)) * 32768
@@ -53,20 +54,21 @@ def main():
         assert sum(p.stat().st_size for p in cache.rglob('*') if p.is_file()) <= 4096
         run('clear-compact', cache, extra=('--cache-clear',))
         assert not list(cache.glob('.7z-http-cache-v1/*/parts.bin'))
-        legacy = work / 'legacy'
-        result = subprocess.run([str(args.legacy_agent.resolve()), url, str(legacy), '--exact-disk-stream-check'],
-                                capture_output=True, timeout=60)
-        assert result.returncode == 0, result.stdout + result.stderr
-        assert run('legacy-v2-reuse', legacy, count=1, first=1, stride=100) == (1, 1, 1)
-        old = next(legacy.glob('.7z-http-cache-v1/*/b0000000000000064.bin'))
-        broken = bytearray(old.read_bytes()); broken[-1] ^= 1; old.write_bytes(broken)
-        assert run('legacy-repair-to-pack', legacy, count=1, first=1, stride=100) == (2, 4, 0)
-        assert run('mixed-legacy-and-pack-reopen', legacy, count=1, first=1, stride=100) == (1, 1, 1)
-        server.etag = '"fixture-v2"'
-        changed = bytearray(data); changed[100] ^= 1; server.files['raw.bin'] = bytes(changed)
-        assert run('changed-version-isolated', legacy, count=1, first=1, stride=100) == (2, 4, 0)
-        run('clear-both-generations', legacy, extra=('--cache-clear',))
-        assert not list(legacy.glob('.7z-http-cache-v1/*/*.bin'))
+        if not args.skip_legacy:
+            legacy = work / 'legacy'
+            result = subprocess.run([str(args.legacy_agent.resolve()), url, str(legacy), '--exact-disk-stream-check'],
+                                    capture_output=True, timeout=60)
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert run('legacy-v2-reuse', legacy, count=1, first=1, stride=100) == (1, 1, 1)
+            old = next(legacy.glob('.7z-http-cache-v1/*/b0000000000000064.bin'))
+            broken = bytearray(old.read_bytes()); broken[-1] ^= 1; old.write_bytes(broken)
+            assert run('legacy-repair-to-pack', legacy, count=1, first=1, stride=100) == (2, 4, 0)
+            assert run('mixed-legacy-and-pack-reopen', legacy, count=1, first=1, stride=100) == (1, 1, 1)
+            server.etag = '"fixture-v2"'
+            changed = bytearray(data); changed[100] ^= 1; server.files['raw.bin'] = bytes(changed)
+            assert run('changed-version-isolated', legacy, count=1, first=1, stride=100) == (2, 4, 0)
+            run('clear-both-generations', legacy, extra=('--cache-clear',))
+            assert not list(legacy.glob('.7z-http-cache-v1/*/*.bin'))
     finally:
         server.shutdown(); server.server_close()
         (work / 'report.json').write_text(json.dumps(dict(cases=cases), indent=2), encoding='utf-8')

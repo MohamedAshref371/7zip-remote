@@ -4,10 +4,10 @@ Study date: October 29, 2026.
 Local version: **7-Zip 26.05**, with source release date `2026-10-21`.
 Git reference at the time of the study: `8204ba7d01f8cd73abee5e2f82ac98e7ce3edef9`.
 
-**Latest implementation update:** v0.5.0 is published. The next development
-preview adds compact exact-range caching, clearer operation progress, nested
-folder restoration and portable packaging. Desktop acceptance and 374 automated
-scenarios passed. See [preview changes](25-next-preview.md),
+**Latest implementation update:** v0.5.0 is published and v1.0.0-rc1 is being
+validated. The release candidate isolates its preferences from upstream 7-Zip,
+adds an exact-read performance warning, and has a local release gate. See the
+[release-candidate notes](27-release-candidate.md),
 [validation and benchmarks](26-development-validation.md), and the root README.
 The sections below preserve the original study.
 
@@ -36,7 +36,9 @@ These are engineering choices for the study, not settings currently available in
 
 ## Study Files
 
-Latest follow-up: [Post-v0.5.0 validation and benchmarks](26-development-validation.md).
+Latest follow-up: [v1.0.0-rc1 release candidate](27-release-candidate.md).
+
+Previous validation: [Post-v0.5.0 validation and benchmarks](26-development-validation.md).
 
 Latest follow-up: [0.6.0-dev preview notes](25-next-preview.md).
 
@@ -83,4 +85,9 @@ For a 20 GiB ZIP, downloading its directory and a 5 MiB compressed file's data, 
 
 ## Work Status
 
-The study, standalone prototype, 26.05 engine build, and CLI integration are complete. File Manager supports opening direct URLs and refreshing with a fresh session, with Agent-level coverage for local/remote browsing, extraction, passwords, zones, rejected mutations, and optional ETag bypass. The user confirmed the previous Open URL flow works; the new checkbox and complete desktop acceptance flow still need verification. A real MediaFire HTTPS listing and selected extraction have now succeeded. HTTP redirects, bounded retries, selection preview and optional persistent disk caching now have controlled integration coverage; see the latest follow-ups. Broader server/proxy interoperability, full-download fallback, and remote volume resolution remain future work. This is a development milestone, not a release-ready product.
+The study, integration and loopback acceptance are complete. Desktop acceptance
+of the 0.6.0-dev build covered URL opening, browsing, extraction, cancellation,
+encrypted archives, cache settings, nested ISO names, Refresh and URL renewal.
+The v1.0.0-rc1 build needs real-server and clean-machine acceptance before a
+stable release. Broader server/proxy interoperability, full-download fallback
+and remote volume resolution remain future work.

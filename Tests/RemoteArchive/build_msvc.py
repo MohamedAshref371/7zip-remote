@@ -7,6 +7,8 @@ from pathlib import Path
 import subprocess
 import shutil
 
+from release_provenance import source_tree_sha256
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -84,6 +86,12 @@ def main():
                             'oleaut32.lib', 'ole32.lib', 'user32.lib', 'advapi32.lib', 'shell32.lib',
                             'comctl32.lib', 'htmlhelp.lib', 'comdlg32.lib', 'mpr.lib', 'gdi32.lib',
                             'delayimp.lib', 'winhttp.lib', '/DELAYLOAD:mpr.dll'], cwd=ROOT, env=env, check=True)
+    if args.target == 'all' and args.http:
+        import hashlib
+        provenance = {'source_tree_sha256': source_tree_sha256(),
+                      'binaries': {name: hashlib.sha256((binaries / name).read_bytes()).hexdigest()
+                                   for name in ('7z.dll', '7z.exe', '7zFM.exe')}}
+        (binaries / 'build-provenance.json').write_text(json.dumps(provenance, indent=2) + '\n', encoding='utf-8')
 
 
 if __name__ == '__main__':

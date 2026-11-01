@@ -1,4 +1,4 @@
-"""Assemble a portable Windows x64 preview with licenses, checksums and provenance."""
+"""Assemble a portable Windows x64 release candidate from a clean source tree."""
 import argparse
 import hashlib
 import json
@@ -8,14 +8,25 @@ import subprocess
 import zipfile
 
 from test_remote import ROOT
+from release_provenance import source_tree_sha256
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bin-dir', type=Path, required=True)
-    parser.add_argument('--notes', type=Path, default=ROOT / 'Notes/25-next-preview.md')
+    parser.add_argument('--notes', type=Path, default=ROOT / 'Notes/27-release-candidate.md')
     args = parser.parse_args()
+    def git(*command):
+        return subprocess.check_output(['git', *command], cwd=ROOT, text=True).strip()
+    if git('status', '--porcelain'):
+        raise SystemExit('Release packages require a clean Git working tree. Commit source changes first.')
     binary = args.bin_dir.resolve()
+    provenance = json.loads((binary / 'build-provenance.json').read_text(encoding='utf-8'))
+    if provenance['source_tree_sha256'] != source_tree_sha256():
+        raise SystemExit('Release binary source does not match the current source tree. Rebuild first.')
+    for name, digest in provenance['binaries'].items():
+        if hashlib.sha256((binary / name).read_bytes()).hexdigest() != digest:
+            raise SystemExit(f'Release binary changed after the build: {name}')
     version = re.search(r'#define REMOTE_ARCHIVE_VERSION "([A-Za-z0-9.+-]+)"',
                         (ROOT / 'CPP/7zip/RemoteVersion.h').read_text())[1]
     assert version.encode('utf-16le') in (binary / '7zFM.exe').read_bytes(), 'Rebuild File Manager after changing the version'
@@ -24,12 +35,15 @@ def main():
                'License.txt': (ROOT / 'DOC/License.txt').read_bytes(),
                'unRarLicense.txt': (ROOT / 'DOC/unRarLicense.txt').read_bytes(),
                'RELEASE_NOTES.md': args.notes.read_bytes()}
-    payload['README.txt'] = f'''7-Zip Remote Archives {version} (experimental Windows x64 preview)
+    payload['README.txt'] = f'''7-Zip Remote Archives {version} (Windows x64 release candidate)
 
 Extract this entire ZIP into one folder. Launch 7zRemoteFM.exe and choose
 File > Open URL. Keep 7z.dll beside both executables. No installation is needed.
-This portable copy does not replace your installed 7-Zip. File Manager settings
-are shared with other 7-Zip builds under your Windows user account.
+This portable copy does not replace your installed 7-Zip. HTTP-enabled builds
+store preferences under Software\\7-Zip Remote, separately from upstream 7-Zip.
+Existing v0.5.0 preferences are not imported; choose cache settings again.
+Changing associations in Tools > Options > System still changes Windows file
+associations for this user or machine when you explicitly apply those choices.
 
 The upstream engine is 7-Zip 26.05 by Igor Pavlov and contributors.
 The remote extension was developed with substantial contributions from OpenAI Codex.
@@ -41,15 +55,13 @@ are unsupported. Solid archives may need most of the compressed data. Keep ETag
 verification enabled when available. Exact reads can reduce bytes but increase
 requests and time. Disk caching reuses downloaded parts subject to verification.
 
-Matching source code is provided in the source ZIP alongside this preview.
-This package contains
-no installer, shell extension, test executables or private test fixtures.
+Matching source code is provided in the source ZIP alongside this package.
+This package contains no installer, shell extension, test executables or private
+test fixtures.
 '''.encode('utf-8')
-    def git(*args):
-        return subprocess.check_output(['git', *args], cwd=ROOT, text=True).strip()
     payload['manifest.json'] = (json.dumps(dict(version=version, platform='windows-x64',
         upstream='7-Zip 26.05', source_commit=git('rev-parse', 'HEAD'),
-        source_modified=bool(git('status', '--porcelain')), files={name: hashlib.sha256(data).hexdigest()
+        source_modified=False, files={name: hashlib.sha256(data).hexdigest()
         for name, data in payload.items()}), indent=2) + '\n').encode('utf-8')
     payload['SHA256SUMS.txt'] = ''.join(f'{hashlib.sha256(data).hexdigest()}  {name}\n'
                                          for name, data in sorted(payload.items())).encode()
@@ -66,7 +78,7 @@ no installer, shell extension, test executables or private test fixtures.
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_suffix('.zip.sha256').write_text(f'{digest}  {archive.name}\n', encoding='ascii')
     source_zip = out / f'7zip-remote-{version}-source.zip'
-    source_files = git('ls-files', '--cached', '--others', '--exclude-standard').splitlines()
+    source_files = git('ls-files').splitlines()
     with zipfile.ZipFile(source_zip, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zip:
         for name in source_files:
             path = ROOT / name
