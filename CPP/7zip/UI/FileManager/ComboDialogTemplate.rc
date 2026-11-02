@@ -1,0 +1,66 @@
+// Included twice by ComboDialog.rc: standard layout and Arabic RTL layout.
+#define xc 240
+#define yc 64
+
+COMBO_DIALOG_ID DIALOG_KIND 0, 0, xs, ys MY_MODAL_RESIZE_DIALOG_STYLE MY_FONT
+DIALOG_DIRECTION_STYLE
+CAPTION "Combo"
+{
+  LTEXT "", IDT_COMBO, m, m, xc, 8
+  // Mirror the combo placement, but keep its URL edit child in LTR reading order.
+  COMBOBOX IDC_COMBO, m, 20, xc, 65, MY_COMBO_WITH_EDIT, WS_EX_NOINHERITLAYOUT
+  OK_CANCEL
+}
+
+#undef xc
+#undef yc
+
+#ifdef Z7_HTTP
+#define xc 300
+#define yc 272
+
+OPEN_DIALOG_ID DIALOG_KIND 0, 0, xs, ys MY_MODAL_DIALOG_STYLE MY_FONT
+DIALOG_DIRECTION_STYLE
+CAPTION "Open URL"
+{
+  LTEXT "Direct HTTP or HTTPS archive URL:", IDT_COMBO, m, m, xc, 8
+  // URLs remain LTR inside the mirrored dialog.
+  COMBOBOX IDC_COMBO, m, 20, xc, 65, MY_COMBO_WITH_EDIT, WS_EX_NOINHERITLAYOUT
+  LTEXT "Archive type:", -1, m, 42, 60, 8
+  COMBOBOX IDC_REMOTE_FORMAT, 75, 39, 140, 80, MY_COMBO
+  CONTROL "Skip ETag verification", IDC_REMOTE_SKIP_ETAG, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 65, xc, 12
+  LTEXT "Enable only if you trust that the archive will not change. Changes during download may cause incorrect data or extraction errors.", -1, m, 82, xc, 25
+  CONTROL "Download only requested data (no read-ahead)", IDC_REMOTE_EXACT_READS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 111, xc, 12
+  LTEXT "RAR/TAR archives with many files can take minutes instead of seconds because of extra requests. Default blocks are faster. Disk cache saves only downloaded parts.", -1, m, 127, xc, 28
+  PUSHBUTTON "Cache settings...", IDC_REMOTE_CACHE_SETTINGS, m, 159, 100, 16
+  LTEXT "Saved archive cache (optional link to a different URL):", -1, m, 184, xc, 8
+  COMBOBOX IDC_REMOTE_CACHE_REUSE, m, 196, xc, 100, MY_COMBO
+  CONTROL "Reuse old cache without full version verification", IDC_REMOTE_CACHE_TRUST, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 220, xc, 12
+  LTEXT "Separate consent is required when skipping ETag or linking a new URL. Fresh metadata and samples are checked; matching samples do not prove that the entire archive is unchanged.", -1, m, 237, xc, 25
+  OK_CANCEL
+}
+
+#undef xc
+#undef yc
+
+#define xc 300
+#define yc 184
+CACHE_DIALOG_ID DIALOG_KIND 0, 0, xs, ys MY_MODAL_DIALOG_STYLE MY_FONT
+DIALOG_DIRECTION_STYLE
+CAPTION "Remote archive cache"
+{
+  CONTROL "Keep downloaded archive parts on disk", IDC_CACHE_ENABLED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, m, xc, 12
+  LTEXT "Cache folder:", -1, m, 30, xc, 8
+  EDITTEXT IDC_CACHE_PATH, m, 43, 230, 14, ES_AUTOHSCROLL
+  PUSHBUTTON "Browse...", IDC_CACHE_BROWSE, 246, 42, 62, 16
+  CONTROL "Limit cache size (MiB):", IDC_CACHE_LIMIT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, m, 69, 140, 12
+  EDITTEXT IDC_CACHE_MIB, 155, 68, 80, 14, ES_NUMBER | ES_AUTOHSCROLL
+  LTEXT "Unchecked means unlimited. Changes apply on the next open; active archives are retained.", -1, m, 89, xc, 18
+  LTEXT "", IDC_CACHE_USAGE, m, 113, xc, 20
+  PUSHBUTTON "Clear cache...", IDC_CACHE_CLEAR, m, 140, 95, 16
+  LTEXT "Active archives and unrelated files are retained.", -1, 113, 143, 195, 16
+  OK_CANCEL
+}
+#undef xc
+#undef yc
+#endif

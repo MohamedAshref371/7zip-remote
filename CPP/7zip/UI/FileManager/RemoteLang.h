@@ -6,6 +6,17 @@
 #include "../../../Windows/Window.h"
 #include <wchar.h>
 
+inline bool RemoteLangIsRTL()
+{
+#ifdef Z7_LANG
+  // ID 1 is the language's English name, including when Windows selects the default language.
+  const wchar_t *name = g_Lang.Get(1);
+  return name && wcscmp(name, L"Arabic") == 0;
+#else
+  return false;
+#endif
+}
+
 inline UString RemoteLang(const wchar_t *english)
 {
 #if defined(Z7_HTTP) && defined(Z7_LANG)

@@ -640,7 +640,7 @@ public:
   bool SkipHttpETag = false;
   bool ExactHttpReads = false;
   NWindows::CHttpDiskCacheOptions CacheOptions;
-  INT_PTR Create(HWND parent) { return CModalDialog::Create(IDD_REMOTE_OPEN, parent); }
+  INT_PTR Create(HWND parent) { return CModalDialog::Create(RemoteLangIsRTL() ? IDD_REMOTE_OPEN_RTL : IDD_REMOTE_OPEN, parent); }
 };
 
 HRESULT CPanel::ReopenRemoteArchive(const UString &url,
@@ -700,6 +700,7 @@ void CPanel::RenewRemoteArchiveDialog()
   const UString oldUrl = _parentFolders[0].RemoteUrl;
   const NWindows::CHttpDiskCacheOptions previous = _parentFolders[0].HttpCacheOptions;
   CComboDialog dialog;
+  dialog.RightToLeft = RemoteLangIsRTL();
   dialog.Title = RemoteLang(L"Renew archive URL");
   dialog.Static = RemoteLang(L"New direct HTTP or HTTPS archive URL:");
   // Never store signed URLs in combo history or prefill the old access token.

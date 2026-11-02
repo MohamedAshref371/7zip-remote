@@ -19,6 +19,10 @@ remain byte-for-byte identical to the installer payload.
   and checksums. The release verifier checks the exact language payload.
 - Choose **Tools > Options > Language**. The existing 7-Zip language selection
   and registry behavior are retained. Keep `Lang/` beside `7zRemoteFM.exe`.
+- When Arabic is selected, the remote Open URL, cache settings, and URL renewal
+  dialogs use mirrored RTL templates. The File Manager and other 7-Zip dialogs
+  retain their existing layout; URL input retains LTR reading order. Switching
+  language affects newly opened remote dialogs without restarting the File Manager.
 - The remote extension has 133 Arabic strings and matching English reference
   strings: menus, Open URL, cache dialogs and status, URL renewal, selection
   estimates, opening/extraction progress, About, and HTTP diagnostics on opening.
@@ -50,6 +54,6 @@ and remote lookup/formatting tests for all files, including Arabic, missing-key
 fallbacks and parameterized HTTP status diagnostics. Both checks are included
 in the release gate. The release verifier requires the full language payload.
 
-Arabic visual acceptance on Windows should check long warnings, mixed Arabic /
-URL text, and progress labels at common DPI settings. This change uses the
-existing 7-Zip layout and does not introduce a new RTL layout engine.
+Arabic visual acceptance on Windows should check the mirrored remote dialogs,
+long warnings, mixed Arabic / URL text, and progress labels at common DPI
+settings. This change does not introduce a File Manager-wide RTL layout engine.

@@ -20,9 +20,10 @@ public:
   UString Static;
   UString Value;
   UStringVector Strings;
+  bool RightToLeft = false; // Set only for the remote URL renewal dialog.
   
   // CComboDialog(): Sorted(false) {};
-  INT_PTR Create(HWND parentWindow = NULL) { return CModalDialog::Create(IDD_COMBO, parentWindow); }
+  INT_PTR Create(HWND parentWindow = NULL) { return CModalDialog::Create(RightToLeft ? IDD_COMBO_RTL : IDD_COMBO, parentWindow); }
 };
 
 #endif

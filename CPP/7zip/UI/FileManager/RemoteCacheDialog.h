@@ -206,6 +206,6 @@ class CRemoteCacheDialog Z7_final: public NWindows::NControl::CModalDialog
   }
 public:
   NWindows::CHttpDiskCacheOptions Options;
-  INT_PTR Create(HWND parent) { return CModalDialog::Create(IDD_REMOTE_CACHE, parent); }
+  INT_PTR Create(HWND parent) { return CModalDialog::Create(RemoteLangIsRTL() ? IDD_REMOTE_CACHE_RTL : IDD_REMOTE_CACHE, parent); }
 };
 #endif
