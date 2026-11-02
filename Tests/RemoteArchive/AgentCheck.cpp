@@ -495,6 +495,8 @@ int __cdecl wmain(int argc, wchar_t **argv)
     }
     if (wcscmp(argv[i], L"--skip-http-etag") == 0) manager->SetSkipHttpETag(true);
     if (wcscmp(argv[i], L"--exact-http-reads") == 0) manager->SetExactHttpReads(true);
+    if (wcsncmp(argv[i], L"--http-block-kib=", 17) == 0)
+      manager->SetHttpBlockSize((unsigned)_wtoi(argv[i] + 17) << 10);
     if (wcsncmp(argv[i], L"--format=", 9) == 0) arcFormat = argv[i] + 9;
     if (wcscmp(argv[i], L"--rar-family-check") == 0) rarFamilyCheck = true;
     if (wcscmp(argv[i], L"--estimate-archive-check") == 0) estimateArchiveCheck = true;

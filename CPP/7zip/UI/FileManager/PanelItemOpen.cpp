@@ -461,7 +461,8 @@ void GetFolderError(CMyComPtr<IFolderFolder> &folder, UString &s);
 
 #ifdef Z7_HTTP
 HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, COpenResult &openRes,
-    bool skipHttpETag, const NWindows::CHttpDiskCacheOptions *cacheOptions, bool exactHttpReads)
+    bool skipHttpETag, const NWindows::CHttpDiskCacheOptions *cacheOptions, bool exactHttpReads,
+    unsigned httpBlockSize)
 {
   CDisableTimerProcessing disableTimerProcessing(*this);
   CDisableNotify disableNotify(*this);
@@ -470,6 +471,7 @@ HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, 
   CFfpOpen ffp;
   ffp.SkipHttpETag = skipHttpETag;
   ffp.ExactHttpReads = exactHttpReads;
+  ffp.HttpBlockSize = httpBlockSize;
   if (cacheOptions) ffp.HttpCacheOptions = *cacheOptions;
   const HRESULT res = ffp.OpenFileFolderPlugin(NULL, us2fs(url), arcFormat, GetParent());
   openRes.Encrypted = ffp.Encrypted;
@@ -488,6 +490,7 @@ HRESULT CPanel::OpenRemoteArchive(const UString &url, const UString &arcFormat, 
   link.RemoteArcFormat = arcFormat;
   link.SkipHttpETag = skipHttpETag;
   link.ExactHttpReads = exactHttpReads;
+  link.HttpBlockSize = httpBlockSize;
   link.HttpCacheOptions = ffp.HttpCacheOptions;
   if (link.HttpCacheOptions.AllowUnverified)
   {
@@ -521,12 +524,14 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
 {
   NWindows::NControl::CComboBox _url;
   NWindows::NControl::CComboBox _format;
+  NWindows::NControl::CComboBox _blockSize;
   NWindows::NControl::CComboBox _reuse;
   std::vector<NWindows::NHttpCache::CEntry> _entries;
   void UpdateCacheControls()
   {
     EnableItem(IDC_REMOTE_CACHE_REUSE, CacheOptions.Enabled);
     EnableItem(IDC_REMOTE_CACHE_TRUST, CacheOptions.Enabled);
+    EnableItem(IDC_REMOTE_BLOCK_SIZE, !IsButtonCheckedBool(IDC_REMOTE_EXACT_READS));
   }
   void CacheEntries()
   {
@@ -568,6 +573,7 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
     RemoteLangDialog(*this);
     _url.Attach(GetItem(IDC_COMBO));
     _format.Attach(GetItem(IDC_REMOTE_FORMAT));
+    _blockSize.Attach(GetItem(IDC_REMOTE_BLOCK_SIZE));
     _reuse.Attach(GetItem(IDC_REMOTE_CACHE_REUSE));
     LoadRemoteCacheSettings(CacheOptions);
     CacheEntries();
@@ -579,7 +585,13 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
     _format.AddString(L"TAR");
     _format.SetCurSel(0);
     bool reuseUnverified = false;
-    LoadRemoteOpenSettings(SkipHttpETag, reuseUnverified, ExactHttpReads);
+    LoadRemoteOpenSettings(SkipHttpETag, reuseUnverified, ExactHttpReads, HttpBlockSize);
+    _blockSize.AddString(L"32 KiB");
+    _blockSize.AddString(L"64 KiB");
+    _blockSize.AddString(L"128 KiB");
+    _blockSize.AddString(L"256 KiB");
+    _blockSize.SetCurSel(HttpBlockSize == (32u << 10) ? 0 :
+        HttpBlockSize == (64u << 10) ? 1 : HttpBlockSize == (128u << 10) ? 2 : 3);
     CheckButton(IDC_REMOTE_EXACT_READS, ExactHttpReads);
     CheckButton(IDC_REMOTE_SKIP_ETAG, SkipHttpETag);
     CheckButton(IDC_REMOTE_CACHE_TRUST, reuseUnverified);
@@ -592,6 +604,9 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
     _url.GetText(Value);
     SkipHttpETag = IsButtonCheckedBool(IDC_REMOTE_SKIP_ETAG);
     ExactHttpReads = IsButtonCheckedBool(IDC_REMOTE_EXACT_READS);
+    const int blockIndex = _blockSize.GetCurSel();
+    HttpBlockSize = blockIndex == 0 ? (32u << 10) : blockIndex == 1 ? (64u << 10) :
+        blockIndex == 2 ? (128u << 10) : (256u << 10);
     const bool useCache = CacheOptions.Enabled;
     const bool reuseUnverified = IsButtonCheckedBool(IDC_REMOTE_CACHE_TRUST);
     CacheOptions.AllowUnverified = useCache && reuseUnverified;
@@ -612,7 +627,7 @@ class CRemoteOpenDialog Z7_final: public NWindows::NControl::CModalDialog
       case 5: ArcFormat = "tar"; break;
       default: ArcFormat.Empty(); break; // Empty uses the engine's format detection.
     }
-    if (!SaveRemoteOpenSettings(SkipHttpETag, reuseUnverified, ExactHttpReads))
+    if (!SaveRemoteOpenSettings(SkipHttpETag, reuseUnverified, ExactHttpReads, HttpBlockSize))
     { MessageBoxW(*this, RemoteLang(L"Cannot save Open URL settings."), RemoteLang(L"Open URL"), MB_OK | MB_ICONWARNING); return; }
     CModalDialog::OnOK();
   }
@@ -639,6 +654,7 @@ public:
   UString ArcFormat;
   bool SkipHttpETag = false;
   bool ExactHttpReads = false;
+  unsigned HttpBlockSize = 256u << 10;
   NWindows::CHttpDiskCacheOptions CacheOptions;
   INT_PTR Create(HWND parent) { return CModalDialog::Create(RemoteLangIsRTL() ? IDD_REMOTE_OPEN_RTL : IDD_REMOTE_OPEN, parent); }
 };
@@ -652,6 +668,7 @@ HRESULT CPanel::ReopenRemoteArchive(const UString &url,
   const UString format = _parentFolders[0].RemoteArcFormat;
   const bool skipETag = _parentFolders[0].SkipHttpETag;
   const bool exactReads = _parentFolders[0].ExactHttpReads;
+  const unsigned blockSize = _parentFolders[0].HttpBlockSize;
   const bool outer = _parentFolders.Size() == 1;
   const bool flat = _flatMode;
   const UString folderPath = outer ? GetFolderPath(_folder) : UString();
@@ -660,7 +677,7 @@ HRESULT CPanel::ReopenRemoteArchive(const UString &url,
   CRemoteCacheRefreshScope handoff(outer ? (IFolderFolder *)_folder
       : (IFolderFolder *)_parentFolders[1].ParentFolder);
   COpenResult openRes;
-  const HRESULT result = OpenRemoteArchive(url, format, openRes, skipETag, &cacheOptions, exactReads);
+  const HRESULT result = OpenRemoteArchive(url, format, openRes, skipETag, &cacheOptions, exactReads, blockSize);
   bool restoreSelection = outer;
   if (result == S_OK)
   {
@@ -781,7 +798,8 @@ void CPanel::OpenRemoteArchiveDialog()
     return;
   }
   COpenResult openRes;
-  if (OpenRemoteArchive(dialog.Value, dialog.ArcFormat, openRes, dialog.SkipHttpETag, &dialog.CacheOptions, dialog.ExactHttpReads) == S_OK)
+  if (OpenRemoteArchive(dialog.Value, dialog.ArcFormat, openRes, dialog.SkipHttpETag,
+      &dialog.CacheOptions, dialog.ExactHttpReads, dialog.HttpBlockSize) == S_OK)
     RefreshListCtrl();
   SetFocusToList();
 }

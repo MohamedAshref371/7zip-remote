@@ -49,7 +49,7 @@ def main():
     catalog = (ROOT / 'CPP/7zip/UI/FileManager/RemoteLangStrings.inc').read_text()
     entries = [(int(key), json.loads(text)) for key, text in
                re.findall(r'^REMOTE_LANG\((\d+), L("(?:[^"\\]|\\.)*")\)$', catalog, re.M)]
-    assert len(entries) >= 133 and len({key for key, _ in entries}) == len(entries)
+    assert len(entries) >= 134 and len({key for key, _ in entries}) == len(entries)
     assert len({text for _, text in entries}) == len(entries), 'Ambiguous English keys'
     for key, english in entries:
         assert key >= 900000 and parsed['en.ttt'][key] == english, key

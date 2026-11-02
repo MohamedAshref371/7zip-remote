@@ -210,7 +210,8 @@ inline bool Info(const std::wstring &folder, CInfo &info)
   memcpy(&info, bytes.data(), sizeof(info));
   BYTE digest[32];
   return (!memcmp(info.Magic, "7ZHC01I", 8) || !memcmp(info.Magic, "7ZHC02I", 8)
-      || !memcmp(info.Magic, "7ZHC03I", 8))
+      || !memcmp(info.Magic, "7ZHC03I", 8) || !memcmp(info.Magic, "7ZHC04I", 8)
+      || !memcmp(info.Magic, "7ZHC05I", 8) || !memcmp(info.Magic, "7ZHC06I", 8))
       && info.Name[160] == 0 && info.Verified <= 1
       && info.Size > 0 && info.Size <= 0x7fffffffffffffffull
       && Hash(&info, offsetof(CInfo, Digest), digest) && !memcmp(digest, info.Digest, 32);
@@ -286,6 +287,7 @@ class CHttpDiskCache
   ULONGLONG _unprunedBytes = 0;
   bool _suspended = false;
   bool _exactReads = false;
+  unsigned _blockSize = 262144;
   std::wstring _resumeStatus;
   NHttpCache::CInfo _info = {};
   std::map<ULONGLONG, unsigned> _blocks;
@@ -526,10 +528,16 @@ public:
   }
   template<class TSource>
   HRESULT Open(const CHttpDiskCacheOptions &options, const std::wstring &url, TSource &source,
-      bool exactReads = false)
+      bool exactReads = false, unsigned blockSize = 262144)
   {
     using namespace NHttpCache;
+    if (blockSize != 32768 && blockSize != 65536 && blockSize != 131072
+        && blockSize != 262144) return E_INVALIDARG;
     _exactReads = exactReads;
+    _blockSize = blockSize;
+    const char * const cacheMagic = _exactReads ? "7ZHC03I" :
+        _blockSize == 32768 ? "7ZHC06I" : _blockSize == 65536 ? "7ZHC04I" :
+        _blockSize == 131072 ? "7ZHC05I" : "7ZHC01I";
     if (!options.Enabled) return S_OK;
     Status = L"Cache unavailable (memory only)";
     _root = Root(options.Directory, true);
@@ -549,7 +557,8 @@ public:
     {
       if (!entry.Valid) continue;
       // Separate generations keep legacy fixed-block readers compatible.
-      if ((memcmp(entry.Info.Magic, "7ZHC01I", 8) != 0) != _exactReads) continue;
+      if (memcmp(entry.Info.Magic, cacheMagic, 8) != 0
+          && !(_exactReads && memcmp(entry.Info.Magic, "7ZHC02I", 8) == 0)) continue;
       const bool sameUrl = !memcmp(entry.Info.Url, urlHash, 32) && !memcmp(entry.Info.Endpoint, endpoint, 32);
       if ((!options.ReuseId.empty() && options.ReuseId == entry.Id) || (options.ReuseId.empty() && sameUrl))
       {
@@ -571,7 +580,8 @@ public:
     else if (!_exactReads)
     {
       std::vector<unsigned char> first, last, fingerprint;
-      const unsigned length = (unsigned)((std::min)(source.Size, (ULONGLONG)65536));
+      const unsigned length = (unsigned)((std::min)(source.Size,
+          (ULONGLONG)(std::min)(_blockSize, 65536u)));
       result = source.Fetch(0, length, first);
       if (result != S_OK) return result;
       if (source.Size <= length) last = first;
@@ -600,8 +610,8 @@ public:
         if (source.IsCancelled()) { Close(); return E_ABORT; }
         ULONGLONG offset = 0;
         if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || !BlockName(file.cFileName, offset)
-            || (!_exactReads && offset % 262144) || offset >= source.Size) continue;
-        const unsigned maximum = (unsigned)((std::min)(source.Size - offset, (ULONGLONG)262144));
+            || (!_exactReads && offset % _blockSize) || offset >= source.Size) continue;
+        const unsigned maximum = (unsigned)((std::min)(source.Size - offset, (ULONGLONG)_blockSize));
         if (file.nFileSizeHigh || file.nFileSizeLow <= sizeof(CBlockHeader)) continue;
         const unsigned count = _exactReads ? file.nFileSizeLow - sizeof(CBlockHeader) : maximum;
         if (count > maximum) continue;
@@ -652,7 +662,7 @@ public:
     if (id.empty() || !CreateDirectoryW((_root + L"\\" + id).c_str(), NULL) || !LockEntry(id)) return S_OK;
     if (!AtomicWrite(_folder + L"\\entry.owner", "7ZHC01E", 8)) { Close(); return S_OK; }
     memset(&_info, 0, sizeof(_info));
-    memcpy(_info.Magic, _exactReads ? "7ZHC03I" : "7ZHC01I", 8);
+    memcpy(_info.Magic, cacheMagic, 8);
     _info.Size = source.Size;
     _info.Verified = source.SkipsETag() ? 0 : 1;
     memcpy(_info.Url, urlHash, 32); memcpy(_info.Endpoint, endpoint, 32);

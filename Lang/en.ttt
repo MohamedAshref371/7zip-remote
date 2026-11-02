@@ -799,3 +799,5 @@ Content-Length does not match the requested range.
 Range body exceeds its declared length.
 900132
 The server sent an incomplete byte range. Check your connection and reopen the archive.
+900133
+Download block size:

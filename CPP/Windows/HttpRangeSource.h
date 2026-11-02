@@ -21,6 +21,7 @@ struct CHttpRangeOptions
   unsigned RequestDeadlineMs = 30000;
   bool SkipETagVerification = false; // explicit per-session opt-in; range/size checks remain mandatory
   bool ExactReads = false; // no block rounding/read-ahead; cache variable-sized parts
+  unsigned BlockSize = 256u << 10; // block mode: 32, 64, 128, or 256 KiB
   CHttpDiskCacheOptions DiskCache;
   void (*Progress)(void *, ULONGLONG, ULONGLONG, ULONGLONG) = NULL;
   void *ProgressContext = NULL; // scoped to the current operation

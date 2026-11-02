@@ -23,7 +23,7 @@ remain byte-for-byte identical to the installer payload.
   dialogs use mirrored RTL templates. The File Manager and other 7-Zip dialogs
   retain their existing layout; URL input retains LTR reading order. Switching
   language affects newly opened remote dialogs without restarting the File Manager.
-- The remote extension has 133 Arabic strings and matching English reference
+- The remote extension has 134 Arabic strings and matching English reference
   strings: menus, Open URL, cache dialogs and status, URL renewal, selection
   estimates, opening/extraction progress, About, and HTTP diagnostics on opening.
 - Other languages retain their upstream translations; remote additions fall back

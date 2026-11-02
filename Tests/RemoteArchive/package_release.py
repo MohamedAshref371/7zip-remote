@@ -58,7 +58,8 @@ Direct HTTP(S) archive links and byte-range support are required. Browser logins
 sharing-page resolution, archive modification and multi-volume remote archives
 are unsupported. Solid archives may need most of the compressed data. Keep ETag
 verification enabled when available. Exact reads can reduce bytes but increase
-requests and time. Disk caching reuses downloaded parts subject to verification.
+requests and time. Open URL also offers 32, 64, 128 and 256 KiB download blocks;
+256 KiB remains the default. Disk caching reuses downloaded parts subject to verification.
 
 Matching source code is provided in the source ZIP alongside this package.
 This package contains no installer, shell extension, test executables or private

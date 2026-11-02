@@ -22,7 +22,7 @@ extension-specific handler interface exposes conservative physical ranges:
   conservative estimate and can overestimate small members or unusual layouts.
   Multi-volume and incomplete/problematic ZIP metadata are not estimated.
 
-The stream rounds ranges to its actual 256 KiB HTTP blocks, merges overlapping
+The stream rounds ranges to its selected HTTP block size (256 KiB by default), merges overlapping
 and adjacent ranges, and subtracts blocks currently in the 8 MiB cache. Arithmetic
 is checked against the validated source size; huge intervals are processed
 without allocating an entry for every block. Empty selections need zero bytes.

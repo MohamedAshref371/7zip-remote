@@ -17,8 +17,8 @@ bool CHttpInStream::EstimateMissingBytes(std::vector<CHttpReadRange> ranges, UIn
     if (_exactReads) continue;
     const UInt64 end = range.Start + range.Size;
     const UInt64 roundedEnd = (std::min)(Source.Size,
-        ((end - 1) / kBlockSize + 1) * kBlockSize);
-    range.Start = range.Start / kBlockSize * kBlockSize;
+        ((end - 1) / _blockSize + 1) * _blockSize);
+    range.Start = range.Start / _blockSize * _blockSize;
     range.Size = roundedEnd - range.Start;
   }
   std::sort(ranges.begin(), ranges.end(), [](const CHttpReadRange &a, const CHttpReadRange &b)
@@ -72,14 +72,18 @@ bool CHttpInStream::EstimateMissingBytes(std::vector<CHttpReadRange> ranges, UIn
 
 HRESULT CHttpInStream::Open(const wchar_t *url, const NWindows::CHttpRangeOptions &options)
 {
+  if (options.BlockSize != (32u << 10) && options.BlockSize != (64u << 10)
+      && options.BlockSize != (128u << 10)
+      && options.BlockSize != kBlockSize) return E_INVALIDARG;
   _exactReads = options.ExactReads;
+  _blockSize = _exactReads ? kBlockSize : options.BlockSize;
   try
   {
     _failure = Source.Open(url, options);
     if (_failure == S_OK)
     {
       if (options.DiskCache.Enabled) Source.ReportStage(NWindows::kHttpCheckingCache);
-      try { _failure = DiskCache.Open(options.DiskCache, url, Source, _exactReads); }
+      try { _failure = DiskCache.Open(options.DiskCache, url, Source, _exactReads, _blockSize); }
       catch (...) { DiskCache.Close(); DiskCache.Status = L"Cache unavailable (memory only)"; }
     }
     if (_failure == S_OK) Source.ReportStage(NWindows::kHttpReadingHeaders);
@@ -136,7 +140,7 @@ Z7_COM7F_IMF(CHttpInStream::Read(void *data, UInt32 size, UInt32 *processed))
   if (_pos >= Source.Size) return S_OK;
   try
   {
-    const UInt64 start = _exactReads ? _pos : _pos / kBlockSize * kBlockSize;
+    const UInt64 start = _exactReads ? _pos : _pos / _blockSize * _blockSize;
     auto block = _cache.begin();
     for (; block != _cache.end(); ++block)
       if (_exactReads ? (_pos >= block->Start && _pos - block->Start < block->Data.size())
@@ -146,7 +150,7 @@ Z7_COM7F_IMF(CHttpInStream::Read(void *data, UInt32 size, UInt32 *processed))
       CBlock fetched;
       fetched.Start = start;
       unsigned length = static_cast<unsigned>((std::min)(
-          Source.Size - start, static_cast<UInt64>(kBlockSize)));
+          Source.Size - start, static_cast<UInt64>(_blockSize)));
       if (_exactReads)
       {
         length = (std::min)(length, size);

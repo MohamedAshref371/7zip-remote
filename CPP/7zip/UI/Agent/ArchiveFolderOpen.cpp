@@ -103,6 +103,7 @@ Z7_COM7F_IMF(CArchiveFolderManager::OpenFolderFile(IInStream *inStream,
   #ifdef Z7_HTTP
   agent->SkipHttpETag = SkipHttpETag;
   agent->ExactHttpReads = ExactHttpReads;
+  agent->HttpBlockSize = HttpBlockSize;
   agent->HttpCacheOptions = HttpCacheOptions;
   #endif
   CMyComPtr<IInFolderArchive> archive = agent;

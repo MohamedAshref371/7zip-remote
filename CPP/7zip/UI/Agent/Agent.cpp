@@ -1772,6 +1772,7 @@ Z7_COM7F_IMF(CAgent::Open(
     remoteOptions.CancelContext = openArchiveCallback;
     remoteOptions.SkipETagVerification = SkipHttpETag;
     remoteOptions.ExactReads = ExactHttpReads;
+    remoteOptions.BlockSize = HttpBlockSize;
     remoteOptions.DiskCache = HttpCacheOptions;
     RINOK(RemoteSource.Open(_archiveFilePath, remoteOptions))
     inStream = RemoteSource.Stream;

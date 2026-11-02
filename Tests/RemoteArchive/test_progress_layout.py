@@ -29,8 +29,13 @@ def read_dialog(exe, resource_id=97):
     finally:
         api.FreeLibrary(module)
 
-    style, _, count, _, _, width, height = struct.unpack_from('<IIHhhhh', data)
-    offset = 18
+    extended = struct.unpack_from('<H', data, 2)[0] == 0xffff
+    if extended:
+        _, _, _, _, style, count, _, _, width, height = struct.unpack_from('<HHIIIHhhhh', data)
+        offset = 26
+    else:
+        style, _, count, _, _, width, height = struct.unpack_from('<IIHhhhh', data)
+        offset = 18
 
     def skip_text():
         nonlocal offset
@@ -46,13 +51,17 @@ def read_dialog(exe, resource_id=97):
     for _ in range(3):  # menu, class, title
         skip_text()
     if style & 0x40:  # DS_SETFONT
-        offset += 2
+        offset += 6 if extended else 2
         skip_text()
     items = {}
     for _ in range(count):
         offset = (offset + 3) & ~3
-        _, _, x, y, w, h, item_id = struct.unpack_from('<IIhhhhH', data, offset)
-        offset += 18
+        if extended:
+            _, _, _, x, y, w, h, item_id = struct.unpack_from('<IIIhhhhI', data, offset)
+            offset += 24
+        else:
+            _, _, x, y, w, h, item_id = struct.unpack_from('<IIhhhhH', data, offset)
+            offset += 18
         skip_text()
         skip_text()
         extra, = struct.unpack_from('<H', data, offset)

@@ -25,17 +25,22 @@ See the [release-candidate notes](Notes/27-release-candidate.md),
   Names become available after their headers are read (and decrypted, if needed).
   ISO reports full directory paths with Joliet/Rock Ridge naming and counts
   consecutive extents of the same file once.
-- **Download only requested data:** optional Open URL checkbox removes the
-  256 KiB minimum fetch. Small reads request only the bytes asked for by the
+- **Download block size:** Open URL offers 32, 64, 128, and 256 KiB blocks. The
+  default remains 256 KiB. Smaller blocks can avoid downloading as much unused
+  data while scanning sparse RAR headers, but can increase request counts when
+  reading file data. The choice is remembered for Refresh and URL renewal;
+  disk caches for different block sizes are kept separate.
+- **Download only requested data:** optional Open URL checkbox disables block
+  prefetch. Small reads request only the bytes asked for by the
   archive engine; larger reads may be split. Optional disk caching saves these
   exact parts and reuses them on subsequent opens, without padding or fetching
   extra bytes to complete a block. Many requests can make RAR/TAR header scans
   substantially slower; leave the default block mode on when speed matters. Archive
   metadata, engine buffering and solid-compression dependencies still require
   data beyond the selected file. The choice is remembered and retained on
-  Refresh and URL renewal; unchecked preserves the existing block-cache mode.
-  The two modes use separate cache generations. Cache reuse keeps the existing
-  ETag/explicit-consent rules and integrity checks.
+  Refresh and URL renewal; unchecked uses the selected block size.
+  Each block size and exact mode uses a separate cache generation. Cache reuse
+  keeps the existing ETag/explicit-consent rules and integrity checks.
 - **Renew expired links:** File ? Renew archive URL... opens a replacement link,
   retaining the current folder and selection where possible. Linking previous
   cached parts requires separate consent to partial verification. Failed renewal

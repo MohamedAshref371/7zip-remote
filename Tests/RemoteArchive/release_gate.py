@@ -44,6 +44,7 @@ def main():
         ('test_retry.py', '--exe', console, '--agent', agent),
         ('test_cancel.py', '--exe', agent),
         ('test_exact_reads.py', '--exe', agent),
+        ('test_block_sizes.py', '--exe', agent),
         ('test_disk_cache.py', '--exe', checker),
         ('test_disk_cache_agent.py', '--exe', agent, '--checker', checker),
         ('test_disk_cache_agent.py', '--exe', agent, '--checker', checker, '--exact-http-reads'),

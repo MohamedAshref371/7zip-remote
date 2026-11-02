@@ -17,6 +17,7 @@ public:
   #ifdef Z7_HTTP
   bool SkipHttpETag = false;
   bool ExactHttpReads = false;
+  unsigned HttpBlockSize = 256u << 10;
   NWindows::CHttpDiskCacheOptions HttpCacheOptions;
   #endif
   UString Password;

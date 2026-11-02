@@ -27,6 +27,7 @@ class CHttpInStream Z7_final:
   UInt64 _pos = 0;
   HRESULT _failure = E_UNEXPECTED;
   bool _exactReads = false;
+  unsigned _blockSize = kBlockSize;
 public:
   // Single consumer. 32 x 256 KiB = 8 MiB maximum retained cache.
   static const unsigned kBlockSize = 256u << 10;

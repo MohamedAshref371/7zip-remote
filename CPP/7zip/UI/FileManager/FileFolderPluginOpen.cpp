@@ -312,6 +312,7 @@ HRESULT CFfpOpen::OpenFileFolderPlugin(IInStream *inStream,
       t.ManagerSpec = manager;
       manager->SetSkipHttpETag(SkipHttpETag);
       manager->SetExactHttpReads(ExactHttpReads);
+      manager->SetHttpBlockSize(HttpBlockSize);
       manager->SetHttpCacheOptions(HttpCacheOptions);
       #endif
     }

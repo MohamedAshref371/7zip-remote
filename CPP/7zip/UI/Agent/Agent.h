@@ -251,6 +251,7 @@ public:
   CRemoteArchiveSource RemoteSource;
   bool SkipHttpETag = false;
   bool ExactHttpReads = false;
+  unsigned HttpBlockSize = 256u << 10;
   NWindows::CHttpDiskCacheOptions HttpCacheOptions;
   bool IsRemote() const { return RemoteSource.Spec != NULL; }
   #endif
@@ -378,6 +379,7 @@ Z7_CLASS_IMP_COM_1(
   UString RemoteError;
   bool SkipHttpETag = false;
   bool ExactHttpReads = false;
+  unsigned HttpBlockSize = 256u << 10;
   NWindows::CHttpDiskCacheOptions HttpCacheOptions;
   #endif
 
@@ -391,6 +393,7 @@ public:
   const UString &GetRemoteError() const { return RemoteError; }
   void SetSkipHttpETag(bool skip) { SkipHttpETag = skip; }
   void SetExactHttpReads(bool exact) { ExactHttpReads = exact; }
+  void SetHttpBlockSize(unsigned size) { HttpBlockSize = size; }
   void SetHttpCacheOptions(const NWindows::CHttpDiskCacheOptions &options) { HttpCacheOptions = options; }
   #endif
 };

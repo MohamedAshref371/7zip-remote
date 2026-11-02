@@ -10,9 +10,11 @@
 #include <memory>
 #include <thread>
 
-inline void LoadRemoteOpenSettings(bool &skipETag, bool &reuseUnverified, bool &exactReads)
+inline void LoadRemoteOpenSettings(bool &skipETag, bool &reuseUnverified, bool &exactReads,
+    unsigned &blockSize)
 {
   skipETag = reuseUnverified = exactReads = false;
+  blockSize = 256u << 10;
   HKEY key;
   if (RegOpenKeyExW(HKEY_CURRENT_USER, Z7_REMOTE_CACHE_REGISTRY_PATH, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS) return;
   const wchar_t *names[] = { L"SkipETagVerification", L"ReuseUnverifiedCache", L"ExactReads" };
@@ -23,18 +25,29 @@ inline void LoadRemoteOpenSettings(bool &skipETag, bool &reuseUnverified, bool &
     if (RegQueryValueExW(key, names[i], NULL, &type, (BYTE *)&value, &size) == ERROR_SUCCESS
         && type == REG_DWORD && size == sizeof(value)) *values[i] = value != 0;
   }
+  DWORD saved = 0, type = 0, size = sizeof(saved);
+  if (RegQueryValueExW(key, L"BlockSize", NULL, &type, (BYTE *)&saved, &size) == ERROR_SUCCESS
+      && type == REG_DWORD && size == sizeof(saved)
+      && (saved == (32u << 10) || saved == (64u << 10)
+          || saved == (128u << 10) || saved == (256u << 10)))
+    blockSize = saved;
   RegCloseKey(key);
 }
 
-inline bool SaveRemoteOpenSettings(bool skipETag, bool reuseUnverified, bool exactReads)
+inline bool SaveRemoteOpenSettings(bool skipETag, bool reuseUnverified, bool exactReads,
+    unsigned blockSize)
 {
+  if (blockSize != (32u << 10) && blockSize != (64u << 10)
+      && blockSize != (128u << 10) && blockSize != (256u << 10)) return false;
   HKEY key;
   if (RegCreateKeyExW(HKEY_CURRENT_USER, Z7_REMOTE_CACHE_REGISTRY_PATH, 0, NULL, 0,
       KEY_SET_VALUE, NULL, &key, NULL) != ERROR_SUCCESS) return false;
   const DWORD skip = skipETag ? 1 : 0, reuse = reuseUnverified ? 1 : 0, exact = exactReads ? 1 : 0;
+  const DWORD block = blockSize;
   const bool ok = RegSetValueExW(key, L"SkipETagVerification", 0, REG_DWORD, (const BYTE *)&skip, sizeof(skip)) == ERROR_SUCCESS
       && RegSetValueExW(key, L"ReuseUnverifiedCache", 0, REG_DWORD, (const BYTE *)&reuse, sizeof(reuse)) == ERROR_SUCCESS
-      && RegSetValueExW(key, L"ExactReads", 0, REG_DWORD, (const BYTE *)&exact, sizeof(exact)) == ERROR_SUCCESS;
+      && RegSetValueExW(key, L"ExactReads", 0, REG_DWORD, (const BYTE *)&exact, sizeof(exact)) == ERROR_SUCCESS
+      && RegSetValueExW(key, L"BlockSize", 0, REG_DWORD, (const BYTE *)&block, sizeof(block)) == ERROR_SUCCESS;
   RegCloseKey(key);
   return ok;
 }
