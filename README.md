@@ -8,10 +8,11 @@ The original 7-Zip engine and format handlers are reused. Depending on the archi
 and its compression layout, selected extraction can avoid downloading the entire
 archive.
 
-**Status:** [v1.0.0-rc1](https://github.com/MohamedAshref371/7zip-remote/releases/tag/v1.0.0-rc1)
-is a public Windows x64 prerelease. The stable v1.0.0 release awaits
-real-server and clean-machine acceptance.
-See the [release-candidate notes](Notes/27-release-candidate.md),
+**Status:** v1.0.0-rc2 is a Windows x64 release candidate. See
+[GitHub Releases](https://github.com/MohamedAshref371/7zip-remote/releases)
+for published downloads. The stable v1.0.0 release awaits real-server and
+clean-machine acceptance. See the [rc2 candidate notes](Notes/29-release-candidate-rc2.md),
+[rc1 notes](Notes/27-release-candidate.md),
 [development validation](Notes/26-development-validation.md) and
 [implementation notes](Notes/README.md).
 
@@ -133,8 +134,8 @@ Zig/Clang build instructions are available in the [test and build guide](Tests/R
 ```
 
 For the portable ZIP, close an older File Manager instance and launch
-`7zRemoteFM.exe` from the extracted `7zip-remote-1.0.0-rc1` folder. **Help →
-About 7-Zip Remote** should show `1.0.0-rc1` as the product version;
+`7zRemoteFM.exe` from the extracted versioned folder. **Help →
+About 7-Zip Remote** should show the version printed on that folder;
 `26.05` is the underlying 7-Zip engine version.
 
 1. Choose **File → Open URL...** and paste a direct archive URL.

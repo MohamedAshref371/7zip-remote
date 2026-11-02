@@ -14,7 +14,7 @@ from release_provenance import source_tree_sha256
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bin-dir', type=Path, required=True)
-    parser.add_argument('--notes', type=Path, default=ROOT / 'Notes/27-release-candidate.md')
+    parser.add_argument('--notes', type=Path, default=ROOT / 'Notes/29-release-candidate-rc2.md')
     args = parser.parse_args()
     def git(*command):
         return subprocess.check_output(['git', *command], cwd=ROOT, text=True).strip()
