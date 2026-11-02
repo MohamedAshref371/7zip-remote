@@ -108,7 +108,10 @@ MASM assembly. A separate GNU make installation is unnecessary for this route.
 `--agent-check` also builds the headless integration harness.
 
 The output directory contains `7z.dll`, `7z.exe`, `7zFM.exe`, and
-`agentcheck.exe`. Keep the DLL beside the executables. Build artifacts and logs
+`agentcheck.exe`. Keep the DLL and the copied `Lang/` folder beside the executables.
+Choose **Tools → Options → Language** to change the interface language. The
+original translations are included; remote additions currently include Arabic
+and fall back to English in other languages. See [localization notes](Notes/28-localization.md). Build artifacts and logs
 stay under `.build/`; the installed copy of 7-Zip is unchanged.
 
 Without `--http`, the build uses the ordinary local-file behavior. Portable

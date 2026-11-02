@@ -6,6 +6,7 @@
 #include "../../CPP/Common/StringConvert.h"
 #include "../../CPP/7zip/UI/Common/RemoteRenewal.h"
 #include "../../C/DllSecur.h"
+#include "../../CPP/7zip/UI/FileManager/RemoteLang.h"
 #include "../../CPP/7zip/UI/FileManager/OpenCallback.h"
 #include "../../CPP/7zip/UI/FileManager/ExtractCallback.h"
 
@@ -402,11 +403,44 @@ static int CheckExactStream(const wchar_t *url, const wchar_t *cachePath, bool d
   return 0;
 }
 
+static int CheckLanguages(int argc, wchar_t **argv)
+{
+  unsigned files = 0, arabic = 0;
+  for (int i = 2; i < argc; ++i)
+  {
+    CHECK(g_Lang.Open(argv[i], "7-Zip"));
+    ++files;
+    if (wcscmp(g_Lang.Get(1), L"Arabic") == 0)
+    {
+      ++arabic;
+      CHECK(RemoteLang(L"Open URL") == L"\u0641\u062a\u062d \u0631\u0627\u0628\u0637");
+#define REMOTE_LANG(id, text) CHECK(g_Lang.Get(id) && RemoteLang(text) == g_Lang.Get(id));
+#include "../../CPP/7zip/UI/FileManager/RemoteLangStrings.inc"
+#undef REMOTE_LANG
+      CHECK(RemoteLangMessage(L"Network request failed. Check your connection and reopen the archive. (HTTP 403)")
+          == RemoteLang(L"Network request failed. Check your connection and reopen the archive.") + L" (HTTP 403)");
+      CHECK(RemoteLangMessage(L"Unexpected HTTP status 418. Use a direct archive download URL that supports partial downloads. (HTTP 418)")
+          == RemoteLangFormat(L"Unexpected HTTP status {0}. Use a direct archive download URL that supports partial downloads.", UString(L"418")) + L" (HTTP 418)");
+      CHECK(RemoteLang(L"C:\\private\\Open URL") == L"C:\\private\\Open URL");
+    }
+    else if (wcscmp(g_Lang.Get(1), L"English") != 0)
+      CHECK(RemoteLang(L"Open URL") == L"Open URL");
+  }
+  CHECK(files == 93 && arabic == 1);
+  g_Lang.Clear();
+  CHECK(RemoteLang(L"Open URL") == L"Open URL"); // Missing Lang directory / explicit English.
+  CHECK(RemoteLangFormat(L"Used: {0} in {1} saved archives", UString(L"{1}"), UString(L"2"))
+      == L"Used: {1} in 2 saved archives"); // Never expand tokens in inserted values.
+  printf("PASS real CLang parser, Arabic lookup, English fallback, HTTP diagnostics and placeholders (%u files).\n", files);
+  return 0;
+}
+
 int __cdecl wmain(int argc, wchar_t **argv)
 {
   if (argc < 3) return 2;
   g_hInstance = GetModuleHandleW(NULL);
   My_SetDefaultDllDirectories();
+  if (wcscmp(argv[1], L"--language-check") == 0) return CheckLanguages(argc, argv);
   CHECK(CheckNetworkSync() == 0);
   if (argc > 3 && wcscmp(argv[3], L"--exact-stream-check") == 0)
     return CheckExactStream(argv[1], argv[2], false);

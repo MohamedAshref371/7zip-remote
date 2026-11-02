@@ -35,10 +35,15 @@ def main():
                'License.txt': (ROOT / 'DOC/License.txt').read_bytes(),
                'unRarLicense.txt': (ROOT / 'DOC/unRarLicense.txt').read_bytes(),
                'RELEASE_NOTES.md': args.notes.read_bytes()}
+    for path in sorted((ROOT / 'Lang').iterdir()):
+        if path.suffix in ('.txt', '.ttt'):
+            payload['Lang/' + path.name] = path.read_bytes()
     payload['README.txt'] = f'''7-Zip Remote Archives {version} (Windows x64 release candidate)
 
 Extract this entire ZIP into one folder. Launch 7zRemoteFM.exe and choose
-File > Open URL. Keep 7z.dll beside both executables. No installation is needed.
+File > Open URL. Keep 7z.dll beside both executables. No installation is needed. Keep the Lang folder beside 7zRemoteFM.exe.
+Choose Tools > Options > Language to change the interface language.
+Remote additions currently include Arabic; other translations fall back to English.
 This portable copy does not replace your installed 7-Zip. HTTP-enabled builds
 store preferences under Software\\7-Zip Remote, separately from upstream 7-Zip.
 Existing v0.5.0 preferences are not imported; choose cache settings again.

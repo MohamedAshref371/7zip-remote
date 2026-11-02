@@ -69,6 +69,8 @@ def main():
         destination = binaries / name
         if not destination.exists() or not filecmp.cmp(obj / name, destination, shallow=False):
             shutil.copy2(obj / name, destination)
+        if target == 'filemanager':
+            shutil.copytree(ROOT / 'Lang', binaries / 'Lang', dirs_exist_ok=True)
         print('Built ' + target, flush=True)
         if target == 'filemanager' and args.agent_check:
             if not args.http:

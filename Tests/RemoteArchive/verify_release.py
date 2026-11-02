@@ -44,6 +44,12 @@ def main():
         assert sorted(sums) == sorted(expected_sums)
         for name, digest in manifest['files'].items():
             assert hashlib.sha256(archive.read(prefix + name)).hexdigest() == digest, name
+        language_files = {path.name: path.read_bytes() for path in (ROOT / 'Lang').iterdir()
+                          if path.suffix in ('.txt', '.ttt')}
+        assert {name for name in manifest['files'] if name.startswith('Lang/')} == {
+            'Lang/' + name for name in language_files}
+        for name, data in language_files.items():
+            assert archive.read(prefix + 'Lang/' + name) == data, name
         archive.extractall(temp)
         exe = Path(temp) / stem / '7z.exe'
         subprocess.run([sys.executable, str(ROOT / 'Tests/RemoteArchive/test_cli.py'), '--exe', str(exe)],

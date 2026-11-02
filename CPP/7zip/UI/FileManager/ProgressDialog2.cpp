@@ -1,6 +1,7 @@
 // ProgressDialog2.cpp
 
 #include "StdAfx.h"
+#include "RemoteLang.h"
 
 #ifdef Z7_OLD_WIN_SDK
 #include <ShlGuid.h>
@@ -809,18 +810,18 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
   }
 
   UInt32 curTime = ::GetTickCount();
-  SetItemText(IDT_PROGRESS_PATH_KIND, lastDiscovered ? L"Last discovered item:" : L"Current item:");
+  SetItemText(IDT_PROGRESS_PATH_KIND, lastDiscovered ? RemoteLang(L"Last discovered item:") : RemoteLang(L"Current item:"));
 
  #ifdef Z7_HTTP
   if (networkDefined)
   {
     // Body bytes for this operation, not unique archive coverage or extraction %.
     wchar_t value[48];
-    UString text(L"Downloaded: ");
+    UString text(RemoteLang(L"Downloaded: "));
     ConvertSizeToString(networkBytes, value);
     text += value;
     if (networkBytes < 100000) text += L" B";
-    text += L" / estimated total: ";
+    text += RemoteLang(L" / estimated total: ");
     if (estimateDefined)
     {
       text += L"~";
@@ -828,11 +829,11 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
       text += value;
       if (estimate < 100000) text += L" B";
     }
-    else text += L"unavailable";
+    else text += RemoteLang(L"unavailable");
     SetItemText(IDT_PROGRESS_NETWORK, text);
 
     const UInt64 elapsed = NetworkTimeMs() - networkStarted;
-    text = L"Network speed (average): ";
+    text = RemoteLang(L"Network speed (average): ");
     // Divide before multiplying to avoid overflow for very large transfers.
     const UInt64 rate = elapsed ? (networkBytes / elapsed) * 1000
         + ((networkBytes % elapsed) * 1000) / elapsed : 0;
@@ -841,11 +842,11 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
     if (rate < 100000) text += L" B";
     text += L"/s";
     SetItemText(IDT_PROGRESS_NETWORK_SPEED, text);
-    text = L"HTTP requests: ";
+    text = RemoteLang(L"HTTP requests: ");
     text.Add_UInt64(networkRequests);
     if (networkSize)
     {
-      text += L" | archive size: ";
+      text += RemoteLang(L" | archive size: ");
       ConvertSizeToString(networkSize, value);
       text += value;
       if (networkSize < 100000) text += L" B";
@@ -1034,7 +1035,7 @@ void CProgressDialog::UpdateStatInfo(bool showAll)
 
   if (status_Changed)
   {
-    UString s = _status;
+    UString s = RemoteLang(_status);
     ReduceString(s, _numReduceSymbols);
     SetItemText(IDT_PROGRESS_STATUS, s);
   }

@@ -1,5 +1,6 @@
 #ifndef ZIP7_INC_REMOTE_CACHE_DIALOG_H
 #define ZIP7_INC_REMOTE_CACHE_DIALOG_H
+#include "RemoteLang.h"
 #include "../../../Windows/HttpDiskCache.h"
 #include "../../../Windows/Shell.h"
 #include "../Common/RemoteSelection.h"
@@ -92,9 +93,9 @@ class CRemoteCacheDialog Z7_final: public NWindows::NControl::CModalDialog
     ++_usageGeneration;
     _usageChanged = GetTickCount();
     _usagePending = true;
-    SetItemText(IDC_CACHE_USAGE, L"Calculating cache usage...");
+    SetItemText(IDC_CACHE_USAGE, RemoteLang(L"Calculating cache usage..."));
     if (!::SetTimer(*this, 1, 100, NULL))
-      SetItemText(IDC_CACHE_USAGE, L"Cache usage unavailable");
+      SetItemText(IDC_CACHE_USAGE, RemoteLang(L"Cache usage unavailable"));
   }
   bool OnTimer(WPARAM timerID, LPARAM callback) Z7_override
   {
@@ -105,12 +106,12 @@ class CRemoteCacheDialog Z7_final: public NWindows::NControl::CModalDialog
       {
         if (_usage->Ok)
         {
-          UString text = L"Used: ";
-          text += RemoteSelectionSize(_usage->Used);
-          text += L" in "; text.Add_UInt64(_usage->Count); text += L" saved archives";
+          UString count; count.Add_UInt64(_usage->Count);
+          UString text = RemoteLangFormat(L"Used: {0} in {1} saved archives",
+              RemoteSelectionSize(_usage->Used), count);
           SetItemText(IDC_CACHE_USAGE, text);
         }
-        else SetItemText(IDC_CACHE_USAGE, L"Cache usage unavailable");
+        else SetItemText(IDC_CACHE_USAGE, RemoteLang(L"Cache usage unavailable"));
       }
       _usage.reset();
     }
@@ -138,13 +139,14 @@ class CRemoteCacheDialog Z7_final: public NWindows::NControl::CModalDialog
         }).detach();
         _usage = result;
       }
-      catch (...) { SetItemText(IDC_CACHE_USAGE, L"Cache usage unavailable"); }
+      catch (...) { SetItemText(IDC_CACHE_USAGE, RemoteLang(L"Cache usage unavailable")); }
     }
     if (!_usage && !_usagePending) ::KillTimer(*this, 1);
     return true;
   }
   bool OnInit() Z7_override
   {
+    RemoteLangDialog(*this);
     SetItemText(IDC_CACHE_PATH, Options.Directory.c_str());
     CheckButton(IDC_CACHE_ENABLED, Options.Enabled);
     CheckButton(IDC_CACHE_LIMIT, Options.MaxBytes != 0);
@@ -164,22 +166,22 @@ class CRemoteCacheDialog Z7_final: public NWindows::NControl::CModalDialog
     {
       UString current, chosen;
       GetItemText(IDC_CACHE_PATH, current);
-      if (NWindows::NShell::BrowseForFolder(*this, L"Choose the cache folder", current, chosen))
+      if (NWindows::NShell::BrowseForFolder(*this, RemoteLang(L"Choose the cache folder"), current, chosen))
       { SetItemText(IDC_CACHE_PATH, chosen); Usage(); }
       return true;
     }
     if (id == IDC_CACHE_CLEAR)
     {
-      if (MessageBoxW(*this, L"Clear saved archive data in this cache folder? Active archives and unrelated files will be kept.",
-          L"Clear remote cache", MB_YESNO | MB_ICONQUESTION) != IDYES) return true;
+      if (MessageBoxW(*this, RemoteLang(L"Clear saved archive data in this cache folder? Active archives and unrelated files will be kept."),
+          RemoteLang(L"Clear remote cache"), MB_YESNO | MB_ICONQUESTION) != IDYES) return true;
       UString path; GetItemText(IDC_CACHE_PATH, path);
       unsigned skipped = 0;
       bool ok = false;
       try { ok = NWindows::CHttpDiskCache::Clear(path.Ptr(), skipped); }
       catch (...) { /* Optional cache management must not close the application. */ }
-      UString text = ok ? L"Cache cleared. Active archives retained: " : L"Cache could not be fully cleared. Check the folder or try again when it is idle. Active archives retained: ";
+      UString text = ok ? RemoteLang(L"Cache cleared. Active archives retained: ") : RemoteLang(L"Cache could not be fully cleared. Check the folder or try again when it is idle. Active archives retained: ");
       text.Add_UInt32(skipped);
-      MessageBoxW(*this, text, L"Remote archive cache", MB_OK | (ok ? MB_ICONINFORMATION : MB_ICONWARNING));
+      MessageBoxW(*this, text, RemoteLang(L"Remote archive cache"), MB_OK | (ok ? MB_ICONINFORMATION : MB_ICONWARNING));
       Usage(); return true;
     }
     return CModalDialog::OnButtonClicked(id, hwnd);
@@ -189,7 +191,7 @@ class CRemoteCacheDialog Z7_final: public NWindows::NControl::CModalDialog
     UString path; GetItemText(IDC_CACHE_PATH, path);
     UINT limit = 0;
     if (IsButtonCheckedBool(IDC_CACHE_LIMIT) && (!GetItemUInt(IDC_CACHE_MIB, limit) || !limit))
-    { MessageBoxW(*this, L"Enter a positive cache limit in MiB, or uncheck the limit.", L"Remote cache", MB_OK | MB_ICONWARNING); return; }
+    { MessageBoxW(*this, RemoteLang(L"Enter a positive cache limit in MiB, or uncheck the limit."), RemoteLang(L"Remote cache"), MB_OK | MB_ICONWARNING); return; }
     Options.Enabled = IsButtonCheckedBool(IDC_CACHE_ENABLED);
     Options.Directory = path.Ptr();
     Options.MaxBytes = IsButtonCheckedBool(IDC_CACHE_LIMIT) ? (ULONGLONG)limit << 20 : 0;
@@ -197,9 +199,9 @@ class CRemoteCacheDialog Z7_final: public NWindows::NControl::CModalDialog
     try { if (Options.Enabled) writable = NWindows::CHttpDiskCache::Prepare(Options.Directory); }
     catch (...) { writable = false; }
     if (!writable)
-    { MessageBoxW(*this, L"Choose a writable folder without junctions or symbolic links. An existing unrelated cache folder will not be overwritten.", L"Remote cache", MB_OK | MB_ICONWARNING); return; }
+    { MessageBoxW(*this, RemoteLang(L"Choose a writable folder without junctions or symbolic links. An existing unrelated cache folder will not be overwritten."), RemoteLang(L"Remote cache"), MB_OK | MB_ICONWARNING); return; }
     if (!SaveRemoteCacheSettings(Options))
-    { MessageBoxW(*this, L"Cannot save cache settings.", L"Remote cache", MB_OK | MB_ICONWARNING); return; }
+    { MessageBoxW(*this, RemoteLang(L"Cannot save cache settings."), RemoteLang(L"Remote cache"), MB_OK | MB_ICONWARNING); return; }
     CModalDialog::OnOK();
   }
 public:

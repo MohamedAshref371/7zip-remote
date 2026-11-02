@@ -1,0 +1,801 @@
+﻿;!@Lang2@!UTF-8!
+; 24.04 : 2024-04-05 : Igor Pavlov
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
+0
+7-Zip
+English
+English
+401
+OK
+Cancel
+
+
+
+&Yes
+&No
+&Close
+Help
+
+&Continue
+440
+Yes to &All
+No to A&ll
+Stop
+Restart
+&Background
+&Foreground
+&Pause
+Paused
+Are you sure you want to cancel?
+500
+&File
+&Edit
+&View
+F&avorites
+&Tools
+&Help
+540
+&Open
+Open &Inside
+Open O&utside
+&View
+&Edit
+Rena&me
+&Copy To...
+&Move To...
+&Delete
+&Split file...
+Com&bine files...
+P&roperties
+Comme&nt...
+Calculate checksum
+Diff
+Create Folder
+Create File
+E&xit
+Link
+&Alternate Streams
+600
+Select &All
+Deselect All
+&Invert Selection
+Select...
+Deselect...
+Select by Type
+Deselect by Type
+700
+Lar&ge Icons
+S&mall Icons
+&List
+&Details
+730
+Unsorted
+Flat View
+&2 Panels
+&Toolbars
+Open Root Folder
+Up One Level
+Folders History...
+&Refresh
+Auto Refresh
+750
+Archive Toolbar
+Standard Toolbar
+Large Buttons
+Show Buttons Text
+800
+&Add folder to Favorites as
+Bookmark
+900
+&Options...
+&Benchmark
+910
+Delete Temporary Files...
+960
+&Contents...
+&About 7-Zip...
+1003
+Path
+Name
+Extension
+Folder
+Size
+Packed Size
+Attributes
+Created
+Accessed
+Modified
+Solid
+Commented
+Encrypted
+Split Before
+Split After
+Dictionary
+
+Type
+Anti
+Method
+Host OS
+File System
+User
+Group
+Block
+Comment
+Position
+Path Prefix
+Folders
+Files
+Version
+Volume
+Multivolume
+Offset
+Links
+Blocks
+Volumes
+
+64-bit
+Big-endian
+CPU
+Physical Size
+Headers Size
+Checksum
+Characteristics
+Virtual Address
+ID
+Short Name
+Creator Application
+Sector Size
+Mode
+Symbolic Link
+Error
+Total Size
+Free Space
+Cluster Size
+Label
+Local Name
+Provider
+NT Security
+Alternate Stream
+Aux
+Deleted
+Is Tree
+
+
+Error Type
+Errors
+Errors
+Warnings
+Warning
+Streams
+Alternate Streams
+Alternate Streams Size
+Virtual Size
+Unpack Size
+Total Physical Size
+Volume Index
+SubType
+Short Comment
+Code Page
+
+
+
+Tail Size
+Embedded Stub Size
+Link
+Hard Link
+iNode
+
+Read-only
+
+Copy Link
+
+
+Metadata Changed
+2100
+Options
+Language
+Language:
+Editor
+&Editor:
+&Diff:
+2200
+System
+Associate 7-Zip with:
+All users
+2301
+Integrate 7-Zip to shell context menu
+Cascaded context menu
+Context menu items:
+Icons in context menu
+2320
+<Folder>
+<Archive>
+Open archive
+Extract files...
+Add to archive...
+Test archive
+Extract Here
+Extract to {0}
+Add to {0}
+Compress and email...
+Compress to {0} and email
+2400
+Folders
+&Working folder
+&System temp folder
+&Current
+&Specified:
+Use for removable drives only
+Specify a location for temporary archive files.
+2500
+Settings
+Show ".." item
+Show real file icons
+Show system menu
+&Full row select
+Show &grid lines
+Single-click to open an item
+&Alternative selection mode
+Use &large memory pages
+2900
+About 7-Zip
+7-Zip is free software
+3000
+The system cannot allocate the required amount of memory
+There are no errors
+{0} object(s) selected
+Cannot create folder '{0}'
+Update operations are not supported for this archive.
+Cannot open file '{0}' as archive
+Cannot open encrypted archive '{0}'. Wrong password?
+Unsupported archive type
+File {0} is already exist
+File '{0}' was modified.\nDo you want to update it in the archive?
+Cannot update file\n'{0}'
+Cannot start editor.
+The file looks like a virus (the file name contains long spaces in name).
+The operation cannot be called from a folder that has a long path.
+You must select one file
+You must select one or more files
+Too many items
+Cannot open the file as {0} archive
+The file is open as {0} archive
+The archive is open with offset
+3300
+Extracting
+Compressing
+Testing
+Opening...
+Scanning...
+Removing
+3320
+Adding
+Updating
+Analyzing
+Replicating
+Repacking
+Skipping
+Deleting
+Header creating
+3400
+Extract
+E&xtract to:
+Specify a location for extracted files.
+3410
+Path mode:
+Full pathnames
+No pathnames
+Absolute pathnames
+Relative pathnames
+3420
+Overwrite mode:
+Ask before overwrite
+Overwrite without prompt
+Skip existing files
+Auto rename
+Auto rename existing files
+3430
+Eliminate duplication of root folder
+Restore file security
+3440
+Propagate Zone.Id stream:
+For Office files
+3500
+Confirm File Replace
+Destination folder already contains processed file.
+Would you like to replace the existing file
+with this one?
+{0} bytes
+A&uto Rename
+3700
+Unsupported compression method for '{0}'.
+Data error in '{0}'. File is broken.
+CRC failed in '{0}'. File is broken.
+Data error in encrypted file '{0}'. Wrong password?
+CRC failed in encrypted file '{0}'. Wrong password?
+3710
+Wrong password?
+3721
+Unsupported compression method
+Data error
+CRC failed
+Unavailable data
+Unexpected end of data
+There are some data after the end of the payload data
+Is not archive
+Headers Error
+Wrong password
+3763
+Unavailable start of archive
+Unconfirmed start of archive
+
+
+
+Unsupported feature
+3800
+Enter password
+Enter password:
+Reenter password:
+&Show password
+Passwords do not match
+Use only English letters, numbers and special characters (!, #, $, ...) for password
+Password is too long
+Password
+3900
+Elapsed time:
+Remaining time:
+Total size:
+Speed:
+Processed:
+Compression ratio:
+Errors:
+Archives:
+4000
+Add to archive
+&Archive:
+&Update mode:
+Archive &format:
+Compression &level:
+Compression &method:
+&Dictionary size:
+&Word size:
+Solid block size:
+Number of CPU threads:
+&Parameters:
+Options
+Create SF&X archive
+Compress shared files
+Encryption
+Encryption method:
+Encrypt file &names
+Memory usage for Compressing:
+Memory usage for Decompressing:
+Delete files after compression
+4040
+Store symbolic links
+Store hard links
+Store alternate data streams
+Store file security
+4050
+Store
+Fastest
+Fast
+Normal
+Maximum
+Ultra
+4060
+Add and replace files
+Update and add files
+Freshen existing files
+Synchronize files
+4070
+Browse
+All Files
+Non-solid
+Solid
+4080
+Time
+Timestamp precision:
+Store modification time
+Store creation time
+Store last access time
+Set archive time to latest file time
+Do not change source files last access time
+4090
+sec
+ns
+6000
+Copy
+Move
+Copy to:
+Move to:
+Copying...
+Moving...
+Renaming...
+Select destination folder.
+The operation is not supported for this folder.
+Error Renaming File or Folder
+Confirm File Copy
+Are you sure you want to copy files to archive
+6100
+Confirm File Delete
+Confirm Folder Delete
+Confirm Multiple File Delete
+Are you sure you want to delete '{0}'?
+Are you sure you want to delete the folder '{0}' and all its contents?
+Are you sure you want to delete these {0} items?
+Deleting...
+Error Deleting File or Folder
+The system cannot move a file with long path to the Recycle Bin
+6300
+Create Folder
+Create File
+Folder name:
+File Name:
+New Folder
+New File
+Error Creating Folder
+Error Creating File
+6400
+Comment
+&Comment:
+Select
+Deselect
+Mask:
+6600
+Properties
+Folders History
+Diagnostic messages
+Message
+7100
+Computer
+Network
+Documents
+System
+7200
+Add
+Extract
+Test
+Copy
+Move
+Delete
+Info
+7300
+Split File
+&Split to:
+Split to &volumes, bytes:
+Splitting...
+Confirm Splitting
+Are you sure you want to split file into {0} volumes?
+Volume size must be smaller than size of original file
+Incorrect volume size
+Specified volume size: {0} bytes.\nAre you sure you want to split archive into such volumes?
+7400
+Combine Files
+&Combine to:
+Combining...
+Select only first part of split file
+Cannot detect file as part of split file
+Cannot find more than one part of split file
+7500
+Checksum calculating...
+Checksum information
+CRC checksum for data:
+CRC checksum for data and names:
+7600
+Benchmark
+Memory usage:
+Compressing
+Decompressing
+Rating
+Total Rating
+Current
+Resulting
+CPU Usage
+Rating / Usage
+Passes:
+7700
+Link
+Link
+Link from:
+Link to:
+7710
+Link Type
+Hard Link
+File Symbolic Link
+Directory Symbolic Link
+Directory Junction
+7800
+Memory usage request
+Change allowed limit for next operations
+&Repeat selected action for current operation
+Action
+7810
+The operation was blocked by 7-Zip.
+The operation requires big amount of memory (RAM).
+required memory usage size
+allowed memory usage limit
+memory usage limit set by 7-Zip
+RAM size
+Maximum amount of RAM memory usage allowed to unpack archives:
+7820
+&Allow archive unpacking
+&Skip archive unpacking
+Archive unpacking was skipped.
+
+; 7-Zip Remote extension (900000+). See Notes/28-localization.md.
+900000
+Open &URL...
+900001
+Renew archive URL...
+900002
+&About 7-Zip Remote...
+900003
+About 7-Zip Remote
+900004
+Based on 7-Zip {0}
+900005
+7-Zip engine date: {0}\nDeveloped with OpenAI Codex
+900006
+Open URL
+900007
+Direct HTTP or HTTPS archive URL:
+900008
+Archive type:
+900009
+Skip ETag verification
+900010
+Enable only if you trust that the archive will not change. Changes during download may cause incorrect data or extraction errors.
+900011
+Download only requested data (no read-ahead)
+900012
+RAR/TAR archives with many files can take minutes instead of seconds because of extra requests. Default blocks are faster. Disk cache saves only downloaded parts.
+900013
+Cache settings...
+900014
+Saved archive cache (optional link to a different URL):
+900015
+Reuse old cache without full version verification
+900016
+Separate consent is required when skipping ETag or linking a new URL. Fresh metadata and samples are checked; matching samples do not prove that the entire archive is unchanged.
+900017
+Remote archive cache
+900018
+Keep downloaded archive parts on disk
+900019
+Cache folder:
+900020
+Browse...
+900021
+Limit cache size (MiB):
+900022
+Unchecked means unlimited. Changes apply on the next open; active archives are retained.
+900023
+Clear cache...
+900024
+Active archives and unrelated files are retained.
+900025
+Calculating cache usage...
+900026
+Cache usage unavailable
+900027
+Used: {0} in {1} saved archives
+900028
+Choose the cache folder
+900029
+Clear saved archive data in this cache folder? Active archives and unrelated files will be kept.
+900030
+Clear remote cache
+900031
+Cache cleared. Active archives retained: 
+900032
+Cache could not be fully cleared. Check the folder or try again when it is idle. Active archives retained: 
+900033
+Enter a positive cache limit in MiB, or uncheck the limit.
+900034
+Remote cache
+900035
+Choose a writable folder without junctions or symbolic links. An existing unrelated cache folder will not be overwritten.
+900036
+Cannot save cache settings.
+900037
+Cannot open remote archive.
+900038
+Automatic / new cache
+900039
+ | archive 
+900040
+ | cached 
+900041
+ | used 
+900042
+Auto
+900043
+Linking a saved cache requires separate consent to partial version verification.
+900044
+Matching metadata and samples cannot prove that the entire archive is unchanged. Reusing old data may cause incorrect output. Continue with partial verification?
+900045
+Reuse saved archive cache
+900046
+Cannot save Open URL settings.
+900047
+Renew archive URL
+900048
+New direct HTTP or HTTPS archive URL:
+900049
+Enter a direct HTTP or HTTPS archive URL.
+900050
+Link the previous cache to this new URL?\n\nYes: reuse saved parts after checking metadata and samples. These checks cannot prove the entire archive is unchanged; incorrect output is possible.\n\nNo: open without linking the previous cache.\nCancel: keep the current session.
+900051
+The remote archive could not be accessed. Enter a new direct download URL?\n\nAfter renewing the link, run Extract or Test again. Interrupted extraction will not restart automatically.
+900052
+Connecting to archive
+900053
+Checking saved archive parts
+900054
+Reading archive headers
+900055
+Extracting selected files
+900056
+Testing selected files
+900057
+Last discovered item:
+900058
+Current item:
+900059
+Downloaded: 
+900060
+ / estimated total: 
+900061
+unavailable
+900062
+Network speed (average): 
+900063
+HTTP requests: 
+900064
+ | archive size: 
+900065
+Unpacked: 
+900066
+Download: 
+900067
+ [Solid]
+900068
+ bytes after extraction)
+900069
+ bytes)
+900070
+. Approximate additional download after cached data. Actual download may be larger.
+900071
+. Estimate unavailable for this format, archive layout or selection size.
+900072
+ Solid archives may need other files in the same block.
+900073
+Cache changed or busy after failed refresh (memory only)
+900074
+Cache unavailable (memory only)
+900075
+Cache busy (memory only)
+900076
+Cache paused after a source redirect (memory only)
+900077
+Cache verified
+900078
+Cache reused by consent (partial verification)
+900079
+Cache update failed (memory only)
+900080
+Cache write failed (memory only)
+900081
+Old cache ignored (source changed); new cache
+900082
+New cache
+900083
+Damaged cache part ignored; downloading again
+900084
+Damaged cache block ignored; downloading again
+900085
+Cache busy; new bytes kept in memory
+900086
+Cache write failed (memory only for new data)
+900087
+Cache limit reached; active entries retained
+900088
+Network request failed. Check your connection and reopen the archive.
+900089
+The server took too long to respond. Check your connection and reopen the archive.
+900090
+Cannot resolve the server name. Check the URL and your network connection.
+900091
+Cannot connect to the server or the connection was interrupted. Check your connection and reopen the archive.
+900092
+HTTPS certificate verification failed. Check the server certificate and your system date.
+900093
+Create a new source to reopen an archive.
+900094
+Invalid source options.
+900095
+Cannot create HTTP session.
+900096
+Cannot configure HTTP timeouts.
+900097
+HTTP URL is too long.
+900098
+Use an ASCII percent-encoded HTTP(S) URL without a fragment.
+900099
+Expected an HTTP(S) URL without embedded credentials.
+900100
+Redirect from HTTPS to HTTP is not allowed.
+900101
+Cannot create HTTP connection.
+900102
+Invalid requested byte range.
+900103
+Archive source location changed. Reopen using the final direct download URL.
+900104
+Too many HTTP redirects (maximum 5). Obtain a fresh direct download URL.
+900105
+HTTP request deadline exceeded. Check your connection and reopen the archive.
+900106
+Cannot create HTTP request.
+900107
+Cannot configure asynchronous HTTP request.
+900108
+Cannot configure request timeouts.
+900109
+Cannot configure HTTP request policy.
+900110
+Cannot read HTTP status.
+900111
+Missing, duplicate or invalid HTTP redirect Location.
+900112
+The server does not support partial downloads for this URL. Download the archive locally to open it.
+900113
+The server requires authentication. Browser login sessions are not supported; use a direct download URL that grants access.
+900114
+The server denied access. The download link may have expired; obtain a fresh direct download URL and check access permissions.
+900115
+The archive was not found or is no longer available. Check the URL or obtain a fresh download link.
+900116
+The proxy requires authentication. Check your network proxy settings; proxy authentication is not supported.
+900117
+The server timed out processing the request. Try reopening the archive later.
+900118
+Archive changed on the server. Reopen the archive to read the current version.
+900119
+The server rejected the requested byte range. Reopen the archive; if the problem persists, download it locally.
+900120
+The server is limiting download requests. Wait before reopening the archive.
+900121
+The server reported a temporary failure. Try reopening the archive later.
+900122
+Unsupported HTTP redirect status. Supply a direct download URL.
+900123
+Unexpected HTTP status {0}. Use a direct archive download URL that supports partial downloads.
+900124
+Invalid or mismatched Content-Range.
+900125
+The server did not provide a valid strong ETag to verify the archive version. Download it locally, or skip ETag verification only if you trust the file to remain unchanged (Open URL: Skip ETag verification; console: -shttp-no-etag).
+900126
+Archive identity or size changed during the session. Reopen the archive to read the current version.
+900127
+Encoded HTTP representations are not supported for byte ranges.
+900128
+Multipart range responses are not supported.
+900129
+Invalid Content-Length headers.
+900130
+Content-Length does not match the requested range.
+900131
+Range body exceeds its declared length.
+900132
+The server sent an incomplete byte range. Check your connection and reopen the archive.
